@@ -26,24 +26,24 @@ export async function POST(request: NextRequest) {
     const fileType = file.type.startsWith('image/') ? 1 : 2; // 1=image, 2=video
 
     // Fix orientation and get dimensions for images
-    let processedBuffer = buffer;
+    let processedBuffer: Buffer = buffer;
     let width = 0;
     let height = 0;
-    let thumbnailBuffer: Buffer;
+    let thumbnailBuffer: Buffer = Buffer.from([]);
 
     if (fileType === 1) {
       // Process image
-      processedBuffer = await fixImageOrientation(buffer);
+      processedBuffer = await fixImageOrientation(buffer) as Buffer;
       const dimensions = await getImageDimensions(processedBuffer);
       width = dimensions.width;
       height = dimensions.height;
 
       // Generate thumbnail
-      thumbnailBuffer = await generateImageThumbnail(processedBuffer);
+      thumbnailBuffer = await generateImageThumbnail(processedBuffer) as Buffer;
     } else {
       // For videos, we'd need FFmpeg to extract thumbnail and get dimensions
       // This is a placeholder - implement video processing separately
-      thumbnailBuffer = Buffer.from(''); // Placeholder
+      thumbnailBuffer = Buffer.from([]);
       width = 0;
       height = 0;
     }
