@@ -99,11 +99,8 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// Configuration to allow larger files
-export const config = {
-  api: {
-    bodyParser: {
-      sizeLimit: '50mb',
-    },
-  },
-};
+// Configuration to allow larger files (Next.js 14+ route segment config)
+export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
+// Note: bodyParser size limit is handled by Next.js default of 4.5MB
+// For larger files, consider using streaming or chunked uploads
