@@ -1,0 +1,19 @@
+{
+  "name": "family-album-api",
+  "version": "1.0.0",
+  "description": "Azure Functions API for Family Album",
+  "scripts": {
+    "start": "func start",
+    "test": "echo \"No tests specified\""
+  },
+  "dependencies": {
+    "@azure/functions": "^4.0.0",
+    "mssql": "^11.0.1",
+    "@azure/storage-blob": "^12.15.0",
+    "sharp": "^0.33.0"
+  },
+  "devDependencies": {
+    "@azure/functions": "^4.0.0",
+    "typescript": "^5.0.0"
+  }
+}
