@@ -15,24 +15,45 @@ jobs:
     runs-on: ubuntu-latest
     name: Build and Deploy
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           submodules: true
 
       - name: Setup Node.js
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v4
         with:
-          node-version: '18'
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Cache Next.js build
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.npm
+            ${{ github.workspace }}/.next/cache
+          key: ${{ runner.os }}-nextjs-${{ hashFiles('**/package-lock.json') }}-${{ hashFiles('**/*.js', '**/*.jsx', '**/*.ts', '**/*.tsx') }}
+          restore-keys: |
+            ${{ runner.os }}-nextjs-${{ hashFiles('**/package-lock.json') }}-
 
       - name: Install frontend dependencies
-        run: npm ci
+        run: npm ci --prefer-offline --no-audit
 
       - name: Build Next.js static export
         run: npm run build
+        env:
+          NODE_ENV: production
+
+      - name: Cache API dependencies
+        uses: actions/cache@v4
+        with:
+          path: api/node_modules
+          key: ${{ runner.os }}-api-${{ hashFiles('api/package.json') }}
+          restore-keys: |
+            ${{ runner.os }}-api-
 
       - name: Install API dependencies
         working-directory: ./api
-        run: npm install --production
+        run: npm install --production --prefer-offline --no-audit
 
       - name: Deploy to Azure Static Web Apps
         id: deploy
