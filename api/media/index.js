@@ -4,15 +4,26 @@ module.exports = async function (context, req) {
     context.log('Media API function processed a request.');
 
     const method = req.method;
-    // Handle wildcard route - filename might be empty, undefined, or ""
-    let filename = req.params.filename ? decodeURIComponent(req.params.filename) : null;
     
-    // Normalize: treat empty string or "/" as null (list request)
-    if (filename === '' || filename === '/') {
-        filename = null;
+    // Extract filename from URL path: /api/media/{filename}
+    // req.url might be like "/api/media/On%20Location%5CFile.jpg"
+    let filename = null;
+    if (req.url) {
+        const urlMatch = req.url.match(/^\/api\/media\/(.+?)(?:\?|$)/);
+        if (urlMatch && urlMatch[1]) {
+            filename = decodeURIComponent(urlMatch[1]);
+        }
+    }
+    
+    // Fallback to route params if URL parsing didn't work
+    if (!filename && req.params && req.params.filename) {
+        filename = decodeURIComponent(req.params.filename);
+        if (filename === '' || filename === '/') {
+            filename = null;
+        }
     }
 
-    context.log(`Method: ${method}, Filename: ${filename}`);
+    context.log(`Method: ${method}, URL: ${req.url}, Filename: ${filename}`);
 
     try {
         // GET /api/media/{filename} - Get specific media item
