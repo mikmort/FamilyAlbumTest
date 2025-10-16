@@ -64,8 +64,9 @@ See [scripts/README.md](scripts/README.md) for detailed script documentation.
 
 ### Manual Setup
 
-See detailed documentation in the `docs/` folder:
-- [docs/QUICKSTART.md](docs/QUICKSTART.md) - Step-by-step guide
+See [QUICKSTART.md](QUICKSTART.md) for a complete step-by-step guide.
+
+Additional documentation in the `docs/` folder:
 - [docs/AZURE_SETUP.md](docs/AZURE_SETUP.md) - Azure resources configuration
 - [docs/BICEP_SETUP.md](docs/BICEP_SETUP.md) - Infrastructure as Code setup
 - [docs/SETUP_CHECKLIST.md](docs/SETUP_CHECKLIST.md) - Complete checklist
