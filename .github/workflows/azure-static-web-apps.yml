@@ -4,10 +4,20 @@ on:
   push:
     branches:
       - main
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+      - 'scripts/**'
+      - '.gitignore'
   pull_request:
     types: [opened, synchronize, reopened, closed]
     branches:
       - main
+
+# Cancel in-progress deployments when a new one starts
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   build_and_deploy:
@@ -25,35 +35,26 @@ jobs:
           node-version: '20'
           cache: 'npm'
 
-      - name: Cache Next.js build
+      - name: Cache dependencies
         uses: actions/cache@v4
         with:
           path: |
             ~/.npm
             ${{ github.workspace }}/.next/cache
-          key: ${{ runner.os }}-nextjs-${{ hashFiles('**/package-lock.json') }}-${{ hashFiles('**/*.js', '**/*.jsx', '**/*.ts', '**/*.tsx') }}
+            api/node_modules
+          key: ${{ runner.os }}-deps-${{ hashFiles('package-lock.json', 'api/package.json') }}
           restore-keys: |
-            ${{ runner.os }}-nextjs-${{ hashFiles('**/package-lock.json') }}-
+            ${{ runner.os }}-deps-
 
-      - name: Install frontend dependencies
-        run: npm ci --prefer-offline --no-audit
+      - name: Install all dependencies
+        run: |
+          npm ci --prefer-offline --no-audit
+          cd api && npm install --production --prefer-offline --no-audit
 
       - name: Build Next.js static export
         run: npm run build
         env:
           NODE_ENV: production
-
-      - name: Cache API dependencies
-        uses: actions/cache@v4
-        with:
-          path: api/node_modules
-          key: ${{ runner.os }}-api-${{ hashFiles('api/package.json') }}
-          restore-keys: |
-            ${{ runner.os }}-api-
-
-      - name: Install API dependencies
-        working-directory: ./api
-        run: npm install --production --prefer-offline --no-audit
 
       - name: Deploy to Azure Static Web Apps
         id: deploy
