@@ -31,6 +31,9 @@ yarn-error.log*
 .env.test.local
 .env.production.local
 
+# Azure Functions local settings (contains secrets)
+local.settings.json
+
 # Deployment info (contains secrets)
 deployment-info-*.txt
 

@@ -46,6 +46,25 @@ Inspects SQLite database structure and contents.
 - Shows row counts
 - **Usage**: `.\scripts\inspect-sqlite.ps1`
 
+### `bulk-upload-photos.ps1`
+Bulk uploads photos and videos from a local directory to the Family Album application.
+- Supports multiple file formats (jpg, png, gif, mp4, mov, etc.)
+- Uploads files via the API to Azure Blob Storage
+- Adds files to UnindexedFiles table for processing
+- Preserves directory structure
+- **Usage**: `.\scripts\bulk-upload-photos.ps1 -SourceDirectory "C:\path\to\photos"`
+- **Options**:
+  - `-ApiEndpoint` - API endpoint URL (default: http://localhost:7071/api/upload)
+  - `-BatchSize` - Number of files per batch (default: 10)
+  - `-WhatIf` - Preview files without uploading
+
+### `upload-albums.ps1`
+Quick upload script specifically for the Albums directory.
+- Uploads photos from `E:\Family Album\Albums`
+- Checks if API is running before starting
+- Calls `bulk-upload-photos.ps1` with pre-configured settings
+- **Usage**: `.\scripts\upload-albums.ps1`
+
 ## Legacy Scripts
 
 The following scripts are older versions kept for reference:

@@ -5,7 +5,7 @@ module.exports = async function (context, req) {
     context.log('Upload API function processed a request.');
 
     try {
-        const { fileName, fileData, fileType, contentType } = req.body;
+        const { fileName, fileData, fileType, contentType, directory } = req.body;
 
         if (!fileName || !fileData) {
             context.res = {
@@ -43,7 +43,7 @@ module.exports = async function (context, req) {
 
         await execute(insertQuery, {
             fileName: uniqueFilename,
-            directory: '',
+            directory: directory || '',
             thumbUrl: thumbnailUrl,
             type: mediaType,
             width: 0,  // TODO: Extract dimensions

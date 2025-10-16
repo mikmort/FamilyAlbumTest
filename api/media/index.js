@@ -1,4 +1,5 @@
 const { query, execute } = require('../shared/db');
+const { blobExists, getContainerClient } = require('../shared/storage');
 
 module.exports = async function (context, req) {
     context.log('Media API function processed a request.');
@@ -26,37 +27,39 @@ module.exports = async function (context, req) {
     context.log(`Method: ${method}, URL: ${req.url}, Filename: ${filename}`);
 
     try {
-        // GET /api/media/{filename} - Get specific media item
+        // GET /api/media/{filename} - Stream file directly from blob storage
         if (method === 'GET' && filename) {
-            const mediaQuery = `SELECT * FROM dbo.Pictures WHERE PFileName = @filename`;
-            const mediaResult = await query(mediaQuery, { filename });
-
-            if (mediaResult.length === 0) {
+            // Check if file exists in blob storage
+            const exists = await blobExists(filename);
+            
+            if (!exists) {
                 context.res = {
                     status: 404,
-                    body: { error: 'Media not found' }
+                    body: { error: 'Media file not found in storage' }
                 };
                 return;
             }
 
-            const media = mediaResult[0];
-
-            // Get tagged people
-            const peopleQuery = `
-                SELECT 
-                    ne.ID as id,
-                    ne.neName as name,
-                    np.npPosition as position
-                FROM dbo.NamePhoto np
-                INNER JOIN dbo.NameEvent ne ON np.npID = ne.ID
-                WHERE np.npFileName = @filename
-            `;
-            const people = await query(peopleQuery, { filename });
-
+            // Get blob client and generate URL
+            const containerClient = getContainerClient();
+            const blobClient = containerClient.getBlobClient(filename);
+            
+            // Download the blob
+            const downloadResponse = await blobClient.download();
+            
+            // Determine content type
+            const contentType = downloadResponse.contentType || getContentType(filename);
+            
+            // Stream the blob content
             context.res = {
                 status: 200,
-                headers: { 'Content-Type': 'application/json' },
-                body: { ...media, taggedPeople: people }
+                headers: {
+                    'Content-Type': contentType,
+                    'Content-Disposition': `inline; filename="${filename.split('/').pop()}"`,
+                    'Cache-Control': 'public, max-age=31536000' // Cache for 1 year
+                },
+                body: downloadResponse.readableStreamBody,
+                isRaw: true
             };
             return;
         }
@@ -217,3 +220,23 @@ module.exports = async function (context, req) {
         };
     }
 };
+
+// Helper function to determine content type from filename
+function getContentType(filename) {
+    const ext = filename.toLowerCase().split('.').pop();
+    const contentTypes = {
+        'jpg': 'image/jpeg',
+        'jpeg': 'image/jpeg',
+        'png': 'image/png',
+        'gif': 'image/gif',
+        'bmp': 'image/bmp',
+        'webp': 'image/webp',
+        'mp4': 'video/mp4',
+        'mov': 'video/quicktime',
+        'avi': 'video/x-msvideo',
+        'wmv': 'video/x-ms-wmv',
+        'mpg': 'video/mpeg',
+        'mpeg': 'video/mpeg'
+    };
+    return contentTypes[ext] || 'application/octet-stream';
+}
