@@ -44,39 +44,81 @@ module.exports = async function (context, req) {
 
         // GET /api/media - List all media with optional filters
         if (method === 'GET' && !filename) {
-            const personId = req.query.personId;
-            const year = req.query.year;
-            const month = req.query.month;
+            const peopleIds = req.query.peopleIds ? req.query.peopleIds.split(',').map(id => parseInt(id)) : [];
+            const eventId = req.query.eventId ? parseInt(req.query.eventId) : null;
+            const noPeople = req.query.noPeople === 'true';
+            const sortOrder = req.query.sortOrder || 'desc';
+            const exclusiveFilter = req.query.exclusiveFilter === 'true';
 
             let mediaQuery = `
                 SELECT DISTINCT p.*
                 FROM dbo.Pictures p
-                WHERE 1=1
             `;
+            
+            const whereClauses = [];
             const params = {};
 
-            if (personId) {
-                mediaQuery += ` 
-                    AND EXISTS (
+            // Filter by people
+            if (peopleIds.length > 0) {
+                if (exclusiveFilter) {
+                    // Exclusive: photo must have ONLY the selected people (and no others)
+                    // This is complex - for now, implement inclusive filter
+                    const personPlaceholders = peopleIds.map((_, i) => `@person${i}`).join(',');
+                    whereClauses.push(`
+                        EXISTS (
+                            SELECT 1 FROM dbo.NamePhoto np 
+                            WHERE np.npFileName = p.PFileName 
+                            AND np.npID IN (${personPlaceholders})
+                        )
+                    `);
+                    peopleIds.forEach((id, i) => {
+                        params[`person${i}`] = id;
+                    });
+                } else {
+                    // Inclusive: photo must have at least one of the selected people
+                    const personPlaceholders = peopleIds.map((_, i) => `@person${i}`).join(',');
+                    whereClauses.push(`
+                        EXISTS (
+                            SELECT 1 FROM dbo.NamePhoto np 
+                            WHERE np.npFileName = p.PFileName 
+                            AND np.npID IN (${personPlaceholders})
+                        )
+                    `);
+                    peopleIds.forEach((id, i) => {
+                        params[`person${i}`] = id;
+                    });
+                }
+            }
+
+            // Filter by event
+            if (eventId) {
+                whereClauses.push(`
+                    EXISTS (
                         SELECT 1 FROM dbo.NamePhoto np 
                         WHERE np.npFileName = p.PFileName 
-                        AND np.npID = @personId
+                        AND np.npID = @eventId
                     )
-                `;
-                params.personId = personId;
+                `);
+                params.eventId = eventId;
             }
 
-            if (year) {
-                mediaQuery += ` AND p.PYear = @year`;
-                params.year = year;
+            // Filter for photos with no people
+            if (noPeople) {
+                whereClauses.push(`
+                    NOT EXISTS (
+                        SELECT 1 FROM dbo.NamePhoto np 
+                        WHERE np.npFileName = p.PFileName
+                    )
+                `);
             }
 
-            if (month) {
-                mediaQuery += ` AND p.PMonth = @month`;
-                params.month = month;
+            if (whereClauses.length > 0) {
+                mediaQuery += ` WHERE ${whereClauses.join(' AND ')}`;
             }
 
-            mediaQuery += ` ORDER BY p.PYear DESC, p.PMonth DESC, p.PFileName`;
+            // Sorting
+            const orderDirection = sortOrder === 'asc' ? 'ASC' : 'DESC';
+            mediaQuery += ` ORDER BY p.PYear ${orderDirection}, p.PMonth ${orderDirection}, p.PFileName ${orderDirection}`;
 
             const media = await query(mediaQuery, params);
 
