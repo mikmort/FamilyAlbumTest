@@ -224,14 +224,14 @@ module.exports = async function (context, req) {
             const media = await query(mediaQuery, params);
 
             // Transform results to construct proper blob URLs
-            // PBlobUrl should be the full path: Albums/{PFileDirectory}/{PFileName}
+            // Combine PFileDirectory and PFileName to get the full blob path
             const transformedMedia = media.map(item => {
                 const directory = item.PFileDirectory || '';
                 const fileName = item.PFileName || '';
                 
-                // Construct the blob path: Albums/directory/filename
+                // Construct the blob path: directory/filename
                 // Normalize slashes and remove duplicate slashes
-                let blobPath = directory ? `Albums/${directory}/${fileName}` : `Albums/${fileName}`;
+                let blobPath = directory ? `${directory}/${fileName}` : fileName;
                 blobPath = blobPath.replace(/\\/g, '/').replace(/\/+/g, '/');
                 
                 return {
