@@ -10,11 +10,13 @@ module.exports = async function (context, req) {
         if (method === 'GET') {
             const peopleQuery = `
                 SELECT 
-                    NameID,
-                    NameLName as name,
+                    ID as id,
+                    neName as name,
+                    neType as type,
                     ISNULL(neCount, 0) as photoCount
                 FROM dbo.NameEvent
-                ORDER BY NameLName
+                WHERE neType = 'N'
+                ORDER BY neName
             `;
             const people = await query(peopleQuery);
 
@@ -39,9 +41,9 @@ module.exports = async function (context, req) {
             }
 
             const insertQuery = `
-                INSERT INTO dbo.NameEvent (NameLName, neCount)
-                OUTPUT INSERTED.NameID, INSERTED.NameLName as name, INSERTED.neCount as photoCount
-                VALUES (@name, 0)
+                INSERT INTO dbo.NameEvent (neName, neType, neCount)
+                OUTPUT INSERTED.ID as id, INSERTED.neName as name, INSERTED.neCount as photoCount
+                VALUES (@name, 'N', 0)
             `;
 
             const result = await query(insertQuery, { name });
@@ -67,16 +69,16 @@ module.exports = async function (context, req) {
 
             const updateQuery = `
                 UPDATE dbo.NameEvent 
-                SET NameLName = @name
-                WHERE NameID = @id
+                SET neName = @name
+                WHERE ID = @id
             `;
 
             await execute(updateQuery, { id, name });
 
             const selectQuery = `
-                SELECT NameID, NameLName as name, neCount as photoCount
+                SELECT ID as id, neName as name, neCount as photoCount
                 FROM dbo.NameEvent
-                WHERE NameID = @id
+                WHERE ID = @id
             `;
 
             const result = await query(selectQuery, { id });
@@ -109,11 +111,11 @@ module.exports = async function (context, req) {
             }
 
             // Delete associations first
-            const deleteAssocQuery = `DELETE FROM dbo.NamePhoto WHERE NameID = @id`;
+            const deleteAssocQuery = `DELETE FROM dbo.NamePhoto WHERE npID = @id`;
             await execute(deleteAssocQuery, { id });
 
             // Delete person
-            const deleteQuery = `DELETE FROM dbo.NameEvent WHERE NameID = @id`;
+            const deleteQuery = `DELETE FROM dbo.NameEvent WHERE ID = @id`;
             await execute(deleteQuery, { id });
 
             context.res = {

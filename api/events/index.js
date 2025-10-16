@@ -5,13 +5,13 @@ module.exports = async function (context, req) {
 
     try {
         const eventsQuery = `
-            SELECT DISTINCT
-                CAST(PEventDate AS DATE) as date,
+            SELECT 
+                CONCAT(PYear, '-', RIGHT('0' + CAST(PMonth AS VARCHAR), 2), '-01') as date,
                 COUNT(*) as count
             FROM dbo.Pictures
-            WHERE PEventDate IS NOT NULL
-            GROUP BY CAST(PEventDate AS DATE)
-            ORDER BY date DESC
+            WHERE PYear IS NOT NULL AND PMonth IS NOT NULL
+            GROUP BY PYear, PMonth
+            ORDER BY PYear DESC, PMonth DESC
         `;
 
         const events = await query(eventsQuery);
