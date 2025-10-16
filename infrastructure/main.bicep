@@ -62,10 +62,6 @@ module staticWebApp 'modules/staticwebapp.bicep' = {
     location: location
     environment: environment
     baseName: baseName
-    sqlServerFqdn: infrastructure.outputs.sqlServerFqdn
-    sqlDatabaseName: infrastructure.outputs.sqlDatabaseName
-    storageAccountName: infrastructure.outputs.storageAccountName
-    storageContainerName: infrastructure.outputs.storageContainerName
   }
 }
 

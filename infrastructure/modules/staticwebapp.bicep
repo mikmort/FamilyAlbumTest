@@ -9,18 +9,6 @@ param environment string
 @description('Base name for resources')
 param baseName string
 
-@description('SQL Server FQDN')
-param sqlServerFqdn string
-
-@description('SQL Database name')
-param sqlDatabaseName string
-
-@description('Storage Account name')
-param storageAccountName string
-
-@description('Storage Container name')
-param storageContainerName string
-
 // Static Web App - Free tier suitable for ~20 users
 var staticWebAppName = '${baseName}-${environment}-app'
 

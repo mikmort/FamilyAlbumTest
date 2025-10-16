@@ -237,4 +237,5 @@ output sqlDatabaseName string = sqlDatabase.name
 output storageAccountName string = storageAccount.name
 output storageAccountId string = storageAccount.id
 output storageContainerName string = containerName
+@secure()
 output storageAccountKey string = storageAccount.listKeys().keys[0].value
