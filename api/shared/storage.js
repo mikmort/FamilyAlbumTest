@@ -56,4 +56,10 @@ async function deleteBlob(blobName) {
   await blockBlobClient.deleteIfExists();
 }
 
-module.exports = { uploadBlob, downloadBlob, deleteBlob, getContainerClient };
+async function blobExists(blobName) {
+  const containerClient = getContainerClient();
+  const blockBlobClient = containerClient.getBlockBlobClient(blobName);
+  return await blockBlobClient.exists();
+}
+
+module.exports = { uploadBlob, downloadBlob, deleteBlob, blobExists, getContainerClient };

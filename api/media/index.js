@@ -1,5 +1,6 @@
 const { query, execute } = require('../shared/db');
-const { blobExists, getContainerClient } = require('../shared/storage');
+const { blobExists, getContainerClient, uploadBlob } = require('../shared/storage');
+const sharp = require('sharp');
 
 module.exports = async function (context, req) {
     context.log('Media API function processed a request.');
@@ -24,13 +25,77 @@ module.exports = async function (context, req) {
         }
     }
 
-    context.log(`Method: ${method}, URL: ${req.url}, Filename: ${filename}`);
+    // Check if thumbnail is requested
+    const thumbnail = req.query.thumbnail === 'true';
+
+    context.log(`Method: ${method}, URL: ${req.url}, Filename: ${filename}, Thumbnail: ${thumbnail}`);
 
     try {
+        // GET /api/media/{filename}?thumbnail=true - Get thumbnail (generate if needed)
         // GET /api/media/{filename} - Stream file directly from blob storage
         if (method === 'GET' && filename) {
+            let blobPath = filename;
+            
+            // If thumbnail requested, check if it exists
+            if (thumbnail) {
+                const thumbnailPath = `thumbnails/${filename}`;
+                const thumbnailExists = await blobExists(thumbnailPath);
+                
+                if (!thumbnailExists) {
+                    // Generate thumbnail from original file
+                    context.log(`Generating thumbnail for ${filename}`);
+                    
+                    // Check if original exists
+                    const originalExists = await blobExists(filename);
+                    if (!originalExists) {
+                        context.res = {
+                            status: 404,
+                            body: { error: 'Original media file not found' }
+                        };
+                        return;
+                    }
+                    
+                    // Download original file
+                    const containerClient = getContainerClient();
+                    const originalBlobClient = containerClient.getBlobClient(filename);
+                    const downloadResponse = await originalBlobClient.download();
+                    
+                    // Convert stream to buffer
+                    const chunks = [];
+                    for await (const chunk of downloadResponse.readableStreamBody) {
+                        chunks.push(Buffer.from(chunk));
+                    }
+                    const originalBuffer = Buffer.concat(chunks);
+                    
+                    // Generate thumbnail using sharp (300px width, maintain aspect ratio)
+                    let thumbnailBuffer;
+                    try {
+                        thumbnailBuffer = await sharp(originalBuffer)
+                            .resize(300, null, {
+                                fit: 'inside',
+                                withoutEnlargement: true
+                            })
+                            .jpeg({ quality: 80 })
+                            .toBuffer();
+                        
+                        // Upload thumbnail to blob storage
+                        await uploadBlob(thumbnailPath, thumbnailBuffer, 'image/jpeg');
+                        context.log(`Thumbnail generated and saved: ${thumbnailPath}`);
+                    } catch (sharpError) {
+                        context.log.error(`Error generating thumbnail: ${sharpError.message}`);
+                        // If thumbnail generation fails (e.g., for videos), use original
+                        blobPath = filename;
+                    }
+                }
+                
+                // Use thumbnail path if it exists or was just created
+                if (await blobExists(thumbnailPath)) {
+                    blobPath = thumbnailPath;
+                }
+            }
+            
             // Check if file exists in blob storage
-            const exists = await blobExists(filename);
+            const exists = await blobExists(blobPath);
             
             if (!exists) {
                 context.res = {
@@ -40,22 +105,22 @@ module.exports = async function (context, req) {
                 return;
             }
 
-            // Get blob client and generate URL
+            // Get blob client
             const containerClient = getContainerClient();
-            const blobClient = containerClient.getBlobClient(filename);
+            const blobClient = containerClient.getBlobClient(blobPath);
             
             // Download the blob
             const downloadResponse = await blobClient.download();
             
             // Determine content type
-            const contentType = downloadResponse.contentType || getContentType(filename);
+            const contentType = downloadResponse.contentType || getContentType(blobPath);
             
             // Stream the blob content
             context.res = {
                 status: 200,
                 headers: {
                     'Content-Type': contentType,
-                    'Content-Disposition': `inline; filename="${filename.split('/').pop()}"`,
+                    'Content-Disposition': `inline; filename="${blobPath.split('/').pop()}"`,
                     'Cache-Control': 'public, max-age=31536000' // Cache for 1 year
                 },
                 body: downloadResponse.readableStreamBody,
