@@ -39,7 +39,16 @@ module.exports = async function (context, req) {
         // GET /api/media/{filename}?thumbnail=true - Get thumbnail (generate if needed)
         // GET /api/media/{filename} - Stream file directly from blob storage
         if (method === 'GET' && filename) {
-            let blobPath = filename;
+            // Find the actual blob path (handles legacy/mismatched paths)
+            let blobPath = await findBlobPath(filename);
+            
+            if (!blobPath) {
+                context.res = {
+                    status: 404,
+                    body: { error: 'Media file not found in storage' }
+                };
+                return;
+            }
             
             // If thumbnail requested, check if it exists
             if (thumbnail) {
@@ -214,10 +223,28 @@ module.exports = async function (context, req) {
 
             const media = await query(mediaQuery, params);
 
+            // Transform results to construct proper blob URLs
+            // PBlobUrl should be the full path: Albums/{PFileDirectory}/{PFileName}
+            const transformedMedia = media.map(item => {
+                const directory = item.PFileDirectory || '';
+                const fileName = item.PFileName || '';
+                
+                // Construct the blob path: Albums/directory/filename
+                // Normalize slashes and remove duplicate slashes
+                let blobPath = directory ? `Albums/${directory}/${fileName}` : `Albums/${fileName}`;
+                blobPath = blobPath.replace(/\\/g, '/').replace(/\/+/g, '/');
+                
+                return {
+                    ...item,
+                    PBlobUrl: `/api/media/${encodeURIComponent(blobPath)}`,
+                    PThumbnailUrl: `/api/media/${encodeURIComponent(blobPath)}?thumbnail=true`
+                };
+            });
+
             context.res = {
                 status: 200,
                 headers: { 'Content-Type': 'application/json' },
-                body: media
+                body: transformedMedia
             };
             return;
         }
