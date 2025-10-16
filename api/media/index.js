@@ -249,7 +249,8 @@ module.exports = async function (context, req) {
                 return {
                     ...item,
                     PBlobUrl: `/api/media/${encodeURIComponent(blobPath)}`,
-                    PThumbnailUrl: `/api/media/${encodeURIComponent(blobPath)}?thumbnail=true`
+                    // Temporarily disable thumbnails - just use full image until all files are uploaded
+                    PThumbnailUrl: `/api/media/${encodeURIComponent(blobPath)}`
                 };
             });
 
