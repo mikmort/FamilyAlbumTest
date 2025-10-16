@@ -10,10 +10,12 @@ module.exports = async function (context, req) {
         if (method === 'GET') {
             const peopleQuery = `
                 SELECT 
-                    ID as id,
-                    neName as name,
-                    neType as type,
-                    ISNULL(neCount, 0) as photoCount
+                    ID,
+                    neName,
+                    neRelation,
+                    neType,
+                    neDateLastModified,
+                    ISNULL(neCount, 0) as neCount
                 FROM dbo.NameEvent
                 WHERE neType = 'N'
                 ORDER BY neName

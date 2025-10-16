@@ -6,12 +6,15 @@ module.exports = async function (context, req) {
     try {
         const eventsQuery = `
             SELECT 
-                CONCAT(PYear, '-', RIGHT('0' + CAST(PMonth AS VARCHAR), 2), '-01') as date,
-                COUNT(*) as count
-            FROM dbo.Pictures
-            WHERE PYear IS NOT NULL AND PMonth IS NOT NULL
-            GROUP BY PYear, PMonth
-            ORDER BY PYear DESC, PMonth DESC
+                ID,
+                neName,
+                neRelation,
+                neType,
+                neDateLastModified,
+                ISNULL(neCount, 0) as neCount
+            FROM dbo.NameEvent
+            WHERE neType = 'E'
+            ORDER BY neName
         `;
 
         const events = await query(eventsQuery);
