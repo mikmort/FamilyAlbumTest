@@ -97,26 +97,79 @@ export default function PeopleSelector({
       <h1 className="text-center mb-2">Select People to Browse</h1>
 
       <div className="form-group">
-        <label>Select People (up to 5):</label>
-        <div style={{ maxHeight: '300px', overflowY: 'auto', border: '1px solid #ddd', padding: '0.5rem', borderRadius: '4px' }}>
-          {people.map((person) => (
-            <div key={person.ID} style={{ padding: '0.5rem', borderBottom: '1px solid #eee' }}>
-              <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer' }}>
-                <input
-                  type="checkbox"
-                  checked={selectedPeople.includes(person.ID)}
-                  onChange={() => togglePerson(person.ID)}
-                  disabled={!selectedPeople.includes(person.ID) && selectedPeople.length >= 5}
-                  style={{ marginRight: '0.5rem' }}
-                />
-                <span>
-                  <strong>{person.neName}</strong>
-                  {person.neRelation && ` - ${person.neRelation}`}
-                  {` (${person.neCount} photos)`}
-                </span>
-              </label>
-            </div>
-          ))}
+        <label style={{ marginBottom: '0.5rem', display: 'block' }}>Select People (up to 5):</label>
+        <div style={{ 
+          maxHeight: '350px', 
+          overflowY: 'auto', 
+          border: '1px solid #ddd', 
+          borderRadius: '4px',
+          backgroundColor: '#fff'
+        }}>
+          <table style={{ 
+            width: '100%', 
+            borderCollapse: 'collapse',
+            fontSize: '0.95rem'
+          }}>
+            <thead style={{ 
+              position: 'sticky', 
+              top: 0, 
+              backgroundColor: '#f8f9fa',
+              borderBottom: '2px solid #dee2e6'
+            }}>
+              <tr>
+                <th style={{ padding: '0.75rem 0.5rem', textAlign: 'center', width: '40px' }}></th>
+                <th style={{ padding: '0.75rem 0.5rem', textAlign: 'left', fontWeight: '600' }}>Name</th>
+                <th style={{ padding: '0.75rem 0.5rem', textAlign: 'left', fontWeight: '600' }}>Description</th>
+                <th style={{ padding: '0.75rem 0.5rem', textAlign: 'center', fontWeight: '600', width: '100px' }}>Photos</th>
+              </tr>
+            </thead>
+            <tbody>
+              {people.map((person) => (
+                <tr 
+                  key={person.ID} 
+                  style={{ 
+                    borderBottom: '1px solid #eee',
+                    backgroundColor: selectedPeople.includes(person.ID) ? '#e3f2fd' : 'transparent',
+                    cursor: 'pointer'
+                  }}
+                  onClick={() => togglePerson(person.ID)}
+                >
+                  <td style={{ padding: '0.75rem 0.5rem', textAlign: 'center' }}>
+                    <input
+                      type="checkbox"
+                      checked={selectedPeople.includes(person.ID)}
+                      onChange={() => togglePerson(person.ID)}
+                      disabled={!selectedPeople.includes(person.ID) && selectedPeople.length >= 5}
+                      style={{ cursor: 'pointer' }}
+                      onClick={(e) => e.stopPropagation()}
+                    />
+                  </td>
+                  <td style={{ 
+                    padding: '0.75rem 0.5rem', 
+                    fontWeight: '500',
+                    color: '#212529'
+                  }}>
+                    {person.neName}
+                  </td>
+                  <td style={{ 
+                    padding: '0.75rem 0.5rem',
+                    color: '#6c757d',
+                    fontSize: '0.9rem'
+                  }}>
+                    {person.neRelation || '—'}
+                  </td>
+                  <td style={{ 
+                    padding: '0.75rem 0.5rem', 
+                    textAlign: 'center',
+                    fontWeight: '500',
+                    color: '#495057'
+                  }}>
+                    {person.neCount}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       </div>
 
@@ -135,28 +188,50 @@ export default function PeopleSelector({
         </select>
       </div>
 
-      <div className="form-group">
-        <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer' }}>
+      <div className="form-group" style={{ 
+        padding: '0.75rem', 
+        backgroundColor: '#f8f9fa', 
+        borderRadius: '4px',
+        border: '1px solid #dee2e6'
+      }}>
+        <label style={{ 
+          display: 'flex', 
+          alignItems: 'center', 
+          cursor: 'pointer',
+          margin: 0,
+          fontSize: '0.95rem'
+        }}>
           <input
             type="checkbox"
             checked={showNoPeople}
             onChange={(e) => onShowNoPeopleChange(e.target.checked)}
-            style={{ marginRight: '0.5rem' }}
+            style={{ marginRight: '0.75rem', cursor: 'pointer' }}
           />
-          Show photos with no people tagged
+          <span>Show photos with no people tagged</span>
         </label>
       </div>
 
       {selectedPeople.length > 1 && (
-        <div className="form-group">
-          <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer' }}>
+        <div className="form-group" style={{ 
+          padding: '0.75rem', 
+          backgroundColor: '#fff3cd', 
+          borderRadius: '4px',
+          border: '1px solid #ffc107'
+        }}>
+          <label style={{ 
+            display: 'flex', 
+            alignItems: 'center', 
+            cursor: 'pointer',
+            margin: 0,
+            fontSize: '0.95rem'
+          }}>
             <input
               type="checkbox"
               checked={exclusiveFilter}
               onChange={(e) => onExclusiveFilterChange(e.target.checked)}
-              style={{ marginRight: '0.5rem' }}
+              style={{ marginRight: '0.75rem', cursor: 'pointer' }}
             />
-            Show only photos with ALL selected people (AND logic)
+            <span>Show only photos with <strong>ALL</strong> selected people (AND logic)</span>
           </label>
         </div>
       )}
