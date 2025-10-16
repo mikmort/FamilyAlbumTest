@@ -108,7 +108,7 @@ export default function ThumbnailGallery({
             onClick={() => onMediaClick(item.PFileName)}
           >
             <img
-              src={item.PThumbnailUrl || '/placeholder.png'}
+              src={item.PThumbnailUrl || '/placeholder.svg'}
               alt={item.PDescription || item.PFileName}
             />
             {item.PType === 2 && (
