@@ -16,7 +16,7 @@ module.exports = async function (context, req) {
                     neType,
                     neDateLastModified,
                     ISNULL(neCount, 0) as neCount
-                FROM dbo.NameEvent
+                FROM dbo.NameEvent WITH (NOLOCK)
                 WHERE neType = 'N'
                 ORDER BY neName
             `;

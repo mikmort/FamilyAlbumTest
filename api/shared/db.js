@@ -8,10 +8,12 @@ const config = {
   options: {
     encrypt: true,
     trustServerCertificate: false,
+    enableArithAbort: true,
+    requestTimeout: 15000, // 15 seconds
   },
   pool: {
     max: 10,
-    min: 0,
+    min: 2, // Keep 2 connections alive to avoid cold starts
     idleTimeoutMillis: 30000,
   },
 };

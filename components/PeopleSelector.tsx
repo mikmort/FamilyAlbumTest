@@ -34,10 +34,16 @@ export default function PeopleSelector({
   const [events, setEvents] = useState<Event[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [dataLoaded, setDataLoaded] = useState(false);
 
   useEffect(() => {
-    fetchData();
-  }, []);
+    // Only fetch if we haven't loaded data yet
+    if (!dataLoaded) {
+      fetchData();
+    } else {
+      setLoading(false);
+    }
+  }, [dataLoaded]);
 
   const fetchData = async () => {
     try {
@@ -56,6 +62,7 @@ export default function PeopleSelector({
 
       setPeople(peopleData);
       setEvents(eventsData);
+      setDataLoaded(true);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred');
     } finally {
@@ -73,9 +80,26 @@ export default function PeopleSelector({
 
   if (loading) {
     return (
-      <div className="card text-center">
-        <div className="loading-spinner"></div>
-        <p className="mt-2">Loading...</p>
+      <div className="card">
+        <h1 className="text-center mb-2">Select People to Browse</h1>
+        <div className="form-group">
+          <label style={{ marginBottom: '0.5rem', display: 'block' }}>Loading people...</label>
+          <div style={{ 
+            height: '350px', 
+            border: '1px solid #ddd', 
+            borderRadius: '4px',
+            backgroundColor: '#f8f9fa',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            flexDirection: 'column'
+          }}>
+            <div className="loading-spinner"></div>
+            <p style={{ marginTop: '1rem', color: '#6c757d' }}>
+              Loading {people.length > 0 ? `${people.length} people` : 'data'}...
+            </p>
+          </div>
+        </div>
       </div>
     );
   }
