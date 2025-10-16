@@ -25,6 +25,11 @@ module.exports = async function (context, req) {
         }
     }
 
+    // Normalize path: convert backslashes to forward slashes for blob storage
+    if (filename) {
+        filename = filename.replace(/\\/g, '/');
+    }
+
     // Check if thumbnail is requested
     const thumbnail = req.query.thumbnail === 'true';
 
