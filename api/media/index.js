@@ -230,8 +230,20 @@ module.exports = async function (context, req) {
                 const fileName = item.PFileName || '';
                 
                 // Construct the blob path: directory/filename
+                // But check if fileName already contains the directory to avoid duplication
+                let blobPath;
+                if (directory && fileName.startsWith(directory)) {
+                    // Filename already contains the full path
+                    blobPath = fileName;
+                } else if (directory) {
+                    // Need to combine directory and filename
+                    blobPath = `${directory}/${fileName}`;
+                } else {
+                    // No directory, just use filename
+                    blobPath = fileName;
+                }
+                
                 // Normalize slashes and remove duplicate slashes
-                let blobPath = directory ? `${directory}/${fileName}` : fileName;
                 blobPath = blobPath.replace(/\\/g, '/').replace(/\/+/g, '/');
                 
                 return {
