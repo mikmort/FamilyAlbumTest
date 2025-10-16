@@ -4,7 +4,15 @@ module.exports = async function (context, req) {
     context.log('Media API function processed a request.');
 
     const method = req.method;
-    const filename = req.params.filename ? decodeURIComponent(req.params.filename) : null;
+    // Handle wildcard route - filename might be empty, undefined, or ""
+    let filename = req.params.filename ? decodeURIComponent(req.params.filename) : null;
+    
+    // Normalize: treat empty string or "/" as null (list request)
+    if (filename === '' || filename === '/') {
+        filename = null;
+    }
+
+    context.log(`Method: ${method}, Filename: ${filename}`);
 
     try {
         // GET /api/media/{filename} - Get specific media item
