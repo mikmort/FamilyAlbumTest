@@ -2,6 +2,19 @@
 
 A comprehensive family photo and video management web application built with Next.js, TypeScript, Azure SQL Database, and Azure Blob Storage.
 
+## 📁 Project Structure
+
+```
+├── app/                    # Next.js app directory (pages and layouts)
+├── api/                    # Azure Functions (serverless API)
+├── components/             # React components
+├── infrastructure/         # Bicep templates for Azure deployment
+├── database/              # SQL schema files
+├── scripts/               # PowerShell deployment and migration scripts
+├── docs/                  # Documentation files
+└── lib/                   # Shared TypeScript utilities and types
+```
+
 ## Features
 
 - **Media Management**: Upload, organize, and manage family photos and videos
@@ -27,52 +40,35 @@ A comprehensive family photo and video management web application built with Nex
 - Azure Subscription
 - Git
 
-## Azure Resources Setup
+## 🚀 Quick Start
 
-### 1. Create Azure SQL Database (Serverless)
+### Automated Deployment (Recommended)
 
-1. Go to Azure Portal (portal.azure.com)
-2. Create a new SQL Database with these settings:
-   - **Compute tier**: Serverless (for cost optimization)
-   - **Database name**: `FamilyAlbum`
-   - **Min vCores**: 0.5
-   - **Max vCores**: 1 or 2 (depending on your needs)
-   - **Auto-pause delay**: 1 hour (pauses when not in use to save costs)
-3. Configure firewall to allow your IP address
-4. Note down:
-   - Server name (e.g., `your-server.database.windows.net`)
-   - Database name
-   - Admin username
-   - Admin password
+Use the PowerShell scripts for automated deployment:
 
-### 2. Initialize Database Schema
+```powershell
+# 1. Deploy Azure infrastructure
+.\scripts\deploy.ps1
 
-1. Connect to your Azure SQL Database using Azure Data Studio or SQL Server Management Studio
-2. Run the SQL script from `database/schema.sql`
-3. Verify tables are created: `NameEvent`, `Pictures`, `NamePhoto`, `UnindexedFiles`
+# 2. Initialize database schema
+.\scripts\setup-database.ps1
 
-### 3. Create Azure Storage Account
+# 3. Configure GitHub integration
+.\scripts\setup-github-azure.ps1
 
-1. Go to Azure Portal
-2. Create a new Storage Account:
-   - **Performance**: Standard
-   - **Replication**: LRS (Locally Redundant Storage for cost savings)
-   - **Access tier**: Hot
-3. Create a container named `family-album-media`
-4. Note down:
-   - Storage account name
-   - Access key (under "Access keys" in the portal)
+# 4. (Optional) Migrate existing SQLite data
+.\scripts\migrate-sqlite-v4.ps1 -SqliteDbPath "C:\path\to\database.db"
+```
 
-### 4. Create Azure Static Web App (Optional - for production)
+See [scripts/README.md](scripts/README.md) for detailed script documentation.
 
-1. Go to Azure Portal
-2. Create a new Static Web App
-3. Connect to your GitHub repository
-4. Configure build settings:
-   - **App location**: `/`
-   - **API location**: `` (leave empty, we use Next.js API routes)
-   - **Output location**: `.next`
-5. Azure will create a GitHub Actions workflow automatically
+### Manual Setup
+
+See detailed documentation in the `docs/` folder:
+- [docs/QUICKSTART.md](docs/QUICKSTART.md) - Step-by-step guide
+- [docs/AZURE_SETUP.md](docs/AZURE_SETUP.md) - Azure resources configuration
+- [docs/BICEP_SETUP.md](docs/BICEP_SETUP.md) - Infrastructure as Code setup
+- [docs/SETUP_CHECKLIST.md](docs/SETUP_CHECKLIST.md) - Complete checklist
 
 ## Local Development Setup
 
