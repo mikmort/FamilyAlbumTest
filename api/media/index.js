@@ -39,16 +39,8 @@ module.exports = async function (context, req) {
         // GET /api/media/{filename}?thumbnail=true - Get thumbnail (generate if needed)
         // GET /api/media/{filename} - Stream file directly from blob storage
         if (method === 'GET' && filename) {
-            // Find the actual blob path (handles legacy/mismatched paths)
-            let blobPath = await findBlobPath(filename);
-            
-            if (!blobPath) {
-                context.res = {
-                    status: 404,
-                    body: { error: 'Media file not found in storage' }
-                };
-                return;
-            }
+            // Use the filename directly as the blob path
+            let blobPath = filename;
             
             // If thumbnail requested, check if it exists
             if (thumbnail) {
