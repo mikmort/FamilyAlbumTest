@@ -57,15 +57,19 @@ module.exports = async function (context, req) {
             
             context.log(`Blob exists with plain path: ${blobFound}`);
             
-            // If not found, try with URL-encoded filename (some blobs were uploaded with encoded names)
+            // If not found, try with URL-encoded filename (some blobs have %27, %20 etc in their actual blob name)
             if (!blobFound) {
                 const pathParts = blobPath.split('/');
-                const encodedFilename = pathParts.slice(0, -1).concat(encodeURIComponent(pathParts[pathParts.length - 1])).join('/');
+                const directory = pathParts.slice(0, -1).join('/');
+                const filename = pathParts[pathParts.length - 1];
+                
+                // Try encoding the filename part - this creates blob names like "dir/file%27s%20name.jpg"
+                const encodedFilename = directory + (directory ? '/' : '') + encodeURIComponent(filename).replace(/%2F/g, '/');
                 context.log(`Trying encoded blob path: "${encodedFilename}"`);
                 if (await blobExists(encodedFilename)) {
                     blobPath = encodedFilename;
                     blobFound = true;
-                    context.log(`Blob found with encoded path!`);
+                    context.log(`Blob found with encoded filename!`);
                 }
             }
             
