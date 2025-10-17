@@ -9,7 +9,7 @@ interface ThumbnailGalleryProps {
   noPeople: boolean;
   sortOrder: 'asc' | 'desc';
   exclusiveFilter: boolean;
-  onMediaClick: (filename: string) => void;
+  onMediaClick: (media: MediaItem) => void;
 }
 
 export default function ThumbnailGallery({
@@ -105,7 +105,7 @@ export default function ThumbnailGallery({
           <div
             key={item.PFileName}
             className="thumbnail-item"
-            onClick={() => onMediaClick(item.PFileName)}
+            onClick={() => onMediaClick(item)}
           >
             <img
               src={item.PThumbnailUrl || '/placeholder.svg'}

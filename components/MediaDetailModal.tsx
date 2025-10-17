@@ -1,112 +1,28 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { MediaItem, PersonWithRelation } from '@/lib/types';
+import { useState } from 'react';
+import { MediaItem } from '@/lib/types';
 
 interface MediaDetailModalProps {
-  filename: string;
+  media: MediaItem;
   onClose: () => void;
 }
 
-interface MediaDetails {
-  media: MediaItem;
-  people: PersonWithRelation[];
-  event: { ID: number; Name: string; Details: string } | null;
-}
-
 export default function MediaDetailModal({
-  filename,
+  media,
   onClose,
 }: MediaDetailModalProps) {
-  const [details, setDetails] = useState<MediaDetails | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [editing, setEditing] = useState(false);
   
-  const [description, setDescription] = useState('');
-  const [month, setMonth] = useState<number | ''>('');
-  const [year, setYear] = useState<number | ''>('');
-
-  useEffect(() => {
-    fetchDetails();
-  }, [filename]);
-
-  const fetchDetails = async () => {
-    try {
-      setLoading(true);
-      const res = await fetch(`/api/media/${encodeURIComponent(filename)}`);
-
-      if (!res.ok) {
-        throw new Error('Failed to fetch media details');
-      }
-
-      const data = await res.json();
-      setDetails(data);
-      setDescription(data.media.PDescription || '');
-      setMonth(data.media.PMonth || '');
-      setYear(data.media.PYear || '');
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'An error occurred');
-    } finally {
-      setLoading(false);
-    }
-  };
+  const [description, setDescription] = useState(media.PDescription || '');
+  const [month, setMonth] = useState<number | ''>(media.PMonth || '');
+  const [year, setYear] = useState<number | ''>(media.PYear || '');
 
   const handleSave = async () => {
-    if (!details) return;
-
-    try {
-      const res = await fetch(`/api/media/${encodeURIComponent(filename)}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          description,
-          month: month || null,
-          year: year || null,
-          peopleIds: details.people.map((p) => p.ID),
-          eventId: details.event?.ID || null,
-        }),
-      });
-
-      if (!res.ok) {
-        throw new Error('Failed to update media');
-      }
-
-      setEditing(false);
-      fetchDetails();
-    } catch (err) {
-      alert(err instanceof Error ? err.message : 'An error occurred');
-    }
+    // TODO: Implement update functionality with proper API endpoint
+    alert('Update functionality to be implemented');
+    setEditing(false);
   };
-
-  if (loading) {
-    return (
-      <div className="modal-overlay">
-        <div className="modal-content">
-          <div className="loading-spinner"></div>
-          <p className="mt-2">Loading...</p>
-        </div>
-      </div>
-    );
-  }
-
-  if (error || !details) {
-    return (
-      <div className="modal-overlay" onClick={onClose}>
-        <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-          <h2>Error</h2>
-          <p>{error || 'Media not found'}</p>
-          <button className="btn btn-primary mt-2" onClick={onClose}>
-            Close
-          </button>
-        </div>
-      </div>
-    );
-  }
-
-  const { media, people, event } = details;
 
   return (
     <div className="modal-overlay" onClick={onClose}>
@@ -142,7 +58,7 @@ export default function MediaDetailModal({
             <p>
               <strong>Dimensions:</strong> {media.PWidth} x {media.PHeight}
             </p>
-            {media.PType === 2 && (
+            {media.PType === 2 && media.PTime && (
               <p>
                 <strong>Duration:</strong>{' '}
                 {Math.floor(media.PTime / 60)}:{(media.PTime % 60).toString().padStart(2, '0')}
@@ -196,30 +112,9 @@ export default function MediaDetailModal({
               )}
             </div>
 
-            {event && (
-              <div className="form-group">
-                <label>Event:</label>
-                <p>
-                  <strong>{event.Name}</strong>
-                </p>
-                {event.Details && <p>{event.Details}</p>}
-              </div>
-            )}
-
             <div className="form-group">
               <label>Tagged People:</label>
-              {people.length > 0 ? (
-                <ul className="people-list">
-                  {people.map((person) => (
-                    <li key={person.ID}>
-                      <strong>{person.Name}</strong>
-                      {person.Relationship && ` - ${person.Relationship}`}
-                    </li>
-                  ))}
-                </ul>
-              ) : (
-                <p>No people tagged</p>
-              )}
+              <p>Feature coming soon...</p>
             </div>
 
             <div className="flex flex-gap mt-2">
