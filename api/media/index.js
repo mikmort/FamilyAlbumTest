@@ -248,23 +248,15 @@ module.exports = async function (context, req) {
                     blobPath = fileName;
                 }
                 
-                // Decode the blob path in case it contains URL-encoded characters from the database
-                // This prevents double-encoding when we use encodeURIComponent below
-                try {
-                    blobPath = decodeURIComponent(blobPath);
-                } catch (e) {
-                    // If decoding fails, the path is not encoded, so use it as-is
-                    context.log(`Could not decode path: ${blobPath}`, e.message);
-                }
+                // Normalize slashes (convert backslash to forward slash)
+                // Do NOT decode - the database has the correct URL-encoded names that match blob storage
+                blobPath = blobPath.replace(/\\/g, '/');
                 
-                // Normalize slashes and remove duplicate slashes (after decoding)
-                blobPath = blobPath.replace(/\\/g, '/').replace(/\/+/g, '/');
-                
+                // Don't encode the blobPath - it's already URL-encoded in the database to match blob storage
                 return {
                     ...item,
-                    PBlobUrl: `/api/media/${encodeURIComponent(blobPath)}`,
-                    // Temporarily disable thumbnails - just use full image until all files are uploaded
-                    PThumbnailUrl: `/api/media/${encodeURIComponent(blobPath)}`
+                    PBlobUrl: `/api/media/${blobPath}`,
+                    PThumbnailUrl: `/api/media/${blobPath}`
                 };
             });
 
