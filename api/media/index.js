@@ -398,7 +398,13 @@ module.exports = async function (context, req) {
         context.log.error('Error:', error);
         context.res = {
             status: 500,
-            body: { error: 'Internal server error', message: error.message }
+            body: {
+                error: 'Internal server error',
+                message: error.message,
+                stack: error.stack,
+                url: req.url,
+                method: req.method
+            }
         };
     }
 };
