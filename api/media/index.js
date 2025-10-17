@@ -202,7 +202,12 @@ module.exports = async function (context, req) {
                 context.log.error(`Error downloading blob "${blobPath}": ${downloadError.message}`);
                 context.res = {
                     status: 500,
-                    body: { error: 'Error downloading media file', details: downloadError.message }
+                    body: {
+                        error: 'Error downloading media file',
+                        details: downloadError.message,
+                        stack: downloadError.stack,
+                        blobPath
+                    }
                 };
                 return;
             }
