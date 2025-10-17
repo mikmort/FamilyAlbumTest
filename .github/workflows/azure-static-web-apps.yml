@@ -42,14 +42,15 @@ jobs:
             ~/.npm
             ${{ github.workspace }}/.next/cache
             api/node_modules
-          key: ${{ runner.os }}-deps-${{ hashFiles('package-lock.json', 'api/package.json') }}
+          key: ${{ runner.os }}-deps-${{ hashFiles('package-lock.json', 'api/package-lock.json') }}
           restore-keys: |
             ${{ runner.os }}-deps-
 
-      - name: Install all dependencies
-        run: |
-          npm ci --prefer-offline --no-audit
-          cd api && npm install --production --prefer-offline --no-audit
+      - name: Install root dependencies
+        run: npm ci --prefer-offline --no-audit
+
+      - name: Install API dependencies
+        run: cd api && npm ci --production --prefer-offline --no-audit
 
       - name: Build Next.js static export
         run: npm run build
