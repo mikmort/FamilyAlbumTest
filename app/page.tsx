@@ -14,7 +14,7 @@ export default function Home() {
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
   const [showNoPeople, setShowNoPeople] = useState(false);
   const [exclusiveFilter, setExclusiveFilter] = useState(false);
-  const [selectedMedia, setSelectedMedia] = useState<string | null>(null);
+  const [selectedMedia, setSelectedMedia] = useState<MediaItem | null>(null);
 
   const handleContinue = () => {
     setView('gallery');
@@ -103,7 +103,7 @@ export default function Home() {
 
         {selectedMedia && (
           <MediaDetailModal
-            filename={selectedMedia}
+            media={selectedMedia}
             onClose={() => setSelectedMedia(null)}
           />
         )}
