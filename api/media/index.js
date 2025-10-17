@@ -1,6 +1,13 @@
 const { query, execute } = require('../shared/db');
 const { blobExists, getContainerClient, uploadBlob } = require('../shared/storage');
-const sharp = require('sharp');
+
+// Make sharp optional - only needed for thumbnail generation
+let sharp = null;
+try {
+    sharp = require('sharp');
+} catch (err) {
+    console.warn('Sharp module not available - thumbnail generation disabled');
+}
 
 module.exports = async function (context, req) {
     context.log('Media API function processed a request.');
@@ -75,21 +82,27 @@ module.exports = async function (context, req) {
                     
                     // Generate thumbnail using sharp (300px width, maintain aspect ratio)
                     let thumbnailBuffer;
-                    try {
-                        thumbnailBuffer = await sharp(originalBuffer)
-                            .resize(300, null, {
-                                fit: 'inside',
-                                withoutEnlargement: true
-                            })
-                            .jpeg({ quality: 80 })
-                            .toBuffer();
-                        
-                        // Upload thumbnail to blob storage
-                        await uploadBlob(thumbnailPath, thumbnailBuffer, 'image/jpeg');
-                        context.log(`Thumbnail generated and saved: ${thumbnailPath}`);
-                    } catch (sharpError) {
-                        context.log.error(`Error generating thumbnail: ${sharpError.message}`);
-                        // If thumbnail generation fails (e.g., for videos), use original
+                    if (sharp) {
+                        try {
+                            thumbnailBuffer = await sharp(originalBuffer)
+                                .resize(300, null, {
+                                    fit: 'inside',
+                                    withoutEnlargement: true
+                                })
+                                .jpeg({ quality: 80 })
+                                .toBuffer();
+                            
+                            // Upload thumbnail to blob storage
+                            await uploadBlob(thumbnailPath, thumbnailBuffer, 'image/jpeg');
+                            context.log(`Thumbnail generated and saved: ${thumbnailPath}`);
+                        } catch (sharpError) {
+                            context.log.error(`Error generating thumbnail: ${sharpError.message}`);
+                            // If thumbnail generation fails (e.g., for videos), use original
+                            blobPath = filename;
+                        }
+                    } else {
+                        // Sharp not available, use original image
+                        context.log('Sharp not available, using original image');
                         blobPath = filename;
                     }
                 }
