@@ -249,14 +249,16 @@ module.exports = async function (context, req) {
                 }
                 
                 // Normalize slashes (convert backslash to forward slash)
-                // Do NOT decode - the database has the correct URL-encoded names that match blob storage
                 blobPath = blobPath.replace(/\\/g, '/');
                 
-                // Don't encode the blobPath - it's already URL-encoded in the database to match blob storage
+                // Encode the path for use in URLs
+                // Encode each path segment separately to preserve the forward slashes
+                const encodedPath = blobPath.split('/').map(segment => encodeURIComponent(segment)).join('/');
+                
                 return {
                     ...item,
-                    PBlobUrl: `/api/media/${blobPath}`,
-                    PThumbnailUrl: `/api/media/${blobPath}`
+                    PBlobUrl: `/api/media/${encodedPath}`,
+                    PThumbnailUrl: `/api/media/${encodedPath}`
                 };
             });
 
