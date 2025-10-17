@@ -52,25 +52,41 @@ module.exports = async function (context, req) {
             
             context.log(`Trying blob path: "${blobPath}"`);
             
-            // Check if the blob exists with the plain name
-            let blobFound = await blobExists(blobPath);
+            // Try multiple variations to handle inconsistent blob naming
+            const pathsToTry = [
+                blobPath, // Try as-is first
+            ];
             
-            context.log(`Blob exists with plain path: ${blobFound}`);
+            // If path contains special chars, try with encoded filename
+            const pathParts = blobPath.split('/');
+            const directory = pathParts.slice(0, -1).join('/');
+            const filename = pathParts[pathParts.length - 1];
             
-            // If not found, try with URL-encoded filename (some blobs have %27, %20 etc in their actual blob name)
-            if (!blobFound) {
-                const pathParts = blobPath.split('/');
-                const directory = pathParts.slice(0, -1).join('/');
-                const filename = pathParts[pathParts.length - 1];
-                
-                // Try encoding the filename part - this creates blob names like "dir/file%27s%20name.jpg"
-                const encodedFilename = directory + (directory ? '/' : '') + encodeURIComponent(filename).replace(/%2F/g, '/');
-                context.log(`Trying encoded blob path: "${encodedFilename}"`);
-                if (await blobExists(encodedFilename)) {
-                    blobPath = encodedFilename;
-                    blobFound = true;
-                    context.log(`Blob found with encoded filename!`);
+            // Add variation with encoded filename (for blobs like "Devorah%27s%20Wedding%20003.jpg")
+            const encodedFilename = directory + (directory ? '/' : '') + encodeURIComponent(filename).replace(/%2F/g, '/');
+            if (encodedFilename !== blobPath) {
+                pathsToTry.push(encodedFilename);
+            }
+            
+            let blobFound = false;
+            let foundPath = null;
+            
+            for (const tryPath of pathsToTry) {
+                context.log(`Checking: "${tryPath}"`);
+                try {
+                    if (await blobExists(tryPath)) {
+                        blobFound = true;
+                        foundPath = tryPath;
+                        context.log(`Found at: "${tryPath}"`);
+                        break;
+                    }
+                } catch (err) {
+                    context.log.error(`Error checking blob "${tryPath}": ${err.message}`);
                 }
+            }
+            
+            if (blobFound) {
+                blobPath = foundPath;
             }
             
             if (!blobFound) {
