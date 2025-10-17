@@ -46,8 +46,30 @@ module.exports = async function (context, req) {
         // GET /api/media/{filename}?thumbnail=true - Get thumbnail (generate if needed)
         // GET /api/media/{filename} - Stream file directly from blob storage
         if (method === 'GET' && filename) {
-            // Use the filename directly as the blob path
+            // The filename has been decoded from the URL
+            // We need to find the actual blob, which might be stored with URL-encoded name or plain name
             let blobPath = filename;
+            
+            // Check if the blob exists with the plain name
+            let blobFound = await blobExists(blobPath);
+            
+            // If not found, try with URL-encoded filename (some blobs were uploaded with encoded names)
+            if (!blobFound) {
+                const pathParts = blobPath.split('/');
+                const encodedFilename = pathParts.slice(0, -1).concat(encodeURIComponent(pathParts[pathParts.length - 1])).join('/');
+                if (await blobExists(encodedFilename)) {
+                    blobPath = encodedFilename;
+                    blobFound = true;
+                }
+            }
+            
+            if (!blobFound) {
+                context.res = {
+                    status: 404,
+                    body: { error: 'Media file not found in storage' }
+                };
+                return;
+            }
             
             // If thumbnail requested, check if it exists
             if (thumbnail) {
