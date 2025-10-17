@@ -235,7 +235,16 @@ module.exports = async function (context, req) {
                     blobPath = fileName;
                 }
                 
-                // Normalize slashes and remove duplicate slashes
+                // Decode the blob path in case it contains URL-encoded characters from the database
+                // This prevents double-encoding when we use encodeURIComponent below
+                try {
+                    blobPath = decodeURIComponent(blobPath);
+                } catch (e) {
+                    // If decoding fails, the path is not encoded, so use it as-is
+                    context.log(`Could not decode path: ${blobPath}`, e.message);
+                }
+                
+                // Normalize slashes and remove duplicate slashes (after decoding)
                 blobPath = blobPath.replace(/\\/g, '/').replace(/\/+/g, '/');
                 
                 return {
