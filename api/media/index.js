@@ -161,39 +161,40 @@ module.exports = async function (context, req) {
                 }
             }
             
-            // Check if file exists in blob storage
-            const exists = await blobExists(blobPath);
+            // At this point, blobPath contains the actual blob name (either original or thumbnail)
+            context.log(`Downloading blob: "${blobPath}"`);
             
-            if (!exists) {
+            try {
+                // Get blob client
+                const containerClient = getContainerClient();
+                const blobClient = containerClient.getBlobClient(blobPath);
+                
+                // Download the blob
+                const downloadResponse = await blobClient.download();
+                
+                // Determine content type
+                const contentType = downloadResponse.contentType || getContentType(blobPath);
+                
+                // Stream the blob content
                 context.res = {
-                    status: 404,
-                    body: { error: 'Media file not found in storage' }
+                    status: 200,
+                    headers: {
+                        'Content-Type': contentType,
+                        'Content-Disposition': `inline; filename="${blobPath.split('/').pop()}"`,
+                        'Cache-Control': 'public, max-age=31536000' // Cache for 1 year
+                    },
+                    body: downloadResponse.readableStreamBody,
+                    isRaw: true
+                };
+                return;
+            } catch (downloadError) {
+                context.log.error(`Error downloading blob "${blobPath}": ${downloadError.message}`);
+                context.res = {
+                    status: 500,
+                    body: { error: 'Error downloading media file', details: downloadError.message }
                 };
                 return;
             }
-
-            // Get blob client
-            const containerClient = getContainerClient();
-            const blobClient = containerClient.getBlobClient(blobPath);
-            
-            // Download the blob
-            const downloadResponse = await blobClient.download();
-            
-            // Determine content type
-            const contentType = downloadResponse.contentType || getContentType(blobPath);
-            
-            // Stream the blob content
-            context.res = {
-                status: 200,
-                headers: {
-                    'Content-Type': contentType,
-                    'Content-Disposition': `inline; filename="${blobPath.split('/').pop()}"`,
-                    'Cache-Control': 'public, max-age=31536000' // Cache for 1 year
-                },
-                body: downloadResponse.readableStreamBody,
-                isRaw: true
-            };
-            return;
         }
 
         // GET /api/media - List all media with optional filters
