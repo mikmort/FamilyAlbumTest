@@ -60,10 +60,10 @@ module.exports = async function (context, req) {
             // If path contains special chars, try with encoded filename
             const pathParts = blobPath.split('/');
             const directory = pathParts.slice(0, -1).join('/');
-            const filename = pathParts[pathParts.length - 1];
+            const filenamePart = pathParts[pathParts.length - 1];
             
             // Add variation with encoded filename (for blobs like "Devorah%27s%20Wedding%20003.jpg")
-            const encodedFilename = directory + (directory ? '/' : '') + encodeURIComponent(filename).replace(/%2F/g, '/');
+            const encodedFilename = directory + (directory ? '/' : '') + encodeURIComponent(filenamePart).replace(/%2F/g, '/');
             if (encodedFilename !== blobPath) {
                 pathsToTry.push(encodedFilename);
             }
