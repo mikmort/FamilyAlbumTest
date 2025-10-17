@@ -57,15 +57,26 @@ module.exports = async function (context, req) {
                 blobPath, // Try as-is first
             ];
             
-            // If path contains special chars, try with encoded filename
+            // If path contains special chars, try with encoded variations
             const pathParts = blobPath.split('/');
             const directory = pathParts.slice(0, -1).join('/');
             const filenamePart = pathParts[pathParts.length - 1];
             
-            // Add variation with encoded filename (for blobs like "Devorah%27s%20Wedding%20003.jpg")
-            const encodedFilename = directory + (directory ? '/' : '') + encodeURIComponent(filenamePart).replace(/%2F/g, '/');
-            if (encodedFilename !== blobPath) {
-                pathsToTry.push(encodedFilename);
+            // Add variation with spaces encoded only
+            if (filenamePart.includes(' ') && !filenamePart.includes('%20')) {
+                const spacesEncoded = directory + (directory ? '/' : '') + filenamePart.replace(/ /g, '%20');
+                pathsToTry.push(spacesEncoded);
+            }
+            
+            // Add variation with full encoding (apostrophes AND spaces)
+            // Note: encodeURIComponent doesn't encode apostrophes, so we do it manually
+            // This handles blobs like "Devorah%27s%20Wedding%20003.jpg"
+            const fullyEncoded = directory + (directory ? '/' : '') + 
+                encodeURIComponent(filenamePart)
+                    .replace(/%2F/g, '/')
+                    .replace(/'/g, '%27');
+            if (fullyEncoded !== blobPath && !pathsToTry.includes(fullyEncoded)) {
+                pathsToTry.push(fullyEncoded);
             }
             
             let blobFound = false;
