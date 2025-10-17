@@ -109,27 +109,21 @@ module.exports = async function (context, req) {
             }
             
             // If thumbnail requested, check if it exists
+            // Use the actual found blob name (foundPath) for thumbnail operations
             if (thumbnail) {
-                const thumbnailPath = `thumbnails/${filename}`;
+                // Get just the filename part from the found path for thumbnail naming
+                const foundFilenamePart = foundPath.split('/').pop();
+                const thumbnailPath = `thumbnails/${foundFilenamePart}`;
                 const thumbnailExists = await blobExists(thumbnailPath);
                 
                 if (!thumbnailExists) {
                     // Generate thumbnail from original file
-                    context.log(`Generating thumbnail for ${filename}`);
+                    context.log(`Generating thumbnail for ${foundPath}`);
                     
-                    // Check if original exists
-                    const originalExists = await blobExists(filename);
-                    if (!originalExists) {
-                        context.res = {
-                            status: 404,
-                            body: { error: 'Original media file not found' }
-                        };
-                        return;
-                    }
-                    
-                    // Download original file
+                    // We already know the original exists because blobFound is true
+                    // Download original file using the found path
                     const containerClient = getContainerClient();
-                    const originalBlobClient = containerClient.getBlobClient(filename);
+                    const originalBlobClient = containerClient.getBlobClient(foundPath);
                     const downloadResponse = await originalBlobClient.download();
                     
                     // Convert stream to buffer
@@ -162,14 +156,20 @@ module.exports = async function (context, req) {
                     } else {
                         // Sharp not available, use original image
                         context.log('Sharp not available, using original image');
-                        blobPath = filename;
+                        blobPath = foundPath;
                     }
                 }
                 
                 // Use thumbnail path if it exists or was just created
                 if (await blobExists(thumbnailPath)) {
                     blobPath = thumbnailPath;
+                } else {
+                    // Thumbnail doesn't exist, use the original found path
+                    blobPath = foundPath;
                 }
+            } else {
+                // No thumbnail requested, use the found path
+                blobPath = foundPath;
             }
             
             // At this point, blobPath contains the actual blob name (either original or thumbnail)
