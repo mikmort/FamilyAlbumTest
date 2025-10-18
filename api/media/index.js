@@ -203,34 +203,50 @@ module.exports = async function (context, req) {
                 const containerClient = getContainerClient();
                 const blobClient = containerClient.getBlobClient(blobPath);
                 
-                // Download the blob
+                context.log(`Attempting to download blob: "${blobPath}"`);
+                
+                // Download the blob to a buffer instead of streaming
                 const downloadResponse = await blobClient.download();
+                
+                // Convert stream to buffer
+                const chunks = [];
+                for await (const chunk of downloadResponse.readableStreamBody) {
+                    chunks.push(Buffer.from(chunk));
+                }
+                const buffer = Buffer.concat(chunks);
+                
+                context.log(`Downloaded ${buffer.length} bytes for ${blobPath}`);
                 
                 // Determine content type
                 const contentType = downloadResponse.contentType || getContentType(blobPath);
                 
-                // Stream the blob content
+                // Return the buffer
                 context.res = {
                     status: 200,
                     headers: {
                         'Content-Type': contentType,
                         'Content-Disposition': `inline; filename="${blobPath.split('/').pop()}"`,
-                        'Cache-Control': 'public, max-age=31536000' // Cache for 1 year
+                        'Cache-Control': 'public, max-age=31536000', // Cache for 1 year
+                        'Content-Length': buffer.length.toString()
                     },
-                    body: downloadResponse.readableStreamBody,
+                    body: buffer,
                     isRaw: true
                 };
                 return;
             } catch (downloadError) {
                 context.log.error(`Error downloading blob "${blobPath}": ${downloadError.message}`);
+                context.log.error(`Stack: ${downloadError.stack}`);
                 context.res = {
                     status: 500,
-                    body: {
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
                         error: 'Error downloading media file',
                         details: downloadError.message,
                         stack: downloadError.stack,
                         blobPath
-                    }
+                    })
                 };
                 return;
             }
