@@ -10,6 +10,14 @@ try {
 }
 
 module.exports = async function (context, req) {
+    // Log everything for debugging
+    context.log('=== MEDIA API DEBUG ===');
+    context.log('req.url:', req.url);
+    context.log('req.method:', req.method);
+    context.log('req.params:', JSON.stringify(req.params));
+    context.log('req.query:', JSON.stringify(req.query));
+    context.log('======================');
+    
     context.log('Media API function processed a request.');
 
     const method = req.method;

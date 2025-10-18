@@ -12,9 +12,9 @@ context.log.warn = (...args) => console.warn('[WARN]', ...args);
 // Mock request object
 const req = {
     method: 'GET',
-    url: "/api/media/Devorah's Wedding/PA130080.JPG",
+    url: "/api/media/Devorah's Wedding/PA130071.JPG",
     params: {
-        filename: "Devorah's Wedding/PA130080.JPG"
+        filename: "Devorah's Wedding/PA130071.JPG"
     },
     query: {}
 };
