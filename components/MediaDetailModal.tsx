@@ -1,16 +1,18 @@
 'use client';
 
-import { useState } from 'react';
-import { MediaItem } from '@/lib/types';
+import { useState, useEffect } from 'react';
+import { MediaItem, Person } from '@/lib/types';
 
 interface MediaDetailModalProps {
   media: MediaItem;
   onClose: () => void;
+  onUpdate?: (updatedMedia: MediaItem) => void;
 }
 
 export default function MediaDetailModal({
   media,
   onClose,
+  onUpdate,
 }: MediaDetailModalProps) {
   const [editing, setEditing] = useState(false);
   const [isFullScreen, setIsFullScreen] = useState(false);
@@ -18,6 +20,98 @@ export default function MediaDetailModal({
   const [description, setDescription] = useState(media.PDescription || '');
   const [month, setMonth] = useState<number | ''>(media.PMonth || '');
   const [year, setYear] = useState<number | ''>(media.PYear || '');
+  const [taggedPeople, setTaggedPeople] = useState<Array<{ ID: number; neName: string }>>(
+    media.TaggedPeople || []
+  );
+  
+  const [allPeople, setAllPeople] = useState<Person[]>([]);
+  const [showPeopleSelector, setShowPeopleSelector] = useState(false);
+  const [loadingPeople, setLoadingPeople] = useState(false);
+  const [savingTag, setSavingTag] = useState(false);
+
+  useEffect(() => {
+    if (showPeopleSelector && allPeople.length === 0) {
+      fetchPeople();
+    }
+  }, [showPeopleSelector]);
+
+  const fetchPeople = async () => {
+    try {
+      setLoadingPeople(true);
+      const response = await fetch('/api/people');
+      if (!response.ok) throw new Error('Failed to fetch people');
+      const data = await response.json();
+      setAllPeople(data);
+    } catch (error) {
+      console.error('Error fetching people:', error);
+      alert('Failed to load people list');
+    } finally {
+      setLoadingPeople(false);
+    }
+  };
+
+  const handleAddPerson = async (personId: number) => {
+    // Check if already tagged
+    if (taggedPeople.some(p => p.ID === personId)) {
+      alert('This person is already tagged in this photo');
+      return;
+    }
+
+    try {
+      setSavingTag(true);
+      const response = await fetch(`/api/media/${encodeURIComponent(media.PFileName)}/tags`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ personId, position: 0 }),
+      });
+
+      if (!response.ok) throw new Error('Failed to tag person');
+
+      // Find the person details
+      const person = allPeople.find(p => p.ID === personId);
+      if (person) {
+        const newTaggedPeople = [...taggedPeople, { ID: person.ID, neName: person.neName }];
+        setTaggedPeople(newTaggedPeople);
+        
+        // Update parent component if callback provided
+        if (onUpdate) {
+          onUpdate({ ...media, TaggedPeople: newTaggedPeople });
+        }
+      }
+      
+      setShowPeopleSelector(false);
+    } catch (error) {
+      console.error('Error tagging person:', error);
+      alert('Failed to tag person');
+    } finally {
+      setSavingTag(false);
+    }
+  };
+
+  const handleRemovePerson = async (personId: number) => {
+    if (!confirm('Remove this person tag?')) return;
+
+    try {
+      const response = await fetch(`/api/media/${encodeURIComponent(media.PFileName)}/tags/${personId}`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ personId }),
+      });
+
+      if (!response.ok) throw new Error('Failed to remove person tag');
+
+      const newTaggedPeople = taggedPeople.filter(p => p.ID !== personId);
+      setTaggedPeople(newTaggedPeople);
+      
+      // Update parent component if callback provided
+      if (onUpdate) {
+        onUpdate({ ...media, TaggedPeople: newTaggedPeople });
+      }
+    } catch (error) {
+      console.error('Error removing person tag:', error);
+      alert('Failed to remove person tag');
+    }
+  };
 
   const handleSave = async () => {
     // TODO: Implement update functionality with proper API endpoint
@@ -158,7 +252,78 @@ export default function MediaDetailModal({
 
             <div className="form-group">
               <label>Tagged People:</label>
-              <p>Feature coming soon...</p>
+              {taggedPeople.length > 0 ? (
+                <div className="tagged-people-list">
+                  {taggedPeople.map((person) => (
+                    <div key={person.ID} className="tagged-person-item">
+                      <span>{person.neName}</span>
+                      {editing && (
+                        <button
+                          onClick={() => handleRemovePerson(person.ID)}
+                          className="btn-remove-tag"
+                          title="Remove tag"
+                        >
+                          ✕
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p>No one tagged yet</p>
+              )}
+              
+              {editing && (
+                <>
+                  {!showPeopleSelector ? (
+                    <button
+                      className="btn btn-secondary mt-1"
+                      onClick={() => setShowPeopleSelector(true)}
+                      style={{ width: '100%' }}
+                    >
+                      + Add Person
+                    </button>
+                  ) : (
+                    <div className="people-selector-dropdown">
+                      <div className="flex flex-between mb-1">
+                        <strong>Select a person:</strong>
+                        <button
+                          className="btn btn-secondary btn-sm"
+                          onClick={() => setShowPeopleSelector(false)}
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                      {loadingPeople ? (
+                        <div className="loading-spinner"></div>
+                      ) : (
+                        <div className="people-list-scroll">
+                          {allPeople
+                            .filter(p => !taggedPeople.some(tp => tp.ID === p.ID))
+                            .map((person) => (
+                              <button
+                                key={person.ID}
+                                className="person-list-item"
+                                onClick={() => handleAddPerson(person.ID)}
+                                disabled={savingTag}
+                              >
+                                {person.neName}
+                                {person.neCount > 0 && (
+                                  <span className="person-count">({person.neCount} photos)</span>
+                                )}
+                              </button>
+                            ))}
+                          {allPeople.filter(p => !taggedPeople.some(tp => tp.ID === p.ID)).length === 0 && (
+                            <p className="text-center" style={{ padding: '1rem', color: '#6c757d' }}>
+                              All people are already tagged
+                            </p>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </>
+              )}
             </div>
 
             <div className="flex flex-gap mt-2">

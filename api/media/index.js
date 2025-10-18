@@ -263,7 +263,12 @@ module.exports = async function (context, req) {
             const exclusiveFilter = req.query.exclusiveFilter === 'true';
 
             let mediaQuery = `
-                SELECT DISTINCT p.*
+                SELECT DISTINCT p.*,
+                    (SELECT ne.ID, ne.neName 
+                     FROM dbo.NamePhoto np 
+                     INNER JOIN dbo.NameEvent ne ON np.npID = ne.ID 
+                     WHERE np.npFileName = p.PFileName 
+                     FOR JSON PATH) as TaggedPeople
                 FROM dbo.Pictures p
             `;
             
@@ -360,10 +365,22 @@ module.exports = async function (context, req) {
                 // The database stores filenames that match blob storage exactly
                 // Some blob names have URL-encoded characters (%27, %20) as part of the blob name
                 // Don't encode again - use the blob path as-is
+                
+                // Parse tagged people from JSON
+                let taggedPeople = [];
+                if (item.TaggedPeople) {
+                    try {
+                        taggedPeople = JSON.parse(item.TaggedPeople);
+                    } catch (e) {
+                        context.log.error('Error parsing TaggedPeople JSON:', e);
+                    }
+                }
+                
                 return {
                     ...item,
                     PBlobUrl: `/api/media/${blobPath}`,
-                    PThumbnailUrl: `/api/media/${blobPath}?thumbnail=true`
+                    PThumbnailUrl: `/api/media/${blobPath}?thumbnail=true`,
+                    TaggedPeople: taggedPeople
                 };
             });
 

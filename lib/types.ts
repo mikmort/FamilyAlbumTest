@@ -34,6 +34,7 @@ export interface MediaItem {
   PReviewed: boolean;
   PSoundFile?: string;
   PBlobUrl: string;
+  TaggedPeople?: Array<{ ID: number; neName: string }>;
 }
 
 export interface UnindexedFile {
