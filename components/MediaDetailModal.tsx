@@ -13,6 +13,7 @@ export default function MediaDetailModal({
   onClose,
 }: MediaDetailModalProps) {
   const [editing, setEditing] = useState(false);
+  const [isFullScreen, setIsFullScreen] = useState(false);
   
   const [description, setDescription] = useState(media.PDescription || '');
   const [month, setMonth] = useState<number | ''>(media.PMonth || '');
@@ -25,7 +26,40 @@ export default function MediaDetailModal({
   };
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
+    <>
+      {/* Full Screen View */}
+      {isFullScreen && (
+        <div 
+          className="fullscreen-overlay" 
+          onClick={() => setIsFullScreen(false)}
+        >
+          <button
+            onClick={() => setIsFullScreen(false)}
+            className="fullscreen-close"
+          >
+            ✕
+          </button>
+          {media.PType === 1 ? (
+            <img 
+              src={media.PBlobUrl} 
+              alt={media.PDescription || media.PFileName}
+              className="fullscreen-image"
+            />
+          ) : (
+            <video 
+              controls 
+              src={media.PBlobUrl}
+              className="fullscreen-video"
+              autoPlay
+            >
+              Your browser does not support the video tag.
+            </video>
+          )}
+        </div>
+      )}
+
+      {/* Detail Modal */}
+      <div className="modal-overlay" onClick={onClose}>
       <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '1200px' }}>
         <button
           onClick={onClose}
@@ -45,9 +79,19 @@ export default function MediaDetailModal({
         <div className="detail-view">
           <div className="media-display">
             {media.PType === 1 ? (
-              <img src={media.PBlobUrl} alt={media.PDescription || media.PFileName} />
+              <img 
+                src={media.PBlobUrl} 
+                alt={media.PDescription || media.PFileName}
+                onClick={() => setIsFullScreen(true)}
+                style={{ cursor: 'pointer' }}
+              />
             ) : (
-              <video controls src={media.PBlobUrl}>
+              <video 
+                controls 
+                src={media.PBlobUrl}
+                onClick={() => setIsFullScreen(true)}
+                style={{ cursor: 'pointer' }}
+              >
                 Your browser does not support the video tag.
               </video>
             )}
@@ -136,6 +180,7 @@ export default function MediaDetailModal({
           </div>
         </div>
       </div>
-    </div>
+      </div>
+    </>
   );
 }
