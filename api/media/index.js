@@ -419,18 +419,24 @@ module.exports = async function (context, req) {
 
     } catch (error) {
         context.log.error('Error:', error);
+        const errorResponse = {
+            error: 'Internal server error',
+            message: error.message,
+            stack: error.stack,
+            debug: {
+                url: req.url,
+                method: req.method,
+                params: req.params,
+                query: req.query
+            }
+        };
+        context.log.error('Error response:', JSON.stringify(errorResponse));
         context.res = {
             status: 500,
             headers: {
                 'Content-Type': 'application/json'
             },
-            body: JSON.stringify({
-                error: 'Internal server error',
-                message: error.message,
-                stack: error.stack,
-                url: req.url,
-                method: req.method
-            })
+            body: JSON.stringify(errorResponse)
         };
     }
 };
