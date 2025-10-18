@@ -413,13 +413,16 @@ module.exports = async function (context, req) {
         context.log.error('Error:', error);
         context.res = {
             status: 500,
-            body: {
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
                 error: 'Internal server error',
                 message: error.message,
                 stack: error.stack,
                 url: req.url,
                 method: req.method
-            }
+            })
         };
     }
 };
