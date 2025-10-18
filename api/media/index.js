@@ -31,7 +31,9 @@ module.exports = async function (context, req) {
                 status: 'healthy',
                 timestamp: new Date().toISOString(),
                 url: req.url,
-                params: req.params
+                params: req.params,
+                sharpAvailable: sharp !== null,
+                sharpVersion: sharp ? sharp.versions : null
             }
         };
         return;
