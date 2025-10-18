@@ -157,10 +157,9 @@ module.exports = async function (context, req) {
                     const originalBuffer = Buffer.concat(chunks);
                     
                     // Generate thumbnail using sharp (300px width, maintain aspect ratio)
-                    let thumbnailBuffer;
                     if (sharp) {
                         try {
-                            thumbnailBuffer = await sharp(originalBuffer)
+                            const thumbnailBuffer = await sharp(originalBuffer)
                                 .resize(300, null, {
                                     fit: 'inside',
                                     withoutEnlargement: true
@@ -171,24 +170,25 @@ module.exports = async function (context, req) {
                             // Upload thumbnail to blob storage
                             await uploadBlob(thumbnailPath, thumbnailBuffer, 'image/jpeg');
                             context.log(`Thumbnail generated and saved: ${thumbnailPath}`);
+                            
+                            // Use the newly created thumbnail
+                            blobPath = thumbnailPath;
                         } catch (sharpError) {
                             context.log.error(`Error generating thumbnail: ${sharpError.message}`);
-                            // If thumbnail generation fails (e.g., for videos), use original
-                            blobPath = filename;
+                            context.log.error(`Sharp error stack: ${sharpError.stack}`);
+                            // If thumbnail generation fails (e.g., for videos or corrupt files), use original
+                            context.log('Falling back to original image');
+                            blobPath = foundPath;
                         }
                     } else {
                         // Sharp not available, use original image
-                        context.log('Sharp not available, using original image');
+                        context.log.warn('Sharp module not available - cannot generate thumbnails, using original image');
                         blobPath = foundPath;
                     }
-                }
-                
-                // Use thumbnail path if it exists or was just created
-                if (await blobExists(thumbnailPath)) {
-                    blobPath = thumbnailPath;
                 } else {
-                    // Thumbnail doesn't exist, use the original found path
-                    blobPath = foundPath;
+                    // Thumbnail already exists, use it
+                    context.log(`Using existing thumbnail: ${thumbnailPath}`);
+                    blobPath = thumbnailPath;
                 }
             } else {
                 // No thumbnail requested, use the found path
@@ -361,7 +361,7 @@ module.exports = async function (context, req) {
                 return {
                     ...item,
                     PBlobUrl: `/api/media/${blobPath}`,
-                    PThumbnailUrl: `/api/media/${blobPath}`
+                    PThumbnailUrl: `/api/media/${blobPath}?thumbnail=true`
                 };
             });
 
