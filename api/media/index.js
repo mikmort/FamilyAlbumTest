@@ -14,6 +14,21 @@ module.exports = async function (context, req) {
 
     const method = req.method;
     
+    // Health check endpoint
+    if (req.url === '/api/media/health' || (req.params && req.params.filename === 'health')) {
+        context.res = {
+            status: 200,
+            headers: { 'Content-Type': 'application/json' },
+            body: {
+                status: 'healthy',
+                timestamp: new Date().toISOString(),
+                url: req.url,
+                params: req.params
+            }
+        };
+        return;
+    }
+    
     // Extract filename from URL path: /api/media/{filename}
     // req.url might be like "/api/media/On%20Location%5CFile.jpg"
     let filename = null;
