@@ -263,12 +263,7 @@ module.exports = async function (context, req) {
             const exclusiveFilter = req.query.exclusiveFilter === 'true';
 
             let mediaQuery = `
-                SELECT DISTINCT p.*,
-                    (SELECT ne.ID, ne.neName 
-                     FROM dbo.NamePhoto np 
-                     INNER JOIN dbo.NameEvent ne ON np.npID = ne.ID 
-                     WHERE np.npFileName = p.PFileName 
-                     FOR JSON PATH) as TaggedPeople
+                SELECT DISTINCT p.*
                 FROM dbo.Pictures p
             `;
             
@@ -339,6 +334,36 @@ module.exports = async function (context, req) {
 
             const media = await query(mediaQuery, params);
 
+            // Fetch tagged people for all photos in one query
+            let taggedPeopleMap = {};
+            if (media.length > 0) {
+                const peopleQuery = `
+                    SELECT np.npFileName, ne.ID, ne.neName
+                    FROM dbo.NamePhoto np
+                    INNER JOIN dbo.NameEvent ne ON np.npID = ne.ID
+                    WHERE np.npFileName IN (${media.map((_, i) => `@filename${i}`).join(',')})
+                    ORDER BY np.npFileName, np.npPosition
+                `;
+                
+                const peopleParams = {};
+                media.forEach((item, i) => {
+                    peopleParams[`filename${i}`] = item.PFileName;
+                });
+                
+                const taggedPeopleResults = await query(peopleQuery, peopleParams);
+                
+                // Group by filename
+                taggedPeopleResults.forEach(row => {
+                    if (!taggedPeopleMap[row.npFileName]) {
+                        taggedPeopleMap[row.npFileName] = [];
+                    }
+                    taggedPeopleMap[row.npFileName].push({
+                        ID: row.ID,
+                        neName: row.neName
+                    });
+                });
+            }
+
             // Transform results to construct proper blob URLs
             // Combine PFileDirectory and PFileName to get the full blob path
             const transformedMedia = media.map(item => {
@@ -366,21 +391,11 @@ module.exports = async function (context, req) {
                 // Some blob names have URL-encoded characters (%27, %20) as part of the blob name
                 // Don't encode again - use the blob path as-is
                 
-                // Parse tagged people from JSON
-                let taggedPeople = [];
-                if (item.TaggedPeople) {
-                    try {
-                        taggedPeople = JSON.parse(item.TaggedPeople);
-                    } catch (e) {
-                        context.log.error('Error parsing TaggedPeople JSON:', e);
-                    }
-                }
-                
                 return {
                     ...item,
                     PBlobUrl: `/api/media/${blobPath}`,
                     PThumbnailUrl: `/api/media/${blobPath}?thumbnail=true`,
-                    TaggedPeople: taggedPeople
+                    TaggedPeople: taggedPeopleMap[item.PFileName] || []
                 };
             });
 
