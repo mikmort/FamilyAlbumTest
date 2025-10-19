@@ -211,24 +211,36 @@ button {
 .modal-content {
   background: white;
   border-radius: 8px;
-  padding: 2rem;
-  max-width: 90vw;
-  max-height: 90vh;
+  padding: 1.5rem;
+  max-width: 95vw;
+  max-height: 95vh;
   overflow: auto;
+  position: relative;
 }
 
 /* Detail View */
 .detail-view {
   display: grid;
-  grid-template-columns: 2fr 1fr;
-  gap: 2rem;
-  padding: 1rem;
+  grid-template-columns: 1.2fr 1fr;
+  gap: 1.5rem;
+  padding: 0.5rem;
+  min-height: 70vh;
+}
+
+.media-display {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #000;
+  border-radius: 8px;
+  overflow: hidden;
 }
 
 .media-display img,
 .media-display video {
-  max-width: 100%;
-  max-height: 80vh;
+  width: 100%;
+  height: auto;
+  max-height: 75vh;
   object-fit: contain;
 }
 
@@ -236,7 +248,8 @@ button {
   background: white;
   padding: 1.5rem;
   border-radius: 8px;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  overflow-y: auto;
+  max-height: 75vh;
 }
 
 .people-list {

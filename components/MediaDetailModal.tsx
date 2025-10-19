@@ -349,7 +349,7 @@ export default function MediaDetailModal({
 
       {/* Detail Modal */}
       <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '1200px' }}>
+      <div className="modal-content" onClick={(e) => e.stopPropagation()}>
         <button
           onClick={onClose}
           style={{
@@ -360,6 +360,7 @@ export default function MediaDetailModal({
             border: 'none',
             fontSize: '2rem',
             cursor: 'pointer',
+            zIndex: 10,
           }}
         >
           ×
@@ -387,7 +388,7 @@ export default function MediaDetailModal({
           </div>
 
           <div className="metadata-panel">
-            <h2>{media.PFileName}</h2>
+            <h2 style={{ marginTop: 0 }}>{media.PFileName}</h2>
             <p>
               <strong>Dimensions:</strong> {media.PWidth} x {media.PHeight}
             </p>
