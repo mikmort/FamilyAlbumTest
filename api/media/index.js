@@ -41,7 +41,7 @@ module.exports = async function (context, req) {
     const method = req.method;
     
     // Health check endpoint
-    if (req.url === '/api/media/health' || (req.params && req.params.filename === 'health')) {
+    if (req.url === '/api/media' && method === 'GET' && !filename) {
         context.res = {
             status: 200,
             headers: { 'Content-Type': 'application/json' },
@@ -50,8 +50,23 @@ module.exports = async function (context, req) {
                 timestamp: new Date().toISOString(),
                 url: req.url,
                 params: req.params,
-                sharpAvailable: sharp !== null,
-                sharpVersion: sharp ? sharp.versions : null
+                modules: {
+                    sharp: {
+                        available: sharp !== null,
+                        version: sharp ? sharp.versions : null
+                    },
+                    ffmpeg: {
+                        available: ffmpeg !== null,
+                        path: ffmpegPath,
+                        fluentVersion: ffmpeg ? require('fluent-ffmpeg/package.json').version : null,
+                        staticVersion: ffmpegPath ? require('ffmpeg-static/package.json').version : null
+                    }
+                },
+                platform: {
+                    os: process.platform,
+                    arch: process.arch,
+                    nodeVersion: process.version
+                }
             }
         };
         return;
