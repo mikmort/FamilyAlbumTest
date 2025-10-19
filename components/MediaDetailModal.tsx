@@ -31,6 +31,16 @@ export default function MediaDetailModal({
   const [loadingPeople, setLoadingPeople] = useState(false);
   const [loadingEvents, setLoadingEvents] = useState(false);
   const [savingTag, setSavingTag] = useState(false);
+  
+  // Inline creation state
+  const [showCreatePerson, setShowCreatePerson] = useState(false);
+  const [showCreateEvent, setShowCreateEvent] = useState(false);
+  const [newPersonName, setNewPersonName] = useState('');
+  const [newPersonRelation, setNewPersonRelation] = useState('');
+  const [newEventName, setNewEventName] = useState('');
+  const [newEventDetails, setNewEventDetails] = useState('');
+  const [creatingPerson, setCreatingPerson] = useState(false);
+  const [creatingEvent, setCreatingEvent] = useState(false);
 
   useEffect(() => {
     if (editing && allEvents.length === 0) {
@@ -214,6 +224,96 @@ export default function MediaDetailModal({
     }
   };
 
+  const handleCreatePerson = async () => {
+    if (!newPersonName.trim()) {
+      alert('Please enter a name');
+      return;
+    }
+
+    try {
+      setCreatingPerson(true);
+      const response = await fetch('/api/people', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          neName: newPersonName.trim(),
+          neRelation: newPersonRelation.trim() || null,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+        throw new Error(errorData.message || 'Failed to create person');
+      }
+
+      const data = await response.json();
+      
+      if (data.success && data.person) {
+        // Add to people list
+        const newPerson = { ...data.person, neCount: 0 };
+        setAllPeople([...allPeople, newPerson].sort((a, b) => a.neName.localeCompare(b.neName)));
+        
+        // Automatically tag the newly created person
+        await handleAddPerson(data.person.ID);
+        
+        // Reset form
+        setNewPersonName('');
+        setNewPersonRelation('');
+        setShowCreatePerson(false);
+      }
+    } catch (error) {
+      console.error('❌ Create person error:', error);
+      alert('Failed to create person');
+    } finally {
+      setCreatingPerson(false);
+    }
+  };
+
+  const handleCreateEvent = async () => {
+    if (!newEventName.trim()) {
+      alert('Please enter an event name');
+      return;
+    }
+
+    try {
+      setCreatingEvent(true);
+      const response = await fetch('/api/events', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          neName: newEventName.trim(),
+          neRelation: newEventDetails.trim() || null,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+        throw new Error(errorData.message || 'Failed to create event');
+      }
+
+      const data = await response.json();
+      
+      if (data.success && data.event) {
+        // Add to events list
+        const newEvent = { ...data.event, neCount: 0 };
+        setAllEvents([...allEvents, newEvent].sort((a, b) => a.neName.localeCompare(b.neName)));
+        
+        // Automatically select the newly created event
+        setSelectedEvent(data.event.ID);
+        
+        // Reset form
+        setNewEventName('');
+        setNewEventDetails('');
+        setShowCreateEvent(false);
+      }
+    } catch (error) {
+      console.error('❌ Create event error:', error);
+      alert('Failed to create event');
+    } finally {
+      setCreatingEvent(false);
+    }
+  };
+
   return (
     <>
       {/* Full Screen View */}
@@ -351,17 +451,69 @@ export default function MediaDetailModal({
                 loadingEvents ? (
                   <div className="loading-spinner"></div>
                 ) : (
-                  <select
-                    value={selectedEvent}
-                    onChange={(e) => setSelectedEvent(e.target.value ? parseInt(e.target.value) : '')}
-                  >
-                    <option value="">-- No Event --</option>
-                    {allEvents.map((event) => (
-                      <option key={event.ID} value={event.ID}>
-                        {event.neName} ({event.neCount} photos)
-                      </option>
-                    ))}
-                  </select>
+                  <>
+                    <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.5rem' }}>
+                      <select
+                        value={selectedEvent}
+                        onChange={(e) => setSelectedEvent(e.target.value ? parseInt(e.target.value) : '')}
+                        style={{ flex: 1 }}
+                      >
+                        <option value="">-- No Event --</option>
+                        {allEvents.map((event) => (
+                          <option key={event.ID} value={event.ID}>
+                            {event.neName} ({event.neCount} photos)
+                          </option>
+                        ))}
+                      </select>
+                      <button
+                        className="btn btn-secondary"
+                        onClick={() => setShowCreateEvent(true)}
+                        title="Create new event"
+                      >
+                        + New
+                      </button>
+                    </div>
+                    
+                    {/* Inline Event Creation Form */}
+                    {showCreateEvent && (
+                      <div className="inline-create-form">
+                        <h4>Create New Event</h4>
+                        <input
+                          type="text"
+                          placeholder="Event name"
+                          value={newEventName}
+                          onChange={(e) => setNewEventName(e.target.value)}
+                          autoFocus
+                        />
+                        <textarea
+                          placeholder="Event details (optional)"
+                          value={newEventDetails}
+                          onChange={(e) => setNewEventDetails(e.target.value)}
+                          rows={2}
+                        />
+                        <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem' }}>
+                          <button
+                            className="btn btn-success btn-sm"
+                            onClick={handleCreateEvent}
+                            disabled={creatingEvent || !newEventName.trim()}
+                          >
+                            {creatingEvent ? 'Creating...' : 'Create & Select'}
+                          </button>
+                          <button
+                            className="btn btn-secondary btn-sm"
+                            onClick={() => {
+                              setShowCreateEvent(false);
+                              setNewEventName('');
+                              setNewEventDetails('');
+                            }}
+                            disabled={creatingEvent}
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </>
                 )
               ) : (
                 <p>{selectedEvent ? allEvents.find(e => e.ID === selectedEvent)?.neName || 'Not set' : 'Not set'}</p>
@@ -405,13 +557,63 @@ export default function MediaDetailModal({
                     <div className="people-selector-dropdown">
                       <div className="flex flex-between mb-1">
                         <strong>Select a person:</strong>
-                        <button
-                          className="btn btn-secondary btn-sm"
-                          onClick={() => setShowPeopleSelector(false)}
-                        >
-                          Cancel
-                        </button>
+                        <div style={{ display: 'flex', gap: '0.5rem' }}>
+                          <button
+                            className="btn btn-success btn-sm"
+                            onClick={() => setShowCreatePerson(true)}
+                            title="Create new person"
+                          >
+                            + New
+                          </button>
+                          <button
+                            className="btn btn-secondary btn-sm"
+                            onClick={() => setShowPeopleSelector(false)}
+                          >
+                            Cancel
+                          </button>
+                        </div>
                       </div>
+                      
+                      {/* Inline Person Creation Form */}
+                      {showCreatePerson && (
+                        <div className="inline-create-form" style={{ marginBottom: '1rem' }}>
+                          <h4>Create New Person</h4>
+                          <input
+                            type="text"
+                            placeholder="Full name"
+                            value={newPersonName}
+                            onChange={(e) => setNewPersonName(e.target.value)}
+                            autoFocus
+                          />
+                          <input
+                            type="text"
+                            placeholder="Relationship (e.g., Uncle, Cousin)"
+                            value={newPersonRelation}
+                            onChange={(e) => setNewPersonRelation(e.target.value)}
+                          />
+                          <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem' }}>
+                            <button
+                              className="btn btn-success btn-sm"
+                              onClick={handleCreatePerson}
+                              disabled={creatingPerson || !newPersonName.trim()}
+                            >
+                              {creatingPerson ? 'Creating...' : 'Create & Tag'}
+                            </button>
+                            <button
+                              className="btn btn-secondary btn-sm"
+                              onClick={() => {
+                                setShowCreatePerson(false);
+                                setNewPersonName('');
+                                setNewPersonRelation('');
+                              }}
+                              disabled={creatingPerson}
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                      
                       {loadingPeople ? (
                         <div className="loading-spinner"></div>
                       ) : (
@@ -426,8 +628,11 @@ export default function MediaDetailModal({
                                 disabled={savingTag}
                               >
                                 {person.neName}
+                                {person.neRelation && (
+                                  <span className="person-relation"> - {person.neRelation}</span>
+                                )}
                                 {person.neCount > 0 && (
-                                  <span className="person-count">({person.neCount} photos)</span>
+                                  <span className="person-count"> ({person.neCount} photos)</span>
                                 )}
                               </button>
                             ))}
