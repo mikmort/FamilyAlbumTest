@@ -1,5 +1,8 @@
 const { query, execute } = require('../shared/db');
 const { blobExists, getContainerClient, uploadBlob } = require('../shared/storage');
+const fs = require('fs');
+const os = require('os');
+const path = require('path');
 
 // Make sharp optional - only needed for thumbnail generation
 let sharp = null;
@@ -7,6 +10,18 @@ try {
     sharp = require('sharp');
 } catch (err) {
     console.warn('Sharp module not available - thumbnail generation disabled');
+}
+
+// Make ffmpeg optional - only needed for video thumbnail generation
+let ffmpeg = null;
+let ffmpegPath = null;
+try {
+    ffmpeg = require('fluent-ffmpeg');
+    ffmpegPath = require('ffmpeg-static');
+    ffmpeg.setFfmpegPath(ffmpegPath);
+    console.log('FFmpeg loaded successfully:', ffmpegPath);
+} catch (err) {
+    console.warn('FFmpeg module not available - video thumbnail generation disabled:', err.message);
 }
 
 module.exports = async function (context, req) {
@@ -163,21 +178,49 @@ module.exports = async function (context, req) {
                     const videoExtensions = ['mp4', 'mov', 'avi', 'wmv', 'mpg', 'mpeg', 'flv'];
                     const isVideo = videoExtensions.includes(fileExt);
                     
-                    if (isVideo) {
-                        // For videos, we can't generate thumbnails with Sharp
-                        // Return a placeholder or the original video
-                        // TODO: Implement proper video thumbnail extraction using ffmpeg
-                        context.log(`Video file detected (${fileExt}), cannot generate thumbnail with Sharp`);
-                        context.log('TODO: Implement video thumbnail extraction using ffmpeg');
+                    if (isVideo && ffmpeg) {
+                        // Extract video frame using ffmpeg
+                        context.log(`Video file detected (${fileExt}), extracting frame with ffmpeg`);
                         
-                        // For now, return a 1x1 transparent pixel as placeholder
-                        // This prevents trying to load large video files as thumbnails
+                        try {
+                            const thumbnailBuffer = await extractVideoFrame(originalBuffer, context);
+                            
+                            // Resize the extracted frame using sharp if available
+                            let finalThumbnail = thumbnailBuffer;
+                            if (sharp) {
+                                finalThumbnail = await sharp(thumbnailBuffer)
+                                    .resize(300, null, {
+                                        fit: 'inside',
+                                        withoutEnlargement: true
+                                    })
+                                    .jpeg({ quality: 80 })
+                                    .toBuffer();
+                            }
+                            
+                            // Upload thumbnail to blob storage
+                            await uploadBlob(thumbnailPath, finalThumbnail, 'image/jpeg');
+                            context.log(`Video thumbnail generated and saved: ${thumbnailPath}`);
+                            blobPath = thumbnailPath;
+                        } catch (ffmpegError) {
+                            context.log.error(`Error extracting video frame: ${ffmpegError.message}`);
+                            context.log.error(`FFmpeg error stack: ${ffmpegError.stack}`);
+                            
+                            // Fall back to placeholder
+                            const placeholderBuffer = Buffer.from(
+                                'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==',
+                                'base64'
+                            );
+                            await uploadBlob(thumbnailPath, placeholderBuffer, 'image/png');
+                            context.log(`Using placeholder for video thumbnail: ${thumbnailPath}`);
+                            blobPath = thumbnailPath;
+                        }
+                    } else if (isVideo && !ffmpeg) {
+                        // FFmpeg not available, use placeholder
+                        context.log(`Video file detected but ffmpeg not available, using placeholder`);
                         const placeholderBuffer = Buffer.from(
                             'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==',
                             'base64'
                         );
-                        
-                        // Upload placeholder as thumbnail
                         await uploadBlob(thumbnailPath, placeholderBuffer, 'image/png');
                         context.log(`Placeholder thumbnail saved for video: ${thumbnailPath}`);
                         blobPath = thumbnailPath;
@@ -608,6 +651,65 @@ module.exports = async function (context, req) {
         };
     }
 };
+
+// Helper function to extract a frame from video buffer
+async function extractVideoFrame(videoBuffer, context) {
+    return new Promise((resolve, reject) => {
+        // Create temporary files for input and output
+        const tempDir = os.tmpdir();
+        const inputPath = path.join(tempDir, `video_${Date.now()}.tmp`);
+        const outputPath = path.join(tempDir, `thumb_${Date.now()}.jpg`);
+        
+        context.log(`Writing video to temp file: ${inputPath}`);
+        
+        // Write video buffer to temp file
+        fs.writeFileSync(inputPath, videoBuffer);
+        
+        context.log(`Extracting frame from video at 1 second mark`);
+        
+        // Extract frame at 1 second using ffmpeg
+        ffmpeg(inputPath)
+            .screenshots({
+                timestamps: ['00:00:01.000'], // Extract at 1 second
+                filename: path.basename(outputPath),
+                folder: path.dirname(outputPath),
+                size: '640x?'
+            })
+            .on('end', () => {
+                context.log(`Frame extracted successfully: ${outputPath}`);
+                try {
+                    // Read the generated thumbnail
+                    const thumbnailBuffer = fs.readFileSync(outputPath);
+                    
+                    // Clean up temp files
+                    try {
+                        fs.unlinkSync(inputPath);
+                        fs.unlinkSync(outputPath);
+                        context.log('Temp files cleaned up');
+                    } catch (cleanupError) {
+                        context.log.warn(`Error cleaning up temp files: ${cleanupError.message}`);
+                    }
+                    
+                    resolve(thumbnailBuffer);
+                } catch (readError) {
+                    reject(new Error(`Failed to read thumbnail: ${readError.message}`));
+                }
+            })
+            .on('error', (err) => {
+                context.log.error(`FFmpeg error: ${err.message}`);
+                
+                // Clean up temp files
+                try {
+                    if (fs.existsSync(inputPath)) fs.unlinkSync(inputPath);
+                    if (fs.existsSync(outputPath)) fs.unlinkSync(outputPath);
+                } catch (cleanupError) {
+                    context.log.warn(`Error cleaning up temp files: ${cleanupError.message}`);
+                }
+                
+                reject(new Error(`FFmpeg failed: ${err.message}`));
+            });
+    });
+}
 
 // Helper function to determine content type from filename
 function getContentType(filename) {
