@@ -7,10 +7,11 @@ import ThumbnailGallery from '@/components/ThumbnailGallery';
 import MediaDetailModal from '@/components/MediaDetailModal';
 import PeopleManager from '@/components/PeopleManager';
 import EventManager from '@/components/EventManager';
+import ProcessNewFiles from '@/components/ProcessNewFiles';
 import { Person, Event, MediaItem } from '@/lib/types';
 
 export default function Home() {
-  const [view, setView] = useState<'select' | 'gallery' | 'manage-people' | 'manage-events'>('select');
+  const [view, setView] = useState<'select' | 'gallery' | 'manage-people' | 'manage-events' | 'process-files'>('select');
   const [selectedPeople, setSelectedPeople] = useState<number[]>([]);
   const [selectedEvent, setSelectedEvent] = useState<number | null>(null);
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
@@ -33,6 +34,7 @@ export default function Home() {
         onManagePeople={() => setView('manage-people')}
         onManageEvents={() => setView('manage-events')}
         onSelectPeople={() => setView('select')}
+        onProcessFiles={() => setView('process-files')}
         onBackup={() => {
           // TODO: Implement backup
           alert('Backup functionality coming soon');
@@ -98,6 +100,15 @@ export default function Home() {
               ← Back
             </button>
             <EventManager />
+          </>
+        )}
+
+        {view === 'process-files' && (
+          <>
+            <button className="btn btn-secondary mb-2" onClick={() => setView('select')}>
+              ← Back
+            </button>
+            <ProcessNewFiles />
           </>
         )}
 
