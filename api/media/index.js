@@ -174,9 +174,28 @@ module.exports = async function (context, req) {
                 const thumbnailPath = `thumbnails/${foundFilenamePart}`;
                 const thumbnailExists = await blobExists(thumbnailPath);
                 
-                if (!thumbnailExists) {
+                let shouldRegenerate = false;
+                
+                // If thumbnail exists, check if it's a placeholder (too small)
+                if (thumbnailExists) {
+                    context.log(`Thumbnail exists at ${thumbnailPath}, checking size...`);
+                    const containerClient = getContainerClient();
+                    const thumbnailBlobClient = containerClient.getBlobClient(thumbnailPath);
+                    const properties = await thumbnailBlobClient.getProperties();
+                    const thumbnailSize = properties.contentLength;
+                    
+                    context.log(`Existing thumbnail size: ${thumbnailSize} bytes`);
+                    
+                    // If thumbnail is less than 100 bytes, it's likely a placeholder - regenerate it
+                    if (thumbnailSize < 100) {
+                        context.log(`⚠️ Thumbnail is too small (${thumbnailSize} bytes), likely a placeholder. Regenerating...`);
+                        shouldRegenerate = true;
+                    }
+                }
+                
+                if (!thumbnailExists || shouldRegenerate) {
                     // Generate thumbnail from original file
-                    context.log(`Generating thumbnail for ${foundPath}`);
+                    context.log(`${shouldRegenerate ? 'Regenerating' : 'Generating'} thumbnail for ${foundPath}`);
                     
                     // We already know the original exists because blobFound is true
                     // Download original file using the found path
