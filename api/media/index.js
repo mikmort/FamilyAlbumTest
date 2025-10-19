@@ -17,11 +17,11 @@ let ffmpeg = null;
 let ffmpegPath = null;
 try {
     ffmpeg = require('fluent-ffmpeg');
-    ffmpegPath = require('ffmpeg-static');
+    ffmpegPath = require('@ffmpeg-installer/ffmpeg').path;
     ffmpeg.setFfmpegPath(ffmpegPath);
     console.log('✅ FFmpeg loaded successfully:', ffmpegPath);
     console.log('FFmpeg module version:', require('fluent-ffmpeg/package.json').version);
-    console.log('FFmpeg static version:', require('ffmpeg-static/package.json').version);
+    console.log('FFmpeg installer version:', require('@ffmpeg-installer/ffmpeg/package.json').version);
 } catch (err) {
     console.warn('⚠️ FFmpeg module not available - video thumbnail generation disabled:', err.message);
     console.warn('Error stack:', err.stack);
