@@ -76,12 +76,36 @@ export default function PeopleSelector({
       clearTimeout(timeoutId);
 
       if (!peopleRes.ok || !eventsRes.ok) {
+        const failedRes = !peopleRes.ok ? peopleRes : eventsRes;
+        const apiName = !peopleRes.ok ? 'People' : 'Events';
+        
+        // Try to get detailed error info
+        const errorData = await failedRes.json().catch(() => ({ error: 'Unknown error' }));
+        
+        // Log detailed error info to console for debugging
+        console.error(`❌ ${apiName} API Error:`, {
+          status: failedRes.status,
+          statusText: failedRes.statusText,
+          url: failedRes.url,
+          errorData: errorData
+        });
+        
+        if (errorData.message) {
+          console.error('Error message:', errorData.message);
+        }
+        if (errorData.stack) {
+          console.error('Stack trace:', errorData.stack);
+        }
+        if (errorData.debug) {
+          console.error('Debug info:', errorData.debug);
+        }
+        
         // Check if it's a cold start (502, 503, 504 errors)
-        if (peopleRes.status >= 502 && peopleRes.status <= 504) {
+        if (failedRes.status >= 502 && failedRes.status <= 504) {
           setIsWarmingUp(true);
           throw new Error('Database is warming up...');
         }
-        throw new Error('Failed to fetch data from server');
+        throw new Error(errorData.message || errorData.error || 'Failed to fetch data from server');
       }
 
       const peopleData = await peopleRes.json();
@@ -94,6 +118,8 @@ export default function PeopleSelector({
       setIsWarmingUp(false);
       setAutoRetryAttempt(0);
     } catch (err) {
+      console.error('❌ PeopleSelector fetch error:', err);
+      
       if (err instanceof Error) {
         if (err.name === 'AbortError') {
           setIsWarmingUp(true);

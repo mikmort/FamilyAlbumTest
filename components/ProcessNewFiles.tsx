@@ -115,9 +115,11 @@ export default function ProcessNewFiles() {
           setCurrentFile(null);
         }
       } else {
+        console.error('❌ Unindexed API error:', data);
         setError(data.error || 'Failed to load file');
       }
     } catch (err: any) {
+      console.error('❌ ProcessNewFiles loadNextFile error:', err);
       setError(err.message || 'Failed to load file');
     } finally {
       setLoading(false);
@@ -171,9 +173,11 @@ export default function ProcessNewFiles() {
         await loadNextFile();
         await loadRemainingCount();
       } else {
+        console.error('❌ Process file API error:', data);
         setError(data.error || 'Failed to process file');
       }
     } catch (err: any) {
+      console.error('❌ ProcessNewFiles handleSaveAndNext error:', err);
       setError(err.message || 'Failed to process file');
     } finally {
       setProcessing(false);
@@ -206,9 +210,11 @@ export default function ProcessNewFiles() {
         await loadNextFile();
         await loadRemainingCount();
       } else {
+        console.error('❌ Delete file API error:', data);
         setError(data.error || 'Failed to delete file');
       }
     } catch (err: any) {
+      console.error('❌ ProcessNewFiles handleDelete error:', err);
       setError(err.message || 'Failed to delete file');
     } finally {
       setProcessing(false);

@@ -48,11 +48,20 @@ export default function MediaDetailModal({
     try {
       setLoadingPeople(true);
       const response = await fetch('/api/people');
-      if (!response.ok) throw new Error('Failed to fetch people');
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+        console.error('❌ People API Error:', {
+          status: response.status,
+          statusText: response.statusText,
+          url: response.url,
+          errorData: errorData
+        });
+        throw new Error(errorData.message || 'Failed to fetch people');
+      }
       const data = await response.json();
       setAllPeople(data);
     } catch (error) {
-      console.error('Error fetching people:', error);
+      console.error('❌ MediaDetailModal fetchPeople error:', error);
       alert('Failed to load people list');
     } finally {
       setLoadingPeople(false);
@@ -63,13 +72,22 @@ export default function MediaDetailModal({
     try {
       setLoadingEvents(true);
       const response = await fetch('/api/events');
-      if (!response.ok) throw new Error('Failed to fetch events');
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+        console.error('❌ Events API Error:', {
+          status: response.status,
+          statusText: response.statusText,
+          url: response.url,
+          errorData: errorData
+        });
+        throw new Error(errorData.message || 'Failed to fetch events');
+      }
       const data = await response.json();
       if (data.success) {
         setAllEvents(data.events);
       }
     } catch (error) {
-      console.error('Error fetching events:', error);
+      console.error('❌ MediaDetailModal fetchEvents error:', error);
       alert('Failed to load events list');
     } finally {
       setLoadingEvents(false);
@@ -91,7 +109,16 @@ export default function MediaDetailModal({
         body: JSON.stringify({ personId, position: 0 }),
       });
 
-      if (!response.ok) throw new Error('Failed to tag person');
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+        console.error('❌ Tag person API Error:', {
+          status: response.status,
+          statusText: response.statusText,
+          url: response.url,
+          errorData: errorData
+        });
+        throw new Error(errorData.message || 'Failed to tag person');
+      }
 
       // Find the person details
       const person = allPeople.find(p => p.ID === personId);
@@ -107,7 +134,7 @@ export default function MediaDetailModal({
       
       setShowPeopleSelector(false);
     } catch (error) {
-      console.error('Error tagging person:', error);
+      console.error('❌ MediaDetailModal handleAddPerson error:', error);
       alert('Failed to tag person');
     } finally {
       setSavingTag(false);
@@ -124,7 +151,16 @@ export default function MediaDetailModal({
         body: JSON.stringify({ personId }),
       });
 
-      if (!response.ok) throw new Error('Failed to remove person tag');
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+        console.error('❌ Remove tag API Error:', {
+          status: response.status,
+          statusText: response.statusText,
+          url: response.url,
+          errorData: errorData
+        });
+        throw new Error(errorData.message || 'Failed to remove person tag');
+      }
 
       const newTaggedPeople = taggedPeople.filter(p => p.ID !== personId);
       setTaggedPeople(newTaggedPeople);
@@ -134,7 +170,7 @@ export default function MediaDetailModal({
         onUpdate({ ...media, TaggedPeople: newTaggedPeople });
       }
     } catch (error) {
-      console.error('Error removing person tag:', error);
+      console.error('❌ MediaDetailModal handleRemovePerson error:', error);
       alert('Failed to remove person tag');
     }
   };
@@ -152,7 +188,16 @@ export default function MediaDetailModal({
         }),
       });
 
-      if (!response.ok) throw new Error('Failed to update media');
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+        console.error('❌ Update media API Error:', {
+          status: response.status,
+          statusText: response.statusText,
+          url: response.url,
+          errorData: errorData
+        });
+        throw new Error(errorData.message || 'Failed to update media');
+      }
 
       const data = await response.json();
       
@@ -164,7 +209,7 @@ export default function MediaDetailModal({
       setEditing(false);
       alert('Successfully updated!');
     } catch (error) {
-      console.error('Error updating media:', error);
+      console.error('❌ MediaDetailModal handleSave error:', error);
       alert('Failed to update media');
     }
   };

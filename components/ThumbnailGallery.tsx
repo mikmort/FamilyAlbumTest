@@ -67,7 +67,27 @@ export default function ThumbnailGallery({
 
       if (!res.ok) {
         const errorData = await res.json().catch(() => ({ error: 'Unknown error' }));
-        throw new Error(errorData.error || `Server error: ${res.status}`);
+        
+        // Log detailed error info to console for debugging
+        console.error('❌ Media API Error:', {
+          status: res.status,
+          statusText: res.statusText,
+          url: res.url,
+          errorData: errorData
+        });
+        
+        // If we have detailed error info from the server, log it
+        if (errorData.message) {
+          console.error('Error message:', errorData.message);
+        }
+        if (errorData.stack) {
+          console.error('Stack trace:', errorData.stack);
+        }
+        if (errorData.debug) {
+          console.error('Debug info:', errorData.debug);
+        }
+        
+        throw new Error(errorData.message || errorData.error || `Server error: ${res.status}`);
       }
 
       const data = await res.json();
@@ -75,6 +95,8 @@ export default function ThumbnailGallery({
       setRetryCount(0);
       setIsWarmingUp(false);
     } catch (err) {
+      console.error('❌ ThumbnailGallery fetch error:', err);
+      
       if (err instanceof Error) {
         if (err.name === 'AbortError') {
           setError('The request timed out. The database may be warming up. Please try again.');
