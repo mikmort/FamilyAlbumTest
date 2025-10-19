@@ -163,7 +163,7 @@ export default function ThumbnailGallery({
         {media.map((item) => (
           <div
             key={item.PFileName}
-            className="thumbnail-item"
+            className={`thumbnail-item ${item.PType === 2 ? 'video-thumbnail' : ''}`}
             onClick={() => onMediaClick(item)}
           >
             <img
@@ -172,7 +172,7 @@ export default function ThumbnailGallery({
             />
             {item.PType === 2 && (
               <div className="video-indicator">
-                VIDEO {item.PTime ? `(${Math.floor(item.PTime / 60)}:${(item.PTime % 60).toString().padStart(2, '0')})` : ''}
+                {item.PTime ? `${Math.floor(item.PTime / 60)}:${(item.PTime % 60).toString().padStart(2, '0')}` : 'VIDEO'}
               </div>
             )}
           </div>

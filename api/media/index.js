@@ -158,34 +158,59 @@ module.exports = async function (context, req) {
                     }
                     const originalBuffer = Buffer.concat(chunks);
                     
-                    // Generate thumbnail using sharp (300px width, maintain aspect ratio)
-                    if (sharp) {
-                        try {
-                            const thumbnailBuffer = await sharp(originalBuffer)
-                                .resize(300, null, {
-                                    fit: 'inside',
-                                    withoutEnlargement: true
-                                })
-                                .jpeg({ quality: 80 })
-                                .toBuffer();
-                            
-                            // Upload thumbnail to blob storage
-                            await uploadBlob(thumbnailPath, thumbnailBuffer, 'image/jpeg');
-                            context.log(`Thumbnail generated and saved: ${thumbnailPath}`);
-                            
-                            // Use the newly created thumbnail
-                            blobPath = thumbnailPath;
-                        } catch (sharpError) {
-                            context.log.error(`Error generating thumbnail: ${sharpError.message}`);
-                            context.log.error(`Sharp error stack: ${sharpError.stack}`);
-                            // If thumbnail generation fails (e.g., for videos or corrupt files), use original
-                            context.log('Falling back to original image');
+                    // Check if this is a video file
+                    const fileExt = foundPath.toLowerCase().split('.').pop();
+                    const videoExtensions = ['mp4', 'mov', 'avi', 'wmv', 'mpg', 'mpeg', 'flv'];
+                    const isVideo = videoExtensions.includes(fileExt);
+                    
+                    if (isVideo) {
+                        // For videos, we can't generate thumbnails with Sharp
+                        // Return a placeholder or the original video
+                        // TODO: Implement proper video thumbnail extraction using ffmpeg
+                        context.log(`Video file detected (${fileExt}), cannot generate thumbnail with Sharp`);
+                        context.log('TODO: Implement video thumbnail extraction using ffmpeg');
+                        
+                        // For now, return a 1x1 transparent pixel as placeholder
+                        // This prevents trying to load large video files as thumbnails
+                        const placeholderBuffer = Buffer.from(
+                            'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==',
+                            'base64'
+                        );
+                        
+                        // Upload placeholder as thumbnail
+                        await uploadBlob(thumbnailPath, placeholderBuffer, 'image/png');
+                        context.log(`Placeholder thumbnail saved for video: ${thumbnailPath}`);
+                        blobPath = thumbnailPath;
+                    } else {
+                        // Generate thumbnail using sharp for images (300px width, maintain aspect ratio)
+                        if (sharp) {
+                            try {
+                                const thumbnailBuffer = await sharp(originalBuffer)
+                                    .resize(300, null, {
+                                        fit: 'inside',
+                                        withoutEnlargement: true
+                                    })
+                                    .jpeg({ quality: 80 })
+                                    .toBuffer();
+                                
+                                // Upload thumbnail to blob storage
+                                await uploadBlob(thumbnailPath, thumbnailBuffer, 'image/jpeg');
+                                context.log(`Thumbnail generated and saved: ${thumbnailPath}`);
+                                
+                                // Use the newly created thumbnail
+                                blobPath = thumbnailPath;
+                            } catch (sharpError) {
+                                context.log.error(`Error generating thumbnail: ${sharpError.message}`);
+                                context.log.error(`Sharp error stack: ${sharpError.stack}`);
+                                // If thumbnail generation fails, use original
+                                context.log('Falling back to original image');
+                                blobPath = foundPath;
+                            }
+                        } else {
+                            // Sharp not available, use original image
+                            context.log.warn('Sharp module not available - cannot generate thumbnails, using original image');
                             blobPath = foundPath;
                         }
-                    } else {
-                        // Sharp not available, use original image
-                        context.log.warn('Sharp module not available - cannot generate thumbnails, using original image');
-                        blobPath = foundPath;
                     }
                 } else {
                     // Thumbnail already exists, use it
