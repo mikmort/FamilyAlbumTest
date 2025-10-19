@@ -324,11 +324,16 @@ module.exports = async function (context, req) {
 
         // GET /api/media - List all media with optional filters
         if (method === 'GET' && !filename) {
+            context.log('Fetching media list with filters');
+            context.log('Query params:', JSON.stringify(req.query));
+            
             const peopleIds = req.query.peopleIds ? req.query.peopleIds.split(',').map(id => parseInt(id)) : [];
             const eventId = req.query.eventId ? parseInt(req.query.eventId) : null;
             const noPeople = req.query.noPeople === 'true';
             const sortOrder = req.query.sortOrder || 'desc';
             const exclusiveFilter = req.query.exclusiveFilter === 'true';
+
+            context.log('Parsed filters:', { peopleIds, eventId, noPeople, sortOrder, exclusiveFilter });
 
             let mediaQuery = `
                 SELECT DISTINCT p.*
@@ -400,11 +405,23 @@ module.exports = async function (context, req) {
             const orderDirection = sortOrder === 'asc' ? 'ASC' : 'DESC';
             mediaQuery += ` ORDER BY p.PYear ${orderDirection}, p.PMonth ${orderDirection}, p.PFileName ${orderDirection}`;
 
-            const media = await query(mediaQuery, params);
+            context.log('Executing main media query...');
+            context.log('Query:', mediaQuery);
+            context.log('Params:', JSON.stringify(params));
+            
+            let media;
+            try {
+                media = await query(mediaQuery, params);
+                context.log(`Found ${media.length} media items`);
+            } catch (queryError) {
+                context.log.error('Error executing main media query:', queryError);
+                throw queryError;
+            }
 
             // Fetch tagged people for all photos in one query
             let taggedPeopleMap = {};
             if (media.length > 0) {
+                context.log('Fetching tagged people for media items...');
                 const peopleQuery = `
                     SELECT np.npFileName, ne.ID, ne.neName
                     FROM dbo.NamePhoto np
@@ -418,7 +435,17 @@ module.exports = async function (context, req) {
                     peopleParams[`filename${i}`] = item.PFileName;
                 });
                 
-                const taggedPeopleResults = await query(peopleQuery, peopleParams);
+                context.log('Executing tagged people query...');
+                context.log(`Query will fetch people for ${media.length} media items`);
+                
+                let taggedPeopleResults;
+                try {
+                    taggedPeopleResults = await query(peopleQuery, peopleParams);
+                    context.log(`Found ${taggedPeopleResults.length} people tags`);
+                } catch (peopleQueryError) {
+                    context.log.error('Error fetching tagged people:', peopleQueryError);
+                    throw peopleQueryError;
+                }
                 
                 // Group by filename
                 taggedPeopleResults.forEach(row => {
@@ -434,44 +461,54 @@ module.exports = async function (context, req) {
 
             // Transform results to construct proper blob URLs
             // Combine PFileDirectory and PFileName to get the full blob path
-            const transformedMedia = media.map(item => {
-                const directory = item.PFileDirectory || '';
-                const fileName = item.PFileName || '';
-                
-                // Construct the blob path: directory/filename
-                // But check if fileName already contains the directory to avoid duplication
-                let blobPath;
-                if (directory && fileName.startsWith(directory)) {
-                    // Filename already contains the full path
-                    blobPath = fileName;
-                } else if (directory) {
-                    // Need to combine directory and filename
-                    blobPath = `${directory}/${fileName}`;
-                } else {
-                    // No directory, just use filename
-                    blobPath = fileName;
-                }
-                
-                // Normalize slashes (convert backslash to forward slash)
-                blobPath = blobPath.replace(/\\/g, '/');
-                
-                // The database stores filenames that match blob storage exactly
-                // Some blob names have URL-encoded characters (%27, %20) as part of the blob name
-                // Don't encode again - use the blob path as-is
-                
-                return {
-                    ...item,
-                    PBlobUrl: `/api/media/${blobPath}`,
-                    PThumbnailUrl: `/api/media/${blobPath}?thumbnail=true`,
-                    TaggedPeople: taggedPeopleMap[item.PFileName] || []
-                };
-            });
+            context.log('Transforming media results with blob URLs...');
+            
+            let transformedMedia;
+            try {
+                transformedMedia = media.map(item => {
+                    const directory = item.PFileDirectory || '';
+                    const fileName = item.PFileName || '';
+                    
+                    // Construct the blob path: directory/filename
+                    // But check if fileName already contains the directory to avoid duplication
+                    let blobPath;
+                    if (directory && fileName.startsWith(directory)) {
+                        // Filename already contains the full path
+                        blobPath = fileName;
+                    } else if (directory) {
+                        // Need to combine directory and filename
+                        blobPath = `${directory}/${fileName}`;
+                    } else {
+                        // No directory, just use filename
+                        blobPath = fileName;
+                    }
+                    
+                    // Normalize slashes (convert backslash to forward slash)
+                    blobPath = blobPath.replace(/\\/g, '/');
+                    
+                    // The database stores filenames that match blob storage exactly
+                    // Some blob names have URL-encoded characters (%27, %20) as part of the blob name
+                    // Don't encode again - use the blob path as-is
+                    
+                    return {
+                        ...item,
+                        PBlobUrl: `/api/media/${blobPath}`,
+                        PThumbnailUrl: `/api/media/${blobPath}?thumbnail=true`,
+                        TaggedPeople: taggedPeopleMap[item.PFileName] || []
+                    };
+                });
+                context.log(`Transformed ${transformedMedia.length} media items successfully`);
+            } catch (transformError) {
+                context.log.error('Error transforming media results:', transformError);
+                throw transformError;
+            }
 
             context.res = {
                 status: 200,
                 headers: { 'Content-Type': 'application/json' },
                 body: transformedMedia
             };
+            context.log('Media list response sent successfully');
             return;
         }
 
