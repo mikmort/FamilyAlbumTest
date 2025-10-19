@@ -50,18 +50,21 @@ export default function PeopleSelector({
 
   // Auto-retry logic for cold starts
   useEffect(() => {
-    if (isWarmingUp && autoRetryAttempt < 30) { // Max 30 attempts (60 seconds)
+    if (isWarmingUp && autoRetryAttempt < 12) { // Max 12 attempts (60 seconds at 5s intervals)
       const retryTimer = setTimeout(() => {
         setAutoRetryAttempt(prev => prev + 1);
         fetchData();
-      }, 2000);
+      }, 5000); // Check every 5 seconds
       return () => clearTimeout(retryTimer);
     }
   }, [isWarmingUp, autoRetryAttempt]);
 
   const fetchData = async () => {
     try {
-      setLoading(true);
+      // Only set loading on first attempt to avoid flash during auto-retries
+      if (!isWarmingUp || autoRetryAttempt === 0) {
+        setLoading(true);
+      }
       setError(null);
       
       // Shorter timeout to detect cold starts faster
@@ -171,8 +174,8 @@ export default function PeopleSelector({
             <div className="progress-fill"></div>
           </div>
           <p className="loading-hint">
-            ☕ Grab a coffee! We're checking every 2 seconds...
-            {autoRetryAttempt > 0 && ` (Attempt ${autoRetryAttempt + 1}/30)`}
+            ☕ Grab a coffee! We're checking every 5 seconds...
+            {autoRetryAttempt > 0 && ` (Attempt ${autoRetryAttempt + 1}/12)`}
           </p>
         </div>
       </div>
