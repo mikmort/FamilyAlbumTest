@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { MediaItem, Person } from '@/lib/types';
+import { MediaItem, Person, Event } from '@/lib/types';
 
 interface MediaDetailModalProps {
   media: MediaItem;
@@ -20,14 +20,23 @@ export default function MediaDetailModal({
   const [description, setDescription] = useState(media.PDescription || '');
   const [month, setMonth] = useState<number | ''>(media.PMonth || '');
   const [year, setYear] = useState<number | ''>(media.PYear || '');
+  const [selectedEvent, setSelectedEvent] = useState<number | ''>('');
   const [taggedPeople, setTaggedPeople] = useState<Array<{ ID: number; neName: string }>>(
     media.TaggedPeople || []
   );
   
   const [allPeople, setAllPeople] = useState<Person[]>([]);
+  const [allEvents, setAllEvents] = useState<Event[]>([]);
   const [showPeopleSelector, setShowPeopleSelector] = useState(false);
   const [loadingPeople, setLoadingPeople] = useState(false);
+  const [loadingEvents, setLoadingEvents] = useState(false);
   const [savingTag, setSavingTag] = useState(false);
+
+  useEffect(() => {
+    if (editing && allEvents.length === 0) {
+      fetchEvents();
+    }
+  }, [editing]);
 
   useEffect(() => {
     if (showPeopleSelector && allPeople.length === 0) {
@@ -47,6 +56,23 @@ export default function MediaDetailModal({
       alert('Failed to load people list');
     } finally {
       setLoadingPeople(false);
+    }
+  };
+
+  const fetchEvents = async () => {
+    try {
+      setLoadingEvents(true);
+      const response = await fetch('/api/events');
+      if (!response.ok) throw new Error('Failed to fetch events');
+      const data = await response.json();
+      if (data.success) {
+        setAllEvents(data.events);
+      }
+    } catch (error) {
+      console.error('Error fetching events:', error);
+      alert('Failed to load events list');
+    } finally {
+      setLoadingEvents(false);
     }
   };
 
@@ -114,9 +140,33 @@ export default function MediaDetailModal({
   };
 
   const handleSave = async () => {
-    // TODO: Implement update functionality with proper API endpoint
-    alert('Update functionality to be implemented');
-    setEditing(false);
+    try {
+      const response = await fetch(`/api/media/${encodeURIComponent(media.PFileName)}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          description,
+          month: month || null,
+          year: year || null,
+          eventID: selectedEvent || null,
+        }),
+      });
+
+      if (!response.ok) throw new Error('Failed to update media');
+
+      const data = await response.json();
+      
+      if (data.success && onUpdate) {
+        // Update parent with new data
+        onUpdate({ ...media, ...data.media, TaggedPeople: taggedPeople });
+      }
+
+      setEditing(false);
+      alert('Successfully updated!');
+    } catch (error) {
+      console.error('Error updating media:', error);
+      alert('Failed to update media');
+    }
   };
 
   return (
@@ -247,6 +297,29 @@ export default function MediaDetailModal({
                 />
               ) : (
                 <p>{description || 'No description'}</p>
+              )}
+            </div>
+
+            <div className="form-group">
+              <label>Event:</label>
+              {editing ? (
+                loadingEvents ? (
+                  <div className="loading-spinner"></div>
+                ) : (
+                  <select
+                    value={selectedEvent}
+                    onChange={(e) => setSelectedEvent(e.target.value ? parseInt(e.target.value) : '')}
+                  >
+                    <option value="">-- No Event --</option>
+                    {allEvents.map((event) => (
+                      <option key={event.ID} value={event.ID}>
+                        {event.neName} ({event.neCount} photos)
+                      </option>
+                    ))}
+                  </select>
+                )
+              ) : (
+                <p>{selectedEvent ? allEvents.find(e => e.ID === selectedEvent)?.neName || 'Not set' : 'Not set'}</p>
               )}
             </div>
 

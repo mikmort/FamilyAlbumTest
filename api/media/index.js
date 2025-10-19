@@ -462,6 +462,99 @@ module.exports = async function (context, req) {
             return;
         }
 
+        // PATCH /api/media/{filename} - Update media metadata
+        if (method === 'PATCH' && filename) {
+            const { description, month, year, eventID } = req.body;
+
+            context.log('Updating media:', filename);
+            context.log('Update data:', { description, month, year, eventID });
+
+            // Build update query dynamically based on provided fields
+            const updates = [];
+            const params = { filename };
+
+            if (description !== undefined) {
+                updates.push('PDescription = @description');
+                params.description = description || null;
+            }
+
+            if (month !== undefined) {
+                updates.push('PMonth = @month');
+                params.month = month || null;
+            }
+
+            if (year !== undefined) {
+                updates.push('PYear = @year');
+                params.year = year || null;
+            }
+
+            if (eventID !== undefined) {
+                // Note: eventID is stored in PPeopleList column (legacy design)
+                // For now, we'll skip event updates - would need schema change
+                context.log('Event update not yet implemented');
+            }
+
+            if (updates.length === 0) {
+                context.res = {
+                    status: 400,
+                    body: { error: 'No fields to update' }
+                };
+                return;
+            }
+
+            updates.push('PLastModifiedDate = GETDATE()');
+
+            const updateQuery = `
+                UPDATE dbo.Pictures
+                SET ${updates.join(', ')}
+                WHERE PFileName = @filename
+            `;
+
+            context.log('Executing update query:', updateQuery);
+            context.log('With params:', params);
+
+            await execute(updateQuery, params);
+
+            // Fetch updated record to return
+            const selectQuery = `
+                SELECT 
+                    PFileName,
+                    PFileDirectory,
+                    PDescription,
+                    PMonth,
+                    PYear,
+                    PBlobUrl,
+                    PThumbnailUrl,
+                    PType,
+                    PWidth,
+                    PHeight,
+                    PTime,
+                    PPeopleList,
+                    PNameCount
+                FROM dbo.Pictures
+                WHERE PFileName = @filename
+            `;
+
+            const result = await query(selectQuery, { filename });
+            
+            if (result.length === 0) {
+                context.res = {
+                    status: 404,
+                    body: { error: 'Media not found after update' }
+                };
+                return;
+            }
+
+            context.res = {
+                status: 200,
+                body: {
+                    success: true,
+                    media: result[0]
+                }
+            };
+            return;
+        }
+
         context.res = {
             status: 405,
             body: { error: 'Method not allowed' }
