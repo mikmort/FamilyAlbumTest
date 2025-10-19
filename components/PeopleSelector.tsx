@@ -35,6 +35,7 @@ export default function PeopleSelector({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [dataLoaded, setDataLoaded] = useState(false);
+  const [retryCount, setRetryCount] = useState(0);
 
   useEffect(() => {
     // Only fetch if we haven't loaded data yet
@@ -48,13 +49,21 @@ export default function PeopleSelector({
   const fetchData = async () => {
     try {
       setLoading(true);
+      setError(null);
+      
+      // Increase timeout for cold starts
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 60000);
+      
       const [peopleRes, eventsRes] = await Promise.all([
-        fetch('/api/people'),
-        fetch('/api/events'),
+        fetch('/api/people', { signal: controller.signal }),
+        fetch('/api/events', { signal: controller.signal }),
       ]);
+      
+      clearTimeout(timeoutId);
 
       if (!peopleRes.ok || !eventsRes.ok) {
-        throw new Error('Failed to fetch data');
+        throw new Error('Failed to fetch data from server');
       }
 
       const peopleData = await peopleRes.json();
@@ -63,11 +72,25 @@ export default function PeopleSelector({
       setPeople(peopleData);
       setEvents(eventsData);
       setDataLoaded(true);
+      setRetryCount(0);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'An error occurred');
+      if (err instanceof Error) {
+        if (err.name === 'AbortError') {
+          setError('The request timed out. The database may be warming up.');
+        } else {
+          setError(err.message);
+        }
+      } else {
+        setError('An error occurred');
+      }
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleRetry = () => {
+    setRetryCount(prev => prev + 1);
+    fetchData();
   };
 
   const togglePerson = (personId: number) => {
@@ -106,12 +129,21 @@ export default function PeopleSelector({
 
   if (error) {
     return (
-      <div className="card">
-        <h2>Error</h2>
-        <p>{error}</p>
-        <button className="btn btn-primary mt-2" onClick={fetchData}>
-          Retry
-        </button>
+      <div className="error-container">
+        <div className="error-card">
+          <div className="error-icon">⚠️</div>
+          <h2>Unable to Load People List</h2>
+          <p className="error-message">{error}</p>
+          {error.includes('warming up') || error.includes('timed out') ? (
+            <div className="error-hint">
+              <p><strong>💡 Tip:</strong> The database may need a moment to start up.</p>
+              <p>This is normal after periods of inactivity. Click retry!</p>
+            </div>
+          ) : null}
+          <button className="btn btn-primary mt-2" onClick={handleRetry}>
+            🔄 Retry {retryCount > 0 && `(Attempt ${retryCount + 1})`}
+          </button>
+        </div>
       </div>
     );
   }
