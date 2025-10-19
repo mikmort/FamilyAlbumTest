@@ -36,6 +36,8 @@ export default function PeopleSelector({
   const [error, setError] = useState<string | null>(null);
   const [dataLoaded, setDataLoaded] = useState(false);
   const [retryCount, setRetryCount] = useState(0);
+  const [isWarmingUp, setIsWarmingUp] = useState(false);
+  const [autoRetryAttempt, setAutoRetryAttempt] = useState(0);
 
   useEffect(() => {
     // Only fetch if we haven't loaded data yet
@@ -46,14 +48,25 @@ export default function PeopleSelector({
     }
   }, [dataLoaded]);
 
+  // Auto-retry logic for cold starts
+  useEffect(() => {
+    if (isWarmingUp && autoRetryAttempt < 30) { // Max 30 attempts (60 seconds)
+      const retryTimer = setTimeout(() => {
+        setAutoRetryAttempt(prev => prev + 1);
+        fetchData();
+      }, 2000);
+      return () => clearTimeout(retryTimer);
+    }
+  }, [isWarmingUp, autoRetryAttempt]);
+
   const fetchData = async () => {
     try {
       setLoading(true);
       setError(null);
       
-      // Increase timeout for cold starts
+      // Shorter timeout to detect cold starts faster
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 60000);
+      const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
       
       const [peopleRes, eventsRes] = await Promise.all([
         fetch('/api/people', { signal: controller.signal }),
@@ -63,6 +76,11 @@ export default function PeopleSelector({
       clearTimeout(timeoutId);
 
       if (!peopleRes.ok || !eventsRes.ok) {
+        // Check if it's a cold start (502, 503, 504 errors)
+        if (peopleRes.status >= 502 && peopleRes.status <= 504) {
+          setIsWarmingUp(true);
+          throw new Error('Database is warming up...');
+        }
         throw new Error('Failed to fetch data from server');
       }
 
@@ -73,10 +91,20 @@ export default function PeopleSelector({
       setEvents(eventsData);
       setDataLoaded(true);
       setRetryCount(0);
+      setIsWarmingUp(false);
+      setAutoRetryAttempt(0);
     } catch (err) {
       if (err instanceof Error) {
         if (err.name === 'AbortError') {
-          setError('The request timed out. The database may be warming up.');
+          setIsWarmingUp(true);
+          setError('Database is warming up...');
+        } else if (err.message.includes('warming up')) {
+          setIsWarmingUp(true);
+          setError(err.message);
+        } else if (err.message.includes('Failed to fetch')) {
+          // Network errors might indicate cold start
+          setIsWarmingUp(true);
+          setError('Database is warming up...');
         } else {
           setError(err.message);
         }
@@ -90,6 +118,8 @@ export default function PeopleSelector({
 
   const handleRetry = () => {
     setRetryCount(prev => prev + 1);
+    setIsWarmingUp(false);
+    setAutoRetryAttempt(0);
     fetchData();
   };
 
@@ -100,6 +130,28 @@ export default function PeopleSelector({
       onSelectedPeopleChange([...selectedPeople, personId]);
     }
   };
+
+  if (loading && isWarmingUp) {
+    return (
+      <div className="loading-container">
+        <div className="loading-card">
+          <div className="loading-spinner"></div>
+          <h2>Database is Warming Up</h2>
+          <p className="loading-message">
+            The Azure SQL database is starting up after being idle.
+            This usually takes 10-30 seconds.
+          </p>
+          <div className="progress-bar">
+            <div className="progress-fill"></div>
+          </div>
+          <p className="loading-hint">
+            ☕ Grab a coffee! We're checking every 2 seconds...
+            {autoRetryAttempt > 0 && ` (Attempt ${autoRetryAttempt + 1}/30)`}
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   if (loading) {
     return (
@@ -127,19 +179,17 @@ export default function PeopleSelector({
     );
   }
 
-  if (error) {
+  if (error && !isWarmingUp) {
     return (
       <div className="error-container">
         <div className="error-card">
           <div className="error-icon">⚠️</div>
           <h2>Unable to Load People List</h2>
           <p className="error-message">{error}</p>
-          {error.includes('warming up') || error.includes('timed out') ? (
-            <div className="error-hint">
-              <p><strong>💡 Tip:</strong> The database may need a moment to start up.</p>
-              <p>This is normal after periods of inactivity. Click retry!</p>
-            </div>
-          ) : null}
+          <div className="error-hint">
+            <p><strong>💡 Tip:</strong> Try clicking retry below.</p>
+            <p>If the issue persists, the database may need to warm up.</p>
+          </div>
           <button className="btn btn-primary mt-2" onClick={handleRetry}>
             🔄 Retry {retryCount > 0 && `(Attempt ${retryCount + 1})`}
           </button>
