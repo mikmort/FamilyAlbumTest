@@ -91,6 +91,16 @@ export default function ThumbnailGallery({
       }
 
       const data = await res.json();
+      
+      // Log video thumbnails for debugging
+      const videoItems = data.filter((item: MediaItem) => item.PType === 2);
+      if (videoItems.length > 0) {
+        console.log('📹 Video items loaded:', videoItems.map((item: MediaItem) => ({
+          fileName: item.PFileName,
+          thumbnailUrl: item.PThumbnailUrl
+        })));
+      }
+      
       setMedia(data);
       setRetryCount(0);
       setIsWarmingUp(false);
@@ -191,6 +201,15 @@ export default function ThumbnailGallery({
             <img
               src={item.PThumbnailUrl || '/placeholder.svg'}
               alt={item.PDescription || item.PFileName}
+              onError={(e) => {
+                console.error('❌ Thumbnail failed to load:', {
+                  fileName: item.PFileName,
+                  thumbnailUrl: item.PThumbnailUrl,
+                  type: item.PType === 2 ? 'video' : 'image'
+                });
+                // Set a gray placeholder on error
+                (e.target as HTMLImageElement).src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="200" height="200"%3E%3Crect width="200" height="200" fill="%23ddd"/%3E%3Ctext x="50%25" y="50%25" text-anchor="middle" dy=".3em" fill="%23999" font-family="sans-serif"%3ENo Thumbnail%3C/text%3E%3C/svg%3E';
+              }}
             />
             {item.PType === 2 && (
               <div className="video-indicator">

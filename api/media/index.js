@@ -19,9 +19,12 @@ try {
     ffmpeg = require('fluent-ffmpeg');
     ffmpegPath = require('ffmpeg-static');
     ffmpeg.setFfmpegPath(ffmpegPath);
-    console.log('FFmpeg loaded successfully:', ffmpegPath);
+    console.log('✅ FFmpeg loaded successfully:', ffmpegPath);
+    console.log('FFmpeg module version:', require('fluent-ffmpeg/package.json').version);
+    console.log('FFmpeg static version:', require('ffmpeg-static/package.json').version);
 } catch (err) {
-    console.warn('FFmpeg module not available - video thumbnail generation disabled:', err.message);
+    console.warn('⚠️ FFmpeg module not available - video thumbnail generation disabled:', err.message);
+    console.warn('Error stack:', err.stack);
 }
 
 module.exports = async function (context, req) {
@@ -181,13 +184,17 @@ module.exports = async function (context, req) {
                     if (isVideo && ffmpeg) {
                         // Extract video frame using ffmpeg
                         context.log(`Video file detected (${fileExt}), extracting frame with ffmpeg`);
+                        context.log(`FFmpeg path: ${ffmpegPath}`);
+                        context.log(`Original buffer size: ${originalBuffer.length} bytes`);
                         
                         try {
                             const thumbnailBuffer = await extractVideoFrame(originalBuffer, context);
+                            context.log(`FFmpeg extraction successful, thumbnail buffer size: ${thumbnailBuffer.length} bytes`);
                             
                             // Resize the extracted frame using sharp if available
                             let finalThumbnail = thumbnailBuffer;
                             if (sharp) {
+                                context.log(`Resizing thumbnail with sharp`);
                                 finalThumbnail = await sharp(thumbnailBuffer)
                                     .resize(300, null, {
                                         fit: 'inside',
@@ -195,23 +202,27 @@ module.exports = async function (context, req) {
                                     })
                                     .jpeg({ quality: 80 })
                                     .toBuffer();
+                                context.log(`Sharp resize successful, final size: ${finalThumbnail.length} bytes`);
                             }
                             
                             // Upload thumbnail to blob storage
+                            context.log(`Uploading thumbnail to blob storage: ${thumbnailPath}`);
                             await uploadBlob(thumbnailPath, finalThumbnail, 'image/jpeg');
-                            context.log(`Video thumbnail generated and saved: ${thumbnailPath}`);
+                            context.log(`✅ Video thumbnail generated and saved: ${thumbnailPath}`);
                             blobPath = thumbnailPath;
                         } catch (ffmpegError) {
-                            context.log.error(`Error extracting video frame: ${ffmpegError.message}`);
+                            context.log.error(`❌ Error extracting video frame: ${ffmpegError.message}`);
                             context.log.error(`FFmpeg error stack: ${ffmpegError.stack}`);
+                            context.log.error(`FFmpeg error details:`, ffmpegError);
                             
                             // Fall back to placeholder
+                            context.log.warn(`Falling back to placeholder thumbnail for video`);
                             const placeholderBuffer = Buffer.from(
                                 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==',
                                 'base64'
                             );
                             await uploadBlob(thumbnailPath, placeholderBuffer, 'image/png');
-                            context.log(`Using placeholder for video thumbnail: ${thumbnailPath}`);
+                            context.log(`⚠️ Using placeholder for video thumbnail: ${thumbnailPath}`);
                             blobPath = thumbnailPath;
                         }
                     } else if (isVideo && !ffmpeg) {
