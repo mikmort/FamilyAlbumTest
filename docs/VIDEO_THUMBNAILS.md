@@ -15,7 +15,7 @@ The system detects video files by extension:
 - FLV
 
 ### 2. **Frame Extraction**
-- Uses **fluent-ffmpeg** and **ffmpeg-static** packages
+- Uses **fluent-ffmpeg** and **@ffmpeg-installer/ffmpeg** packages
 - Extracts a frame at the **1-second mark** of the video
 - Generates a 640px wide frame (height auto-calculated)
 - Falls back to placeholder if extraction fails
@@ -40,18 +40,21 @@ If FFmpeg is not available:
 - All other functionality works normally
 
 ### Production (Azure Functions - Linux x64)
-- FFmpeg-static provides pre-built Linux x64 binaries
+- @ffmpeg-installer/ffmpeg provides pre-built Linux x64 binaries
 - Full video thumbnail extraction works perfectly
 - Automatic and transparent
+- Switched from ffmpeg-static for better compatibility
 
 ## Dependencies
 
 ```json
 {
   "fluent-ffmpeg": "^2.1.3",
-  "ffmpeg-static": "^5.2.0"
+  "@ffmpeg-installer/ffmpeg": "^1.1.0"
 }
 ```
+
+**Note:** Previously used `ffmpeg-static`, but switched to `@ffmpeg-installer/ffmpeg` for better cross-platform support and Azure Functions compatibility.
 
 ## API Usage
 
