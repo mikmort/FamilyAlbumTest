@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { MediaItem, Person } from '@/lib/types';
+import { MediaItem, Person, Event } from '@/lib/types';
 
 interface MediaDetailModalProps {
   media: MediaItem;
@@ -20,14 +20,33 @@ export default function MediaDetailModal({
   const [description, setDescription] = useState(media.PDescription || '');
   const [month, setMonth] = useState<number | ''>(media.PMonth || '');
   const [year, setYear] = useState<number | ''>(media.PYear || '');
+  const [selectedEvent, setSelectedEvent] = useState<number | ''>('');
   const [taggedPeople, setTaggedPeople] = useState<Array<{ ID: number; neName: string }>>(
     media.TaggedPeople || []
   );
   
   const [allPeople, setAllPeople] = useState<Person[]>([]);
+  const [allEvents, setAllEvents] = useState<Event[]>([]);
   const [showPeopleSelector, setShowPeopleSelector] = useState(false);
   const [loadingPeople, setLoadingPeople] = useState(false);
+  const [loadingEvents, setLoadingEvents] = useState(false);
   const [savingTag, setSavingTag] = useState(false);
+  
+  // Inline creation state
+  const [showCreatePerson, setShowCreatePerson] = useState(false);
+  const [showCreateEvent, setShowCreateEvent] = useState(false);
+  const [newPersonName, setNewPersonName] = useState('');
+  const [newPersonRelation, setNewPersonRelation] = useState('');
+  const [newEventName, setNewEventName] = useState('');
+  const [newEventDetails, setNewEventDetails] = useState('');
+  const [creatingPerson, setCreatingPerson] = useState(false);
+  const [creatingEvent, setCreatingEvent] = useState(false);
+
+  useEffect(() => {
+    if (editing && allEvents.length === 0) {
+      fetchEvents();
+    }
+  }, [editing]);
 
   useEffect(() => {
     if (showPeopleSelector && allPeople.length === 0) {
@@ -39,14 +58,49 @@ export default function MediaDetailModal({
     try {
       setLoadingPeople(true);
       const response = await fetch('/api/people');
-      if (!response.ok) throw new Error('Failed to fetch people');
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+        console.error('❌ People API Error:', {
+          status: response.status,
+          statusText: response.statusText,
+          url: response.url,
+          errorData: errorData
+        });
+        throw new Error(errorData.message || 'Failed to fetch people');
+      }
       const data = await response.json();
       setAllPeople(data);
     } catch (error) {
-      console.error('Error fetching people:', error);
+      console.error('❌ MediaDetailModal fetchPeople error:', error);
       alert('Failed to load people list');
     } finally {
       setLoadingPeople(false);
+    }
+  };
+
+  const fetchEvents = async () => {
+    try {
+      setLoadingEvents(true);
+      const response = await fetch('/api/events');
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+        console.error('❌ Events API Error:', {
+          status: response.status,
+          statusText: response.statusText,
+          url: response.url,
+          errorData: errorData
+        });
+        throw new Error(errorData.message || 'Failed to fetch events');
+      }
+      const data = await response.json();
+      if (data.success) {
+        setAllEvents(data.events);
+      }
+    } catch (error) {
+      console.error('❌ MediaDetailModal fetchEvents error:', error);
+      alert('Failed to load events list');
+    } finally {
+      setLoadingEvents(false);
     }
   };
 
@@ -65,7 +119,16 @@ export default function MediaDetailModal({
         body: JSON.stringify({ personId, position: 0 }),
       });
 
-      if (!response.ok) throw new Error('Failed to tag person');
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+        console.error('❌ Tag person API Error:', {
+          status: response.status,
+          statusText: response.statusText,
+          url: response.url,
+          errorData: errorData
+        });
+        throw new Error(errorData.message || 'Failed to tag person');
+      }
 
       // Find the person details
       const person = allPeople.find(p => p.ID === personId);
@@ -81,7 +144,7 @@ export default function MediaDetailModal({
       
       setShowPeopleSelector(false);
     } catch (error) {
-      console.error('Error tagging person:', error);
+      console.error('❌ MediaDetailModal handleAddPerson error:', error);
       alert('Failed to tag person');
     } finally {
       setSavingTag(false);
@@ -98,7 +161,16 @@ export default function MediaDetailModal({
         body: JSON.stringify({ personId }),
       });
 
-      if (!response.ok) throw new Error('Failed to remove person tag');
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+        console.error('❌ Remove tag API Error:', {
+          status: response.status,
+          statusText: response.statusText,
+          url: response.url,
+          errorData: errorData
+        });
+        throw new Error(errorData.message || 'Failed to remove person tag');
+      }
 
       const newTaggedPeople = taggedPeople.filter(p => p.ID !== personId);
       setTaggedPeople(newTaggedPeople);
@@ -108,15 +180,138 @@ export default function MediaDetailModal({
         onUpdate({ ...media, TaggedPeople: newTaggedPeople });
       }
     } catch (error) {
-      console.error('Error removing person tag:', error);
+      console.error('❌ MediaDetailModal handleRemovePerson error:', error);
       alert('Failed to remove person tag');
     }
   };
 
   const handleSave = async () => {
-    // TODO: Implement update functionality with proper API endpoint
-    alert('Update functionality to be implemented');
-    setEditing(false);
+    try {
+      const response = await fetch(`/api/media/${encodeURIComponent(media.PFileName)}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          description,
+          month: month || null,
+          year: year || null,
+          eventID: selectedEvent || null,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+        console.error('❌ Update media API Error:', {
+          status: response.status,
+          statusText: response.statusText,
+          url: response.url,
+          errorData: errorData
+        });
+        throw new Error(errorData.message || 'Failed to update media');
+      }
+
+      const data = await response.json();
+      
+      if (data.success && onUpdate) {
+        // Update parent with new data
+        onUpdate({ ...media, ...data.media, TaggedPeople: taggedPeople });
+      }
+
+      setEditing(false);
+      alert('Successfully updated!');
+    } catch (error) {
+      console.error('❌ MediaDetailModal handleSave error:', error);
+      alert('Failed to update media');
+    }
+  };
+
+  const handleCreatePerson = async () => {
+    if (!newPersonName.trim()) {
+      alert('Please enter a name');
+      return;
+    }
+
+    try {
+      setCreatingPerson(true);
+      const response = await fetch('/api/people', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          neName: newPersonName.trim(),
+          neRelation: newPersonRelation.trim() || null,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+        throw new Error(errorData.message || 'Failed to create person');
+      }
+
+      const data = await response.json();
+      
+      if (data.success && data.person) {
+        // Add to people list
+        const newPerson = { ...data.person, neCount: 0 };
+        setAllPeople([...allPeople, newPerson].sort((a, b) => a.neName.localeCompare(b.neName)));
+        
+        // Automatically tag the newly created person
+        await handleAddPerson(data.person.ID);
+        
+        // Reset form
+        setNewPersonName('');
+        setNewPersonRelation('');
+        setShowCreatePerson(false);
+      }
+    } catch (error) {
+      console.error('❌ Create person error:', error);
+      alert('Failed to create person');
+    } finally {
+      setCreatingPerson(false);
+    }
+  };
+
+  const handleCreateEvent = async () => {
+    if (!newEventName.trim()) {
+      alert('Please enter an event name');
+      return;
+    }
+
+    try {
+      setCreatingEvent(true);
+      const response = await fetch('/api/events', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          neName: newEventName.trim(),
+          neRelation: newEventDetails.trim() || null,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+        throw new Error(errorData.message || 'Failed to create event');
+      }
+
+      const data = await response.json();
+      
+      if (data.success && data.event) {
+        // Add to events list
+        const newEvent = { ...data.event, neCount: 0 };
+        setAllEvents([...allEvents, newEvent].sort((a, b) => a.neName.localeCompare(b.neName)));
+        
+        // Automatically select the newly created event
+        setSelectedEvent(data.event.ID);
+        
+        // Reset form
+        setNewEventName('');
+        setNewEventDetails('');
+        setShowCreateEvent(false);
+      }
+    } catch (error) {
+      console.error('❌ Create event error:', error);
+      alert('Failed to create event');
+    } finally {
+      setCreatingEvent(false);
+    }
   };
 
   return (
@@ -154,7 +349,7 @@ export default function MediaDetailModal({
 
       {/* Detail Modal */}
       <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '1200px' }}>
+      <div className="modal-content" onClick={(e) => e.stopPropagation()}>
         <button
           onClick={onClose}
           style={{
@@ -165,6 +360,7 @@ export default function MediaDetailModal({
             border: 'none',
             fontSize: '2rem',
             cursor: 'pointer',
+            zIndex: 10,
           }}
         >
           ×
@@ -192,7 +388,7 @@ export default function MediaDetailModal({
           </div>
 
           <div className="metadata-panel">
-            <h2>{media.PFileName}</h2>
+            <h2 style={{ marginTop: 0 }}>{media.PFileName}</h2>
             <p>
               <strong>Dimensions:</strong> {media.PWidth} x {media.PHeight}
             </p>
@@ -251,6 +447,81 @@ export default function MediaDetailModal({
             </div>
 
             <div className="form-group">
+              <label>Event:</label>
+              {editing ? (
+                loadingEvents ? (
+                  <div className="loading-spinner"></div>
+                ) : (
+                  <>
+                    <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.5rem' }}>
+                      <select
+                        value={selectedEvent}
+                        onChange={(e) => setSelectedEvent(e.target.value ? parseInt(e.target.value) : '')}
+                        style={{ flex: 1 }}
+                      >
+                        <option value="">-- No Event --</option>
+                        {allEvents.map((event) => (
+                          <option key={event.ID} value={event.ID}>
+                            {event.neName} ({event.neCount} photos)
+                          </option>
+                        ))}
+                      </select>
+                      <button
+                        className="btn btn-secondary"
+                        onClick={() => setShowCreateEvent(true)}
+                        title="Create new event"
+                      >
+                        + New
+                      </button>
+                    </div>
+                    
+                    {/* Inline Event Creation Form */}
+                    {showCreateEvent && (
+                      <div className="inline-create-form">
+                        <h4>Create New Event</h4>
+                        <input
+                          type="text"
+                          placeholder="Event name"
+                          value={newEventName}
+                          onChange={(e) => setNewEventName(e.target.value)}
+                          autoFocus
+                        />
+                        <textarea
+                          placeholder="Event details (optional)"
+                          value={newEventDetails}
+                          onChange={(e) => setNewEventDetails(e.target.value)}
+                          rows={2}
+                        />
+                        <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem' }}>
+                          <button
+                            className="btn btn-success btn-sm"
+                            onClick={handleCreateEvent}
+                            disabled={creatingEvent || !newEventName.trim()}
+                          >
+                            {creatingEvent ? 'Creating...' : 'Create & Select'}
+                          </button>
+                          <button
+                            className="btn btn-secondary btn-sm"
+                            onClick={() => {
+                              setShowCreateEvent(false);
+                              setNewEventName('');
+                              setNewEventDetails('');
+                            }}
+                            disabled={creatingEvent}
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </>
+                )
+              ) : (
+                <p>{selectedEvent ? allEvents.find(e => e.ID === selectedEvent)?.neName || 'Not set' : 'Not set'}</p>
+              )}
+            </div>
+
+            <div className="form-group">
               <label>Tagged People:</label>
               {taggedPeople.length > 0 ? (
                 <div className="tagged-people-list">
@@ -287,13 +558,63 @@ export default function MediaDetailModal({
                     <div className="people-selector-dropdown">
                       <div className="flex flex-between mb-1">
                         <strong>Select a person:</strong>
-                        <button
-                          className="btn btn-secondary btn-sm"
-                          onClick={() => setShowPeopleSelector(false)}
-                        >
-                          Cancel
-                        </button>
+                        <div style={{ display: 'flex', gap: '0.5rem' }}>
+                          <button
+                            className="btn btn-success btn-sm"
+                            onClick={() => setShowCreatePerson(true)}
+                            title="Create new person"
+                          >
+                            + New
+                          </button>
+                          <button
+                            className="btn btn-secondary btn-sm"
+                            onClick={() => setShowPeopleSelector(false)}
+                          >
+                            Cancel
+                          </button>
+                        </div>
                       </div>
+                      
+                      {/* Inline Person Creation Form */}
+                      {showCreatePerson && (
+                        <div className="inline-create-form" style={{ marginBottom: '1rem' }}>
+                          <h4>Create New Person</h4>
+                          <input
+                            type="text"
+                            placeholder="Full name"
+                            value={newPersonName}
+                            onChange={(e) => setNewPersonName(e.target.value)}
+                            autoFocus
+                          />
+                          <input
+                            type="text"
+                            placeholder="Relationship (e.g., Uncle, Cousin)"
+                            value={newPersonRelation}
+                            onChange={(e) => setNewPersonRelation(e.target.value)}
+                          />
+                          <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem' }}>
+                            <button
+                              className="btn btn-success btn-sm"
+                              onClick={handleCreatePerson}
+                              disabled={creatingPerson || !newPersonName.trim()}
+                            >
+                              {creatingPerson ? 'Creating...' : 'Create & Tag'}
+                            </button>
+                            <button
+                              className="btn btn-secondary btn-sm"
+                              onClick={() => {
+                                setShowCreatePerson(false);
+                                setNewPersonName('');
+                                setNewPersonRelation('');
+                              }}
+                              disabled={creatingPerson}
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                      
                       {loadingPeople ? (
                         <div className="loading-spinner"></div>
                       ) : (
@@ -308,8 +629,11 @@ export default function MediaDetailModal({
                                 disabled={savingTag}
                               >
                                 {person.neName}
+                                {person.neRelation && (
+                                  <span className="person-relation"> - {person.neRelation}</span>
+                                )}
                                 {person.neCount > 0 && (
-                                  <span className="person-count">({person.neCount} photos)</span>
+                                  <span className="person-count"> ({person.neCount} photos)</span>
                                 )}
                               </button>
                             ))}

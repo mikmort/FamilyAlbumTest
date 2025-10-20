@@ -35,6 +35,9 @@ export default function PeopleSelector({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [dataLoaded, setDataLoaded] = useState(false);
+  const [retryCount, setRetryCount] = useState(0);
+  const [isWarmingUp, setIsWarmingUp] = useState(false);
+  const [autoRetryAttempt, setAutoRetryAttempt] = useState(0);
 
   useEffect(() => {
     // Only fetch if we haven't loaded data yet
@@ -45,16 +48,67 @@ export default function PeopleSelector({
     }
   }, [dataLoaded]);
 
+  // Auto-retry logic for cold starts
+  useEffect(() => {
+    if (isWarmingUp && autoRetryAttempt < 12) { // Max 12 attempts (60 seconds at 5s intervals)
+      const retryTimer = setTimeout(() => {
+        setAutoRetryAttempt(prev => prev + 1);
+        fetchData();
+      }, 5000); // Check every 5 seconds
+      return () => clearTimeout(retryTimer);
+    }
+  }, [isWarmingUp, autoRetryAttempt]);
+
   const fetchData = async () => {
     try {
-      setLoading(true);
+      // Only set loading on first attempt to avoid flash during auto-retries
+      if (!isWarmingUp || autoRetryAttempt === 0) {
+        setLoading(true);
+      }
+      setError(null);
+      
+      // Shorter timeout to detect cold starts faster
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+      
       const [peopleRes, eventsRes] = await Promise.all([
-        fetch('/api/people'),
-        fetch('/api/events'),
+        fetch('/api/people', { signal: controller.signal }),
+        fetch('/api/events', { signal: controller.signal }),
       ]);
+      
+      clearTimeout(timeoutId);
 
       if (!peopleRes.ok || !eventsRes.ok) {
-        throw new Error('Failed to fetch data');
+        const failedRes = !peopleRes.ok ? peopleRes : eventsRes;
+        const apiName = !peopleRes.ok ? 'People' : 'Events';
+        
+        // Try to get detailed error info
+        const errorData = await failedRes.json().catch(() => ({ error: 'Unknown error' }));
+        
+        // Log detailed error info to console for debugging
+        console.error(`❌ ${apiName} API Error:`, {
+          status: failedRes.status,
+          statusText: failedRes.statusText,
+          url: failedRes.url,
+          errorData: errorData
+        });
+        
+        if (errorData.message) {
+          console.error('Error message:', errorData.message);
+        }
+        if (errorData.stack) {
+          console.error('Stack trace:', errorData.stack);
+        }
+        if (errorData.debug) {
+          console.error('Debug info:', errorData.debug);
+        }
+        
+        // Check if it's a cold start (502, 503, 504 errors)
+        if (failedRes.status >= 502 && failedRes.status <= 504) {
+          setIsWarmingUp(true);
+          throw new Error('Database is warming up...');
+        }
+        throw new Error(errorData.message || errorData.error || 'Failed to fetch data from server');
       }
 
       const peopleData = await peopleRes.json();
@@ -63,11 +117,39 @@ export default function PeopleSelector({
       setPeople(peopleData);
       setEvents(eventsData);
       setDataLoaded(true);
+      setRetryCount(0);
+      setIsWarmingUp(false);
+      setAutoRetryAttempt(0);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'An error occurred');
+      console.error('❌ PeopleSelector fetch error:', err);
+      
+      if (err instanceof Error) {
+        if (err.name === 'AbortError') {
+          setIsWarmingUp(true);
+          setError('Database is warming up...');
+        } else if (err.message.includes('warming up')) {
+          setIsWarmingUp(true);
+          setError(err.message);
+        } else if (err.message.includes('Failed to fetch')) {
+          // Network errors might indicate cold start
+          setIsWarmingUp(true);
+          setError('Database is warming up...');
+        } else {
+          setError(err.message);
+        }
+      } else {
+        setError('An error occurred');
+      }
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleRetry = () => {
+    setRetryCount(prev => prev + 1);
+    setIsWarmingUp(false);
+    setAutoRetryAttempt(0);
+    fetchData();
   };
 
   const togglePerson = (personId: number) => {
@@ -77,6 +159,28 @@ export default function PeopleSelector({
       onSelectedPeopleChange([...selectedPeople, personId]);
     }
   };
+
+  if (loading && isWarmingUp) {
+    return (
+      <div className="loading-container">
+        <div className="loading-card">
+          <div className="loading-spinner"></div>
+          <h2>Database is Warming Up</h2>
+          <p className="loading-message">
+            The Azure SQL database is starting up after being idle.
+            This usually takes 10-30 seconds.
+          </p>
+          <div className="progress-bar">
+            <div className="progress-fill"></div>
+          </div>
+          <p className="loading-hint">
+            ☕ Grab a coffee! We're checking every 5 seconds...
+            {autoRetryAttempt > 0 && ` (Attempt ${autoRetryAttempt + 1}/12)`}
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   if (loading) {
     return (
@@ -104,14 +208,21 @@ export default function PeopleSelector({
     );
   }
 
-  if (error) {
+  if (error && !isWarmingUp) {
     return (
-      <div className="card">
-        <h2>Error</h2>
-        <p>{error}</p>
-        <button className="btn btn-primary mt-2" onClick={fetchData}>
-          Retry
-        </button>
+      <div className="error-container">
+        <div className="error-card">
+          <div className="error-icon">⚠️</div>
+          <h2>Unable to Load People List</h2>
+          <p className="error-message">{error}</p>
+          <div className="error-hint">
+            <p><strong>💡 Tip:</strong> Try clicking retry below.</p>
+            <p>If the issue persists, the database may need to warm up.</p>
+          </div>
+          <button className="btn btn-primary mt-2" onClick={handleRetry}>
+            🔄 Retry {retryCount > 0 && `(Attempt ${retryCount + 1})`}
+          </button>
+        </div>
       </div>
     );
   }

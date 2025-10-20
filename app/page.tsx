@@ -5,10 +5,13 @@ import Navigation from '@/components/Navigation';
 import PeopleSelector from '@/components/PeopleSelector';
 import ThumbnailGallery from '@/components/ThumbnailGallery';
 import MediaDetailModal from '@/components/MediaDetailModal';
+import PeopleManager from '@/components/PeopleManager';
+import EventManager from '@/components/EventManager';
+import ProcessNewFiles from '@/components/ProcessNewFiles';
 import { Person, Event, MediaItem } from '@/lib/types';
 
 export default function Home() {
-  const [view, setView] = useState<'select' | 'gallery' | 'manage-people' | 'manage-events'>('select');
+  const [view, setView] = useState<'select' | 'gallery' | 'manage-people' | 'manage-events' | 'process-files'>('select');
   const [selectedPeople, setSelectedPeople] = useState<number[]>([]);
   const [selectedEvent, setSelectedEvent] = useState<number | null>(null);
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
@@ -31,6 +34,7 @@ export default function Home() {
         onManagePeople={() => setView('manage-people')}
         onManageEvents={() => setView('manage-events')}
         onSelectPeople={() => setView('select')}
+        onProcessFiles={() => setView('process-files')}
         onBackup={() => {
           // TODO: Implement backup
           alert('Backup functionality coming soon');
@@ -82,23 +86,30 @@ export default function Home() {
         )}
 
         {view === 'manage-people' && (
-          <div className="card">
-            <h1>Manage People</h1>
-            <p>People management interface coming soon...</p>
-            <button className="btn btn-secondary mt-2" onClick={() => setView('select')}>
-              Back
+          <>
+            <button className="btn btn-secondary mb-2" onClick={() => setView('select')}>
+              ← Back
             </button>
-          </div>
+            <PeopleManager />
+          </>
         )}
 
         {view === 'manage-events' && (
-          <div className="card">
-            <h1>Manage Events</h1>
-            <p>Events management interface coming soon...</p>
-            <button className="btn btn-secondary mt-2" onClick={() => setView('select')}>
-              Back
+          <>
+            <button className="btn btn-secondary mb-2" onClick={() => setView('select')}>
+              ← Back
             </button>
-          </div>
+            <EventManager />
+          </>
+        )}
+
+        {view === 'process-files' && (
+          <>
+            <button className="btn btn-secondary mb-2" onClick={() => setView('select')}>
+              ← Back
+            </button>
+            <ProcessNewFiles />
+          </>
         )}
 
         {selectedMedia && (
