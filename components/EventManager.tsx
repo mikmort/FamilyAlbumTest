@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Event } from '@/lib/types';
+import { Event } from '../lib/types';
 
 export default function EventManager() {
   const [events, setEvents] = useState<Event[]>([]);

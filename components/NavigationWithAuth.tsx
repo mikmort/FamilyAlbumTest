@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { getCurrentUser, getLoginUrl, logout, ClientPrincipal } from '@/lib/auth';
+import { getCurrentUser, getLoginUrl, logout, ClientPrincipal } from '../lib/auth';
 
 interface UserMenuProps {
   user: ClientPrincipal | null;

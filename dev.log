@@ -1,0 +1,18 @@
+
+> family-album-web@1.0.0 dev
+> next dev
+
+  ▲ Next.js 14.2.33
+  - Local:        http://localhost:3000
+
+ ✓ Starting...
+ ✓ Ready in 3.9s
+ ○ Compiling / ...
+ ✓ Compiled / in 5.5s (481 modules)
+ GET / 200 in 5905ms
+ ✓ Compiled /_not-found in 479ms (470 modules)
+ GET /api/people/ 404 in 698ms
+ ○ Compiling /_error ...
+ ✓ Compiled /_error in 1510ms (697 modules)
+ GET / 404 in 1675ms
+[?25h

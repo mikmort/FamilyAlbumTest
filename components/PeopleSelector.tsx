@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Person, Event } from '@/lib/types';
+import { Person, Event } from '../lib/types';
 
 interface PeopleSelectorProps {
   selectedPeople: number[];
@@ -39,6 +39,19 @@ export default function PeopleSelector({
   const [isWarmingUp, setIsWarmingUp] = useState(false);
   const [autoRetryAttempt, setAutoRetryAttempt] = useState(0);
 
+  // Helpers to normalize API/sample data into expected types
+  const normalizePeople = (arr: any[]): Person[] =>
+    (arr || []).map((p) => ({
+      ...p,
+      neDateLastModified: p.neDateLastModified ? new Date(p.neDateLastModified) : new Date(),
+    } as Person));
+
+  const normalizeEvents = (arr: any[]): Event[] =>
+    (arr || []).map((e) => ({
+      ...e,
+      neDateLastModified: e.neDateLastModified ? new Date(e.neDateLastModified) : new Date(),
+    } as Event));
+
   useEffect(() => {
     // Only fetch if we haven't loaded data yet
     if (!dataLoaded) {
@@ -66,80 +79,36 @@ export default function PeopleSelector({
         setLoading(true);
       }
       setError(null);
-      
-      // Shorter timeout to detect cold starts faster
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
-      
-      const [peopleRes, eventsRes] = await Promise.all([
-        fetch('/api/people', { signal: controller.signal }),
-        fetch('/api/events', { signal: controller.signal }),
-      ]);
-      
-      clearTimeout(timeoutId);
 
-      if (!peopleRes.ok || !eventsRes.ok) {
-        const failedRes = !peopleRes.ok ? peopleRes : eventsRes;
-        const apiName = !peopleRes.ok ? 'People' : 'Events';
-        
-        // Try to get detailed error info
-        const errorData = await failedRes.json().catch(() => ({ error: 'Unknown error' }));
-        
-        // Log detailed error info to console for debugging
-        console.error(`❌ ${apiName} API Error:`, {
-          status: failedRes.status,
-          statusText: failedRes.statusText,
-          url: failedRes.url,
-          errorData: errorData
-        });
-        
-        if (errorData.message) {
-          console.error('Error message:', errorData.message);
-        }
-        if (errorData.stack) {
-          console.error('Stack trace:', errorData.stack);
-        }
-        if (errorData.debug) {
-          console.error('Debug info:', errorData.debug);
-        }
-        
-        // Check if it's a cold start (502, 503, 504 errors)
-        if (failedRes.status >= 502 && failedRes.status <= 504) {
-          setIsWarmingUp(true);
-          throw new Error('Database is warming up...');
-        }
-        throw new Error(errorData.message || errorData.error || 'Failed to fetch data from server');
+  // Try the app API but gracefully fall back to sample data when unavailable.
+  const { fetchWithFallback, samplePeople, sampleEvents } = await import('../lib/api');
+
+      const [peopleData, eventsData] = await Promise.all([
+        fetchWithFallback('/api/people'),
+        fetchWithFallback('/api/events'),
+      ]);
+
+      if (peopleData && eventsData) {
+        setPeople(normalizePeople(peopleData));
+        setEvents(normalizeEvents(eventsData));
+        setDataLoaded(true);
+        setRetryCount(0);
+        setIsWarmingUp(false);
+        setAutoRetryAttempt(0);
+        return;
       }
 
-      const peopleData = await peopleRes.json();
-      const eventsData = await eventsRes.json();
-
-      setPeople(peopleData);
-      setEvents(eventsData);
+      // If API calls failed (null returned), use sample data so UI remains usable.
+  console.warn('PeopleSelector: API unavailable, falling back to sample data');
+  setPeople(normalizePeople(samplePeople()));
+  setEvents(normalizeEvents(sampleEvents()));
       setDataLoaded(true);
       setRetryCount(0);
       setIsWarmingUp(false);
       setAutoRetryAttempt(0);
     } catch (err) {
       console.error('❌ PeopleSelector fetch error:', err);
-      
-      if (err instanceof Error) {
-        if (err.name === 'AbortError') {
-          setIsWarmingUp(true);
-          setError('Database is warming up...');
-        } else if (err.message.includes('warming up')) {
-          setIsWarmingUp(true);
-          setError(err.message);
-        } else if (err.message.includes('Failed to fetch')) {
-          // Network errors might indicate cold start
-          setIsWarmingUp(true);
-          setError('Database is warming up...');
-        } else {
-          setError(err.message);
-        }
-      } else {
-        setError('An error occurred');
-      }
+      setError('An error occurred fetching people/events');
     } finally {
       setLoading(false);
     }

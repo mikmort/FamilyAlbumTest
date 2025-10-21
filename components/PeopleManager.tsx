@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Person } from '@/lib/types';
+import { Person } from '../lib/types';
 
 export default function PeopleManager() {
   const [people, setPeople] = useState<Person[]>([]);

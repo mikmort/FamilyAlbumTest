@@ -120,7 +120,7 @@ export default function MediaDetailModal({
       }
     } catch (error) {
       console.error('❌ MediaDetailModal fetchPeople error:', error);
-      setAllPeople(normalizePeople((await import('@/lib/api')).samplePeople()));
+  setAllPeople(normalizePeople((await import('../lib/api')).samplePeople()));
     } finally {
       setLoadingPeople(false);
     }
@@ -141,7 +141,7 @@ export default function MediaDetailModal({
       }
     } catch (error) {
       console.error('❌ MediaDetailModal fetchEvents error:', error);
-      setAllEvents(normalizeEvents((await import('@/lib/api')).sampleEvents()));
+  setAllEvents(normalizeEvents((await import('../lib/api')).sampleEvents()));
     } finally {
       setLoadingEvents(false);
     }

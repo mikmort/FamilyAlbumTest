@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { MediaItem } from '@/lib/types';
+import { MediaItem } from '../lib/types';
 
 interface ThumbnailGalleryProps {
   peopleIds: number[];

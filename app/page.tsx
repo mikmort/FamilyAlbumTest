@@ -8,7 +8,7 @@ import MediaDetailModal from '@/components/MediaDetailModal';
 import PeopleManager from '@/components/PeopleManager';
 import EventManager from '@/components/EventManager';
 import ProcessNewFiles from '@/components/ProcessNewFiles';
-import { Person, Event, MediaItem } from '@/lib/types';
+import { Person, Event, MediaItem } from '../lib/types';
 
 export default function Home() {
   const [view, setView] = useState<'select' | 'gallery' | 'manage-people' | 'manage-events' | 'process-files'>('select');
