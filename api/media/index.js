@@ -102,6 +102,19 @@ module.exports = async function (context, req) {
     context.log(`Method: ${method}, URL: ${req.url}, Filename: ${filename}, Thumbnail: ${thumbnail}`);
 
     try {
+            // Helper to normalize file name strings for consistent in-memory lookup.
+            // This only affects JS-level map keys and does not change database data.
+            function normalizeFileName(fname) {
+                if (!fname && fname !== '') return fname;
+                let s = String(fname).replace(/\\/g, '/');
+                // Try to decode percent-encodings safely; if decode fails, fall back to raw string
+                try {
+                    if (s.includes('%')) s = decodeURIComponent(s);
+                } catch (e) {
+                    // ignore decode errors
+                }
+                return s;
+            }
         // Explicit debug route: /api/media/debug/namephoto-search?pattern=xxx
         // Returns up to 100 matching NamePhoto rows for the provided pattern (substring match).
         if (method === 'GET' && req.url && req.url.startsWith('/api/media/debug/namephoto-search')) {
@@ -597,10 +610,11 @@ module.exports = async function (context, req) {
                     // Group by filename, only include people (neType === 'N') in taggedPeopleMap
                     taggedPeopleResults.forEach(row => {
                         if (row.neType && row.neType === 'N') {
-                            if (!taggedPeopleMap[row.npFileName]) {
-                                taggedPeopleMap[row.npFileName] = [];
+                            const key = normalizeFileName(row.npFileName);
+                            if (!taggedPeopleMap[key]) {
+                                taggedPeopleMap[key] = [];
                             }
-                            taggedPeopleMap[row.npFileName].push({
+                            taggedPeopleMap[key].push({
                                 ID: row.ID,
                                 neName: row.neName
                             });
@@ -686,7 +700,7 @@ module.exports = async function (context, req) {
                     }
 
                     // Compute ordered TaggedPeople according to PPeopleList tokens (server-side)
-                    const rawTagged = taggedPeopleMap[item.PFileName] || [];
+                    const rawTagged = taggedPeopleMap[normalizeFileName(item.PFileName)] || [];
                     let orderedTagged = rawTagged;
                     if (item.PPeopleList && rawTagged.length > 0) {
                         const tokens = item.PPeopleList.split(',').map(s => s.trim()).filter(Boolean);
