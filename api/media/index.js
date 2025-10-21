@@ -104,21 +104,22 @@ module.exports = async function (context, req) {
     try {
         // Debug helper: return NamePhoto rows for a given filename when ?debugFile=... is supplied.
         // This is intentionally opt-in and only used for diagnosing filename matching issues.
-        // Opt-in wildcard debug: ?debugWildcard=substring will run a LIKE '%substring%' search
-        if (method === 'GET' && req.query && req.query.debugWildcard) {
-            const raw = req.query.debugWildcard;
+        // Opt-in limited wildcard debug: ?debugWildcardLimited=substring will run a safe LIKE '%substring%' search
+        // and return up to 100 matches. Use this to find whether NamePhoto contains a specific token.
+        if (method === 'GET' && req.query && req.query.debugWildcardLimited) {
+            const raw = req.query.debugWildcardLimited;
             const pattern = `%${String(raw).replace(/\\/g, '/')}%`;
-            context.log(`Debug wildcard: searching NamePhoto for pattern "${pattern}"`);
+            context.log(`Debug wildcard limited: searching NamePhoto for pattern "${pattern}"`);
             try {
                 const rows = await query(
-                    `SELECT npFileName, npID, npPosition FROM dbo.NamePhoto WHERE npFileName LIKE @pattern ORDER BY npFileName, npPosition`,
+                    `SELECT TOP 100 npFileName, npID, npPosition FROM dbo.NamePhoto WHERE npFileName LIKE @pattern ORDER BY npFileName, npPosition`,
                     { pattern }
                 );
-                context.res = { status: 200, headers: { 'Content-Type': 'application/json' }, body: { raw, pattern, rows } };
+                context.res = { status: 200, headers: { 'Content-Type': 'application/json' }, body: { raw, pattern, count: rows.length, rows } };
                 return;
             } catch (err) {
-                context.log.error('Error executing debug wildcard query:', err);
-                context.res = { status: 500, body: { error: 'Debug wildcard query failed', details: String(err) } };
+                context.log.error('Error executing debug wildcard limited query:', err);
+                context.res = { status: 500, body: { error: 'Debug wildcard limited query failed', details: String(err) } };
                 return;
             }
         }
