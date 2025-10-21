@@ -102,6 +102,44 @@ module.exports = async function (context, req) {
     context.log(`Method: ${method}, URL: ${req.url}, Filename: ${filename}, Thumbnail: ${thumbnail}`);
 
     try {
+        // Debug helper: return NamePhoto rows for a given filename when ?debugFile=... is supplied.
+        // This is intentionally opt-in and only used for diagnosing filename matching issues.
+        if (method === 'GET' && req.query && req.query.debugFile) {
+            const debugFileRaw = req.query.debugFile;
+            const debugFile = String(debugFileRaw).replace(/\\/g, '/');
+            context.log(`Debug: fetching NamePhoto rows for "${debugFile}" and variants`);
+
+            // Try a few variants: as-provided, backslashes, forwardslashes, and URL-encoded filename
+            const variants = new Set([
+                debugFile,
+                debugFile.replace(/\//g, '\\'),
+                encodeURIComponent(debugFile).replace(/%2F/g, '/').replace(/'/g, '%27')
+            ]);
+
+            const params = {};
+            const placeholders = [];
+            Array.from(variants).forEach((v, i) => {
+                params[`v${i}`] = v;
+                placeholders.push(`@v${i}`);
+            });
+
+            const debugQuery = `SELECT npFileName, npID, npPosition FROM dbo.NamePhoto WHERE npFileName IN (${placeholders.join(',')}) ORDER BY npFileName, npPosition`;
+            let debugRows = [];
+            try {
+                debugRows = await query(debugQuery, params);
+            } catch (dErr) {
+                context.log.error('Error executing NamePhoto debug query:', dErr);
+                context.res = { status: 500, body: { error: 'Debug query failed', details: String(dErr) } };
+                return;
+            }
+
+            context.res = {
+                status: 200,
+                headers: { 'Content-Type': 'application/json' },
+                body: { debugFileRaw, variants: Array.from(variants), rows: debugRows }
+            };
+            return;
+        }
         // GET /api/media/{filename}?thumbnail=true - Get thumbnail (generate if needed)
         // GET /api/media/{filename} - Stream file directly from blob storage
         if (method === 'GET' && filename) {
