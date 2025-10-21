@@ -473,43 +473,59 @@ module.exports = async function (context, req) {
 
             // Fetch tagged people for all photos in one query
             let taggedPeopleMap = {};
+
+            // Defensive guard: if the media result set is extremely large we
+            // avoid building a huge parameter list (SQL Server has a max of
+            // ~2100 parameters). In that case skip the batched fetch and
+            // leave TaggedPeople empty to avoid a 500 error. A better long
+            // term solution is to use a table-valued parameter or a join
+            // based approach, but for now this prevents the site from
+            // breaking on very large result sets.
             if (media.length > 0) {
-                context.log('Fetching tagged people for media items...');
-                const peopleQuery = `
-                    SELECT np.npFileName, ne.ID, ne.neName
-                    FROM dbo.NamePhoto np
-                    INNER JOIN dbo.NameEvent ne ON np.npID = ne.ID
-                    WHERE np.npFileName IN (${media.map((_, i) => `@filename${i}`).join(',')})
-                    ORDER BY np.npFileName, np.npPosition
-                `;
-                
-                const peopleParams = {};
-                media.forEach((item, i) => {
-                    peopleParams[`filename${i}`] = item.PFileName;
-                });
-                
-                context.log('Executing tagged people query...');
-                context.log(`Query will fetch people for ${media.length} media items`);
-                
-                let taggedPeopleResults;
-                try {
-                    taggedPeopleResults = await query(peopleQuery, peopleParams);
-                    context.log(`Found ${taggedPeopleResults.length} people tags`);
-                } catch (peopleQueryError) {
-                    context.log.error('Error fetching tagged people:', peopleQueryError);
-                    throw peopleQueryError;
-                }
-                
-                // Group by filename
-                taggedPeopleResults.forEach(row => {
-                    if (!taggedPeopleMap[row.npFileName]) {
-                        taggedPeopleMap[row.npFileName] = [];
-                    }
-                    taggedPeopleMap[row.npFileName].push({
-                        ID: row.ID,
-                        neName: row.neName
+                if (media.length > 2000) {
+                    context.log(`Skipping tagged-people batch fetch: media.length=${media.length} exceeds safe threshold`);
+                } else {
+                    context.log('Fetching tagged people for media items...');
+                    const peopleQuery = `
+                        SELECT np.npFileName, ne.ID, ne.neName, ne.neType
+                        FROM dbo.NamePhoto np
+                        INNER JOIN dbo.NameEvent ne ON np.npID = ne.ID
+                        WHERE np.npFileName IN (${media.map((_, i) => `@filename${i}`).join(',')})
+                          AND (ne.neType IS NULL OR ne.neType = 'N') -- only include people (exclude events)
+                        ORDER BY np.npFileName, np.npPosition
+                    `;
+
+                    const peopleParams = {};
+                    media.forEach((item, i) => {
+                        peopleParams[`filename${i}`] = item.PFileName;
                     });
-                });
+
+                    context.log('Executing tagged people query...');
+                    context.log(`Query will fetch people for ${media.length} media items`);
+
+                    let taggedPeopleResults;
+                    try {
+                        taggedPeopleResults = await query(peopleQuery, peopleParams);
+                        context.log(`Found ${taggedPeopleResults.length} people tags`);
+                    } catch (peopleQueryError) {
+                        context.log.error('Error fetching tagged people:', peopleQueryError);
+                        throw peopleQueryError;
+                    }
+
+                    // Group by filename
+                    taggedPeopleResults.forEach(row => {
+                        // defensive: skip any rows that look like events
+                        if (row.neType && row.neType === 'E') return;
+
+                        if (!taggedPeopleMap[row.npFileName]) {
+                            taggedPeopleMap[row.npFileName] = [];
+                        }
+                        taggedPeopleMap[row.npFileName].push({
+                            ID: row.ID,
+                            neName: row.neName
+                        });
+                    });
+                }
             }
 
             // Transform results to construct proper blob URLs
