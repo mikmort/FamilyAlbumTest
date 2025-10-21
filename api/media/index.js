@@ -73,10 +73,11 @@ module.exports = async function (context, req) {
     }
     
     // Extract filename from URL path: /api/media/{filename}
-    // req.url might be like "/api/media/On%20Location%5CFile.jpg"
+    // Support additional trailing segments like /tags or /tags/{id} by capturing
+    // only the filename segment between /api/media/ and the next / or ? or end.
     let filename = null;
     if (req.url) {
-        const urlMatch = req.url.match(/^\/api\/media\/(.+?)(?:\?|$)/);
+        const urlMatch = req.url.match(/^\/api\/media\/([^\/\?]+)(?:[\/\?]|$)/);
         if (urlMatch && urlMatch[1]) {
             filename = decodeURIComponent(urlMatch[1]);
         }
@@ -486,14 +487,13 @@ module.exports = async function (context, req) {
                     context.log(`Skipping tagged-people batch fetch: media.length=${media.length} exceeds safe threshold`);
                 } else {
                     context.log('Fetching tagged people for media items...');
-                    const peopleQuery = `
-                        SELECT np.npFileName, ne.ID, ne.neName, ne.neType
-                        FROM dbo.NamePhoto np
-                        INNER JOIN dbo.NameEvent ne ON np.npID = ne.ID
-                        WHERE np.npFileName IN (${media.map((_, i) => `@filename${i}`).join(',')})
-                          AND (ne.neType IS NULL OR ne.neType = 'N') -- only include people (exclude events)
-                        ORDER BY np.npFileName, np.npPosition
-                    `;
+                                        const peopleQuery = `
+                                                SELECT np.npFileName, ne.ID, ne.neName, ne.neType
+                                                FROM dbo.NamePhoto np
+                                                INNER JOIN dbo.NameEvent ne ON np.npID = ne.ID
+                                                WHERE np.npFileName IN (${media.map((_, i) => `@filename${i}`).join(',')})
+                                                ORDER BY np.npFileName, np.npPosition
+                                        `;
 
                     const peopleParams = {};
                     media.forEach((item, i) => {
@@ -512,19 +512,48 @@ module.exports = async function (context, req) {
                         throw peopleQueryError;
                     }
 
-                    // Group by filename
+                    // Group by filename, only include people (neType === 'N') in taggedPeopleMap
                     taggedPeopleResults.forEach(row => {
-                        // defensive: skip any rows that look like events
-                        if (row.neType && row.neType === 'E') return;
-
-                        if (!taggedPeopleMap[row.npFileName]) {
-                            taggedPeopleMap[row.npFileName] = [];
+                        if (row.neType && row.neType === 'N') {
+                            if (!taggedPeopleMap[row.npFileName]) {
+                                taggedPeopleMap[row.npFileName] = [];
+                            }
+                            taggedPeopleMap[row.npFileName].push({
+                                ID: row.ID,
+                                neName: row.neName
+                            });
                         }
-                        taggedPeopleMap[row.npFileName].push({
-                            ID: row.ID,
-                            neName: row.neName
+                    });
+
+                    // Now, determine events from PPeopleList tokens: only treat a numeric token as an event
+                    // if the ID actually points to a NameEvent with neType = 'E'. Collect all numeric tokens
+                    // from PPeopleList across media and query them in a single batch to avoid per-row queries.
+                    const candidateEventIds = new Set();
+                    media.forEach(item => {
+                        const ppl = item.PPeopleList || '';
+                        if (!ppl) return;
+                        const tokens = ppl.split(',').map(s => s.trim()).filter(Boolean);
+                        tokens.forEach(tok => {
+                            if (/^\d+$/.test(tok)) candidateEventIds.add(parseInt(tok));
                         });
                     });
+
+                    let eventLookup = {};
+                    if (candidateEventIds.size > 0) {
+                        const ids = Array.from(candidateEventIds);
+                        const idPlaceholders = ids.map((_, i) => `@id${i}`).join(',');
+                        const eventQuery = `SELECT ID, neName, neType FROM dbo.NameEvent WHERE ID IN (${idPlaceholders})`;
+                        const eventParams = {};
+                        ids.forEach((id, i) => { eventParams[`id${i}`] = id; });
+                        try {
+                            const eventRows = await query(eventQuery, eventParams);
+                            eventRows.forEach(r => {
+                                eventLookup[r.ID] = { ID: r.ID, neName: r.neName, neType: r.neType };
+                            });
+                        } catch (evErr) {
+                            context.log.error('Error querying candidate NameEvent IDs:', evErr);
+                        }
+                    }
                 }
             }
 
@@ -559,11 +588,27 @@ module.exports = async function (context, req) {
                     // Some blob names have URL-encoded characters (%27, %20) as part of the blob name
                     // Don't encode again - use the blob path as-is
                     
+                    // Determine event from PPeopleList by searching numeric tokens in order and
+                    // picking the first one that actually maps to an event (neType === 'E').
+                    let eventForItem = null;
+                    if (item.PPeopleList) {
+                        const tokens = item.PPeopleList.split(',').map(s => s.trim()).filter(Boolean);
+                        const numericIds = tokens.filter(tok => /^\d+$/.test(tok)).map(tok => parseInt(tok));
+                        for (const id of numericIds) {
+                            const lookup = eventLookup[id];
+                            if (lookup && lookup.neType === 'E') {
+                                eventForItem = { ID: lookup.ID, neName: lookup.neName };
+                                break;
+                            }
+                        }
+                    }
+
                     return {
                         ...item,
                         PBlobUrl: `/api/media/${blobPath}`,
                         PThumbnailUrl: `/api/media/${blobPath}?thumbnail=true`,
-                        TaggedPeople: taggedPeopleMap[item.PFileName] || []
+                        TaggedPeople: taggedPeopleMap[item.PFileName] || [],
+                        Event: eventForItem
                     };
                 });
                 context.log(`Transformed ${transformedMedia.length} media items successfully`);

@@ -35,6 +35,8 @@ export interface MediaItem {
   PSoundFile?: string;
   PBlobUrl: string;
   TaggedPeople?: Array<{ ID: number; neName: string }>;
+  // Optional Event information attached by the media API
+  Event?: { ID: number; neName: string } | null;
 }
 
 export interface UnindexedFile {

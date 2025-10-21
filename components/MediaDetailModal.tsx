@@ -20,7 +20,8 @@ export default function MediaDetailModal({
   const [description, setDescription] = useState(media.PDescription || '');
   const [month, setMonth] = useState<number | ''>(media.PMonth || '');
   const [year, setYear] = useState<number | ''>(media.PYear || '');
-  const [selectedEvent, setSelectedEvent] = useState<number | ''>('');
+  // Initialize selectedEvent from media.Event if available (server now returns Event info)
+  const [selectedEvent, setSelectedEvent] = useState<number | ''>(media?.Event?.ID || '');
   const computeOrderedTaggedPeople = (
     tagged: Array<{ ID: number; neName: string }> | undefined,
     peopleList: string | undefined
@@ -37,14 +38,14 @@ export default function MediaDetailModal({
 
     if (tokens.length === 0) return taggedArr;
 
-    const byId = new Map(taggedArr.map((p) => [String(p.ID), p]));
-    const byName = new Map(taggedArr.map((p) => [p.neName, p]));
+  const byId = new Map(taggedArr.map((p) => [String(p.ID), p]));
+  const byName = new Map(taggedArr.map((p) => [String(p.neName).toLowerCase(), p]));
 
     const ordered: Array<{ ID: number; neName: string }> = [];
     const used = new Set<number>();
 
     for (const tok of tokens) {
-      // Prefer ID match
+      // Prefer ID match for numeric tokens (PPeopleList is an ordered list of NameEvent IDs)
       const byIdMatch = byId.get(tok);
       if (byIdMatch) {
         ordered.push(byIdMatch);
@@ -52,8 +53,14 @@ export default function MediaDetailModal({
         continue;
       }
 
-      // Fallback to name match
-      const byNameMatch = byName.get(tok);
+      // If token looks numeric but wasn't found in the tagged people list,
+      // it's likely an event ID or a missing person; skip it for people ordering.
+      if (/^\d+$/.test(tok)) {
+        continue;
+      }
+
+      // Fallback to name match for non-numeric tokens (case-insensitive)
+      const byNameMatch = byName.get(tok.toLowerCase());
       if (byNameMatch) {
         ordered.push(byNameMatch);
         used.add(byNameMatch.ID);
@@ -77,6 +84,31 @@ export default function MediaDetailModal({
     setTaggedPeople(computeOrderedTaggedPeople(media.TaggedPeople, media.PPeopleList));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [media.PPeopleList, JSON.stringify(media.TaggedPeople || [])]);
+
+  // Initialize selectedEvent from server-provided Event or from numeric token in PPeopleList
+  useEffect(() => {
+    // Prefer the server-provided Event when available (server now validates tokens anywhere in the list)
+    if (media?.Event && media.Event.ID) {
+      setSelectedEvent(media.Event.ID);
+      return;
+    }
+
+    // Fallback: walk PPeopleList tokens in order and pick the first numeric token that does not
+    // correspond to an already-tagged person (so we don't accidentally treat a person ID as an event).
+    if (media?.PPeopleList) {
+      const tokens = media.PPeopleList.split(',').map(s => s.trim()).filter(Boolean);
+      const taggedIds = new Set((media.TaggedPeople || []).map(p => p.ID));
+      for (const tok of tokens) {
+        if (/^\d+$/.test(tok)) {
+          const id = parseInt(tok);
+          if (!taggedIds.has(id)) {
+            setSelectedEvent(id);
+            break;
+          }
+        }
+      }
+    }
+  }, [media.PPeopleList, media.Event]);
   
   const [allPeople, setAllPeople] = useState<Person[]>([]);
   const [allEvents, setAllEvents] = useState<Event[]>([]);
