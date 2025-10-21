@@ -104,6 +104,25 @@ module.exports = async function (context, req) {
     try {
         // Debug helper: return NamePhoto rows for a given filename when ?debugFile=... is supplied.
         // This is intentionally opt-in and only used for diagnosing filename matching issues.
+        // Opt-in wildcard debug: ?debugWildcard=substring will run a LIKE '%substring%' search
+        if (method === 'GET' && req.query && req.query.debugWildcard) {
+            const raw = req.query.debugWildcard;
+            const pattern = `%${String(raw).replace(/\\/g, '/')}%`;
+            context.log(`Debug wildcard: searching NamePhoto for pattern "${pattern}"`);
+            try {
+                const rows = await query(
+                    `SELECT npFileName, npID, npPosition FROM dbo.NamePhoto WHERE npFileName LIKE @pattern ORDER BY npFileName, npPosition`,
+                    { pattern }
+                );
+                context.res = { status: 200, headers: { 'Content-Type': 'application/json' }, body: { raw, pattern, rows } };
+                return;
+            } catch (err) {
+                context.log.error('Error executing debug wildcard query:', err);
+                context.res = { status: 500, body: { error: 'Debug wildcard query failed', details: String(err) } };
+                return;
+            }
+        }
+
         if (method === 'GET' && req.query && req.query.debugFile) {
             const debugFileRaw = req.query.debugFile;
             const debugFile = String(debugFileRaw).replace(/\\/g, '/');
