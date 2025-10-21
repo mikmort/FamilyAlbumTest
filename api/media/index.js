@@ -397,8 +397,10 @@ module.exports = async function (context, req) {
                     whereClauses.push(`
                         EXISTS (
                             SELECT 1 FROM dbo.NamePhoto np 
+                            INNER JOIN dbo.NameEvent ne ON np.npID = ne.ID
                             WHERE np.npFileName = p.PFileName 
                             AND np.npID IN (${personPlaceholders})
+                            AND ne.neType = 'N'
                         )
                     `);
                     peopleIds.forEach((id, i) => {
@@ -410,8 +412,10 @@ module.exports = async function (context, req) {
                     whereClauses.push(`
                         EXISTS (
                             SELECT 1 FROM dbo.NamePhoto np 
+                            INNER JOIN dbo.NameEvent ne ON np.npID = ne.ID
                             WHERE np.npFileName = p.PFileName 
                             AND np.npID IN (${personPlaceholders})
+                            AND ne.neType = 'N'
                         )
                     `);
                     peopleIds.forEach((id, i) => {
@@ -425,8 +429,10 @@ module.exports = async function (context, req) {
                 whereClauses.push(`
                     EXISTS (
                         SELECT 1 FROM dbo.NamePhoto np 
+                        INNER JOIN dbo.NameEvent ne ON np.npID = ne.ID
                         WHERE np.npFileName = p.PFileName 
                         AND np.npID = @eventId
+                        AND ne.neType = 'E'
                     )
                 `);
                 params.eventId = eventId;
@@ -437,7 +443,9 @@ module.exports = async function (context, req) {
                 whereClauses.push(`
                     NOT EXISTS (
                         SELECT 1 FROM dbo.NamePhoto np 
+                        INNER JOIN dbo.NameEvent ne ON np.npID = ne.ID
                         WHERE np.npFileName = p.PFileName
+                        AND ne.neType = 'N'
                     )
                 `);
             }
