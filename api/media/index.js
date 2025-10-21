@@ -474,6 +474,9 @@ module.exports = async function (context, req) {
 
             // Fetch tagged people for all photos in one query
             let taggedPeopleMap = {};
+            // Ensure eventLookup exists even if we skip the batched queries for very large result sets
+            // (avoids ReferenceError during the transform step)
+            let eventLookup = {};
 
             // Defensive guard: if the media result set is extremely large we
             // avoid building a huge parameter list (SQL Server has a max of
