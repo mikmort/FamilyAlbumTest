@@ -102,6 +102,27 @@ module.exports = async function (context, req) {
     context.log(`Method: ${method}, URL: ${req.url}, Filename: ${filename}, Thumbnail: ${thumbnail}`);
 
     try {
+        // Explicit debug route: /api/media/debug/namephoto-search?pattern=xxx
+        // Returns up to 100 matching NamePhoto rows for the provided pattern (substring match).
+        if (method === 'GET' && req.url && req.url.startsWith('/api/media/debug/namephoto-search')) {
+            const qp = req.query && (req.query.pattern || req.query.p);
+            if (!qp) {
+                context.res = { status: 400, body: { error: 'Missing pattern query parameter' } };
+                return;
+            }
+            const raw = String(qp);
+            const pattern = `%${raw.replace(/\\/g, '/')}%`;
+            context.log(`Debug route: searching NamePhoto for pattern "${pattern}"`);
+            try {
+                const rows = await query(`SELECT TOP 100 npFileName, npID, npPosition FROM dbo.NamePhoto WHERE npFileName LIKE @pattern ORDER BY npFileName, npPosition`, { pattern });
+                context.res = { status: 200, headers: { 'Content-Type': 'application/json' }, body: { pattern, count: rows.length, rows } };
+                return;
+            } catch (err) {
+                context.log.error('Error executing debug namephoto-search query:', err);
+                context.res = { status: 500, body: { error: 'Debug namephoto-search failed', details: String(err) } };
+                return;
+            }
+        }
         // Debug helper: return NamePhoto rows for a given filename when ?debugFile=... is supplied.
         // This is intentionally opt-in and only used for diagnosing filename matching issues.
         // Opt-in limited wildcard debug: ?debugWildcardLimited=substring will run a safe LIKE '%substring%' search
