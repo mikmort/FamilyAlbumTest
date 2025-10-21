@@ -699,37 +699,55 @@ module.exports = async function (context, req) {
                         }
                     }
 
-                    // Compute ordered TaggedPeople according to PPeopleList tokens (server-side)
+                    // Compute ordered TaggedPeople strictly according to PPeopleList tokens (IDs first).
+                    // Use NamePhoto rows (rawTagged) when available; if a numeric ID from PPeopleList
+                    // has no corresponding NamePhoto row, fall back to NameEvent lookup (eventLookup)
+                    // for neType === 'N'. This ensures the final order exactly follows PPeopleList.
                     const rawTagged = taggedPeopleMap[normalizeFileName(item.PFileName)] || [];
                     let orderedTagged = rawTagged;
-                    if (item.PPeopleList && rawTagged.length > 0) {
+
+                    if (item.PPeopleList) {
                         const tokens = item.PPeopleList.split(',').map(s => s.trim()).filter(Boolean);
+
+                        // Maps built from existing NamePhoto-tagged people
                         const byId = new Map(rawTagged.map(p => [String(p.ID), p]));
                         const byName = new Map(rawTagged.map(p => [String(p.neName).toLowerCase(), p]));
                         const used = new Set();
                         orderedTagged = [];
 
                         for (const tok of tokens) {
-                            // Prefer ID match for numeric tokens
+                            if (!tok) continue;
+
+                            // Numeric tokens: prefer exact ID match from NamePhoto; if missing,
+                            // try eventLookup for a person row (neType === 'N').
                             if (/^\d+$/.test(tok)) {
-                                const p = byId.get(tok);
-                                if (p) {
-                                    orderedTagged.push(p);
-                                    used.add(p.ID);
+                                const id = parseInt(tok, 10);
+                                let person = byId.get(String(id));
+                                if (!person) {
+                                    const lookup = eventLookup && eventLookup[id];
+                                    if (lookup && lookup.neType === 'N') {
+                                        person = { ID: lookup.ID, neName: lookup.neName };
+                                    }
                                 }
+
+                                if (person && !used.has(person.ID)) {
+                                    orderedTagged.push(person);
+                                    used.add(person.ID);
+                                }
+
                                 continue;
                             }
 
-                            // Non-numeric token: try case-insensitive name match
+                            // Non-numeric tokens: try to match by name (case-insensitive)
                             const nameKey = tok.toLowerCase();
                             const pn = byName.get(nameKey);
-                            if (pn) {
+                            if (pn && !used.has(pn.ID)) {
                                 orderedTagged.push(pn);
                                 used.add(pn.ID);
                             }
                         }
 
-                        // Append any tagged people not present in PPeopleList at the end
+                        // Append any tagged people (from NamePhoto) not present in PPeopleList at the end
                         for (const p of rawTagged) {
                             if (!used.has(p.ID)) orderedTagged.push(p);
                         }
