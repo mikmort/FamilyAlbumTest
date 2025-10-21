@@ -606,11 +606,47 @@ module.exports = async function (context, req) {
                         }
                     }
 
+                    // Compute ordered TaggedPeople according to PPeopleList tokens (server-side)
+                    const rawTagged = taggedPeopleMap[item.PFileName] || [];
+                    let orderedTagged = rawTagged;
+                    if (item.PPeopleList && rawTagged.length > 0) {
+                        const tokens = item.PPeopleList.split(',').map(s => s.trim()).filter(Boolean);
+                        const byId = new Map(rawTagged.map(p => [String(p.ID), p]));
+                        const byName = new Map(rawTagged.map(p => [String(p.neName).toLowerCase(), p]));
+                        const used = new Set();
+                        orderedTagged = [];
+
+                        for (const tok of tokens) {
+                            // Prefer ID match for numeric tokens
+                            if (/^\d+$/.test(tok)) {
+                                const p = byId.get(tok);
+                                if (p) {
+                                    orderedTagged.push(p);
+                                    used.add(p.ID);
+                                }
+                                continue;
+                            }
+
+                            // Non-numeric token: try case-insensitive name match
+                            const nameKey = tok.toLowerCase();
+                            const pn = byName.get(nameKey);
+                            if (pn) {
+                                orderedTagged.push(pn);
+                                used.add(pn.ID);
+                            }
+                        }
+
+                        // Append any tagged people not present in PPeopleList at the end
+                        for (const p of rawTagged) {
+                            if (!used.has(p.ID)) orderedTagged.push(p);
+                        }
+                    }
+
                     return {
                         ...item,
                         PBlobUrl: `/api/media/${blobPath}`,
                         PThumbnailUrl: `/api/media/${blobPath}?thumbnail=true`,
-                        TaggedPeople: taggedPeopleMap[item.PFileName] || [],
+                        TaggedPeople: orderedTagged,
                         Event: eventForItem
                     };
                 });
