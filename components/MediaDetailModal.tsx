@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { MediaItem, Person, Event } from '@/lib/types';
+import { MediaItem, Person, Event } from '../lib/types';
 
 interface MediaDetailModalProps {
   media: MediaItem;
@@ -110,7 +110,7 @@ export default function MediaDetailModal({
   const fetchPeople = async () => {
     try {
       setLoadingPeople(true);
-      const { fetchWithFallback, samplePeople } = await import('@/lib/api');
+      const { fetchWithFallback, samplePeople } = await import('../lib/api');
       const data = await fetchWithFallback('/api/people');
       if (data && Array.isArray(data)) {
         setAllPeople(data);
@@ -129,7 +129,7 @@ export default function MediaDetailModal({
   const fetchEvents = async () => {
     try {
       setLoadingEvents(true);
-      const { fetchWithFallback, sampleEvents } = await import('@/lib/api');
+      const { fetchWithFallback, sampleEvents } = await import('../lib/api');
       const data = await fetchWithFallback('/api/events');
       if (data && data.success && Array.isArray(data.events)) {
         setAllEvents(data.events);
