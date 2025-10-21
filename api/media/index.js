@@ -467,13 +467,14 @@ module.exports = async function (context, req) {
             let taggedPeopleMap = {};
             if (media.length > 0) {
                 context.log('Fetching tagged people for media items...');
-                const peopleQuery = `
-                    SELECT np.npFileName, ne.ID, ne.neName
-                    FROM dbo.NamePhoto np
-                    INNER JOIN dbo.NameEvent ne ON np.npID = ne.ID
-                    WHERE np.npFileName IN (${media.map((_, i) => `@filename${i}`).join(',')})
-                    ORDER BY np.npFileName, np.npPosition
-                `;
+                                const peopleQuery = `
+                                        SELECT np.npFileName, ne.ID, ne.neName, ne.neType
+                                        FROM dbo.NamePhoto np
+                                        INNER JOIN dbo.NameEvent ne ON np.npID = ne.ID
+                                        WHERE np.npFileName IN (${media.map((_, i) => `@filename${i}`).join(',')})
+                                            AND (ne.neType IS NULL OR ne.neType = 'N') -- only include people (exclude events)
+                                        ORDER BY np.npFileName, np.npPosition
+                                `;
                 
                 const peopleParams = {};
                 media.forEach((item, i) => {
@@ -494,6 +495,9 @@ module.exports = async function (context, req) {
                 
                 // Group by filename
                 taggedPeopleResults.forEach(row => {
+                    // defensive: skip any rows that look like events
+                    if (row.neType && row.neType === 'E') return;
+
                     if (!taggedPeopleMap[row.npFileName]) {
                         taggedPeopleMap[row.npFileName] = [];
                     }

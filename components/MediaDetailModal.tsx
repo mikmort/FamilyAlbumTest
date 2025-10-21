@@ -27,23 +27,36 @@ export default function MediaDetailModal({
   ) => {
     const taggedArr = tagged || [];
     if (!peopleList) return taggedArr;
-
-    const order = peopleList
+    // PPeopleList historically stored comma-separated person IDs. Some older
+    // data or migrations used names. Support both: prefer matching by ID when
+    // tokens are numeric, otherwise fall back to matching by name.
+    const tokens = peopleList
       .split(',')
       .map((s) => s.trim())
       .filter(Boolean);
 
-    if (order.length === 0) return taggedArr;
+    if (tokens.length === 0) return taggedArr;
 
+    const byId = new Map(taggedArr.map((p) => [String(p.ID), p]));
     const byName = new Map(taggedArr.map((p) => [p.neName, p]));
+
     const ordered: Array<{ ID: number; neName: string }> = [];
     const used = new Set<number>();
 
-    for (const name of order) {
-      const p = byName.get(name);
-      if (p) {
-        ordered.push(p);
-        used.add(p.ID);
+    for (const tok of tokens) {
+      // Prefer ID match
+      const byIdMatch = byId.get(tok);
+      if (byIdMatch) {
+        ordered.push(byIdMatch);
+        used.add(byIdMatch.ID);
+        continue;
+      }
+
+      // Fallback to name match
+      const byNameMatch = byName.get(tok);
+      if (byNameMatch) {
+        ordered.push(byNameMatch);
+        used.add(byNameMatch.ID);
       }
     }
 
