@@ -21,9 +21,49 @@ export default function MediaDetailModal({
   const [month, setMonth] = useState<number | ''>(media.PMonth || '');
   const [year, setYear] = useState<number | ''>(media.PYear || '');
   const [selectedEvent, setSelectedEvent] = useState<number | ''>('');
-  const [taggedPeople, setTaggedPeople] = useState<Array<{ ID: number; neName: string }>>(
-    media.TaggedPeople || []
-  );
+  const computeOrderedTaggedPeople = (
+    tagged: Array<{ ID: number; neName: string }> | undefined,
+    peopleList: string | undefined
+  ) => {
+    const taggedArr = tagged || [];
+    if (!peopleList) return taggedArr;
+
+    const order = peopleList
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean);
+
+    if (order.length === 0) return taggedArr;
+
+    const byName = new Map(taggedArr.map((p) => [p.neName, p]));
+    const ordered: Array<{ ID: number; neName: string }> = [];
+    const used = new Set<number>();
+
+    for (const name of order) {
+      const p = byName.get(name);
+      if (p) {
+        ordered.push(p);
+        used.add(p.ID);
+      }
+    }
+
+    // Append any tagged people not present in PPeopleList at the end
+    for (const p of taggedArr) {
+      if (!used.has(p.ID)) ordered.push(p);
+    }
+
+    return ordered;
+  };
+
+  const [taggedPeople, setTaggedPeople] = useState<
+    Array<{ ID: number; neName: string }>
+  >(() => computeOrderedTaggedPeople(media.TaggedPeople, media.PPeopleList));
+
+  // Keep taggedPeople in sync if the media prop updates
+  useEffect(() => {
+    setTaggedPeople(computeOrderedTaggedPeople(media.TaggedPeople, media.PPeopleList));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [media.PPeopleList, JSON.stringify(media.TaggedPeople || [])]);
   
   const [allPeople, setAllPeople] = useState<Person[]>([]);
   const [allEvents, setAllEvents] = useState<Event[]>([]);
@@ -57,22 +97,17 @@ export default function MediaDetailModal({
   const fetchPeople = async () => {
     try {
       setLoadingPeople(true);
-      const response = await fetch('/api/people');
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
-        console.error('❌ People API Error:', {
-          status: response.status,
-          statusText: response.statusText,
-          url: response.url,
-          errorData: errorData
-        });
-        throw new Error(errorData.message || 'Failed to fetch people');
+      const { fetchWithFallback, samplePeople } = await import('@/lib/api');
+      const data = await fetchWithFallback('/api/people');
+      if (data && Array.isArray(data)) {
+        setAllPeople(data);
+      } else {
+        // fallback to sample data when API unavailable or returns unexpected shape
+        setAllPeople(normalizePeople(samplePeople()));
       }
-      const data = await response.json();
-      setAllPeople(data);
     } catch (error) {
       console.error('❌ MediaDetailModal fetchPeople error:', error);
-      alert('Failed to load people list');
+      setAllPeople(normalizePeople((await import('@/lib/api')).samplePeople()));
     } finally {
       setLoadingPeople(false);
     }
@@ -81,27 +116,37 @@ export default function MediaDetailModal({
   const fetchEvents = async () => {
     try {
       setLoadingEvents(true);
-      const response = await fetch('/api/events');
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
-        console.error('❌ Events API Error:', {
-          status: response.status,
-          statusText: response.statusText,
-          url: response.url,
-          errorData: errorData
-        });
-        throw new Error(errorData.message || 'Failed to fetch events');
-      }
-      const data = await response.json();
-      if (data.success) {
+      const { fetchWithFallback, sampleEvents } = await import('@/lib/api');
+      const data = await fetchWithFallback('/api/events');
+      if (data && data.success && Array.isArray(data.events)) {
         setAllEvents(data.events);
+      } else if (Array.isArray(data)) {
+        // older APIs might return an array directly
+        setAllEvents(data);
+      } else {
+        setAllEvents(normalizeEvents(sampleEvents()));
       }
     } catch (error) {
       console.error('❌ MediaDetailModal fetchEvents error:', error);
-      alert('Failed to load events list');
+      setAllEvents(normalizeEvents((await import('@/lib/api')).sampleEvents()));
     } finally {
       setLoadingEvents(false);
     }
+  };
+
+  // Helpers to normalize sample/API data to expected types
+  const normalizePeople = (arr: any[]): Person[] => {
+    return (arr || []).map((p) => ({
+      ...p,
+      neDateLastModified: p.neDateLastModified ? new Date(p.neDateLastModified) : new Date(0),
+    }));
+  };
+
+  const normalizeEvents = (arr: any[]): Event[] => {
+    return (arr || []).map((e) => ({
+      ...e,
+      neDateLastModified: e.neDateLastModified ? new Date(e.neDateLastModified) : new Date(0),
+    }));
   };
 
   const handleAddPerson = async (personId: number) => {
