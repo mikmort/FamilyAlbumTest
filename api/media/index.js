@@ -581,6 +581,33 @@ module.exports = async function (context, req) {
                     });
                 });
 
+                // Also collect event IDs from NamePhoto table
+                const fileNames = media.map(item => item.PFileName);
+                if (fileNames.length > 0) {
+                    const fileNamePlaceholders = fileNames.map((_, i) => `@file${i}`).join(',');
+                    const eventParams = {};
+                    fileNames.forEach((fn, i) => { eventParams[`file${i}`] = fn; });
+                    
+                    try {
+                        context.log(`Fetching event associations from NamePhoto for ${fileNames.length} media items...`);
+                        const npEventQuery = `
+                            SELECT DISTINCT np.npID 
+                            FROM dbo.NamePhoto np
+                            INNER JOIN dbo.NameEvent ne ON np.npID = ne.ID
+                            WHERE np.npFileName IN (${fileNamePlaceholders})
+                            AND ne.neType = 'E'
+                        `;
+                        const npEventRows = await query(npEventQuery, eventParams);
+                        context.log(`Found ${npEventRows.length} event associations in NamePhoto`);
+                        npEventRows.forEach(r => {
+                            candidateIds.add(r.npID);
+                        });
+                    } catch (npErr) {
+                        context.log.error('Error querying NamePhoto for events:', npErr);
+                        // Don't throw - continue anyway
+                    }
+                }
+
                 // Batch query NameEvent for all candidate IDs
                 if (candidateIds.size > 0) {
                     const ids = Array.from(candidateIds);
@@ -590,7 +617,7 @@ module.exports = async function (context, req) {
                     ids.forEach((id, i) => { eventParams[`id${i}`] = id; });
                     
                     try {
-                        context.log(`Fetching NameEvent records for ${ids.length} IDs from PPeopleList...`);
+                        context.log(`Fetching NameEvent records for ${ids.length} IDs from PPeopleList and NamePhoto...`);
                         const eventRows = await query(eventQuery, eventParams);
                         context.log(`Found ${eventRows.length} NameEvent records`);
                         eventRows.forEach(r => {
@@ -599,6 +626,39 @@ module.exports = async function (context, req) {
                     } catch (evErr) {
                         context.log.error('Error querying NameEvent IDs:', evErr);
                         throw evErr;
+                    }
+                }
+
+                // Build NamePhoto event lookup: for each media file, map to its event ID (if any)
+                let npEventLookup = {};
+                const mediaFileNames = media.map(item => item.PFileName);
+                if (mediaFileNames.length > 0) {
+                    const fileNamePlaceholders = mediaFileNames.map((_, i) => `@file${i}`).join(',');
+                    const npParams = {};
+                    mediaFileNames.forEach((fn, i) => { npParams[`file${i}`] = fn; });
+                    
+                    try {
+                        context.log(`Building NamePhoto event lookup for ${mediaFileNames.length} media items...`);
+                        const npEventQuery = `
+                            SELECT 
+                                np.npFileName,
+                                np.npID
+                            FROM dbo.NamePhoto np
+                            INNER JOIN dbo.NameEvent ne ON np.npID = ne.ID
+                            WHERE np.npFileName IN (${fileNamePlaceholders})
+                            AND ne.neType = 'E'
+                        `;
+                        const npEventRows = await query(npEventQuery, npParams);
+                        context.log(`Found ${npEventRows.length} NamePhoto event associations`);
+                        npEventRows.forEach(r => {
+                            // Map filename to event ID (take first event if multiple)
+                            if (!npEventLookup[r.npFileName]) {
+                                npEventLookup[r.npFileName] = r.npID;
+                            }
+                        });
+                    } catch (npErr) {
+                        context.log.error('Error building NamePhoto event lookup:', npErr);
+                        // Don't throw - continue anyway
                     }
                 }
             }
@@ -646,6 +706,15 @@ module.exports = async function (context, req) {
                                 eventForItem = { ID: lookup.ID, neName: lookup.neName };
                                 break;
                             }
+                        }
+                    }
+                    
+                    // If no event found in PPeopleList, check the NamePhoto event lookup that was built earlier
+                    if (!eventForItem && item.PFileName && npEventLookup[item.PFileName]) {
+                        const npEventId = npEventLookup[item.PFileName];
+                        const eventLookupData = eventLookup[npEventId];
+                        if (eventLookupData) {
+                            eventForItem = { ID: eventLookupData.ID, neName: eventLookupData.neName };
                         }
                     }
 
