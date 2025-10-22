@@ -582,26 +582,35 @@ module.exports = async function (context, req) {
                 });
 
                 // Also collect event IDs from NamePhoto table
+                // Batch the query to avoid SQL parameter limits
                 const fileNames = media.map(item => item.PFileName);
                 if (fileNames.length > 0) {
-                    const fileNamePlaceholders = fileNames.map((_, i) => `@file${i}`).join(',');
-                    const eventParams = {};
-                    fileNames.forEach((fn, i) => { eventParams[`file${i}`] = fn; });
+                    const batchSize = 500;
                     
                     try {
-                        context.log(`Fetching event associations from NamePhoto for ${fileNames.length} media items...`);
-                        const npEventQuery = `
-                            SELECT DISTINCT np.npID 
-                            FROM dbo.NamePhoto np
-                            INNER JOIN dbo.NameEvent ne ON np.npID = ne.ID
-                            WHERE np.npFileName IN (${fileNamePlaceholders})
-                            AND ne.neType = 'E'
-                        `;
-                        const npEventRows = await query(npEventQuery, eventParams);
-                        context.log(`Found ${npEventRows.length} event associations in NamePhoto`);
-                        npEventRows.forEach(r => {
-                            candidateIds.add(r.npID);
-                        });
+                        context.log(`Fetching event associations from NamePhoto for ${fileNames.length} media items (batching in groups of ${batchSize})...`);
+                        
+                        for (let batchStart = 0; batchStart < fileNames.length; batchStart += batchSize) {
+                            const batchEnd = Math.min(batchStart + batchSize, fileNames.length);
+                            const batchFileNames = fileNames.slice(batchStart, batchEnd);
+                            
+                            const fileNamePlaceholders = batchFileNames.map((_, i) => `@file${i}`).join(',');
+                            const eventParams = {};
+                            batchFileNames.forEach((fn, i) => { eventParams[`file${i}`] = fn; });
+                            
+                            const npEventQuery = `
+                                SELECT DISTINCT np.npID 
+                                FROM dbo.NamePhoto np
+                                INNER JOIN dbo.NameEvent ne ON np.npID = ne.ID
+                                WHERE np.npFileName IN (${fileNamePlaceholders})
+                                AND ne.neType = 'E'
+                            `;
+                            const npEventRows = await query(npEventQuery, eventParams);
+                            context.log(`Batch ${Math.floor(batchStart / batchSize) + 1}: Found ${npEventRows.length} event associations in NamePhoto`);
+                            npEventRows.forEach(r => {
+                                candidateIds.add(r.npID);
+                            });
+                        }
                     } catch (npErr) {
                         context.log.error('Error querying NamePhoto for events:', npErr);
                         // Don't throw - continue anyway
