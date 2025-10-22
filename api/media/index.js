@@ -630,32 +630,43 @@ module.exports = async function (context, req) {
                 }
 
                 // Build NamePhoto event lookup: for each media file, map to its event ID (if any)
+                // Batch in groups to avoid SQL parameter limits (max 2100 per query)
                 let npEventLookup = {};
                 const mediaFileNames = media.map(item => item.PFileName);
                 if (mediaFileNames.length > 0) {
-                    const fileNamePlaceholders = mediaFileNames.map((_, i) => `@file${i}`).join(',');
-                    const npParams = {};
-                    mediaFileNames.forEach((fn, i) => { npParams[`file${i}`] = fn; });
+                    const batchSize = 500; // Conservative batch size to avoid parameter limits
                     
                     try {
-                        context.log(`Building NamePhoto event lookup for ${mediaFileNames.length} media items...`);
-                        const npEventQuery = `
-                            SELECT 
-                                np.npFileName,
-                                np.npID
-                            FROM dbo.NamePhoto np
-                            INNER JOIN dbo.NameEvent ne ON np.npID = ne.ID
-                            WHERE np.npFileName IN (${fileNamePlaceholders})
-                            AND ne.neType = 'E'
-                        `;
-                        const npEventRows = await query(npEventQuery, npParams);
-                        context.log(`Found ${npEventRows.length} NamePhoto event associations`);
-                        npEventRows.forEach(r => {
-                            // Map filename to event ID (take first event if multiple)
-                            if (!npEventLookup[r.npFileName]) {
-                                npEventLookup[r.npFileName] = r.npID;
-                            }
-                        });
+                        context.log(`Building NamePhoto event lookup for ${mediaFileNames.length} media items (batching in groups of ${batchSize})...`);
+                        
+                        for (let batchStart = 0; batchStart < mediaFileNames.length; batchStart += batchSize) {
+                            const batchEnd = Math.min(batchStart + batchSize, mediaFileNames.length);
+                            const batchFileNames = mediaFileNames.slice(batchStart, batchEnd);
+                            
+                            const fileNamePlaceholders = batchFileNames.map((_, i) => `@file${i}`).join(',');
+                            const npParams = {};
+                            batchFileNames.forEach((fn, i) => { npParams[`file${i}`] = fn; });
+                            
+                            const npEventQuery = `
+                                SELECT 
+                                    np.npFileName,
+                                    np.npID
+                                FROM dbo.NamePhoto np
+                                INNER JOIN dbo.NameEvent ne ON np.npID = ne.ID
+                                WHERE np.npFileName IN (${fileNamePlaceholders})
+                                AND ne.neType = 'E'
+                            `;
+                            
+                            const npEventRows = await query(npEventQuery, npParams);
+                            context.log(`Batch ${Math.floor(batchStart / batchSize) + 1}: Found ${npEventRows.length} NamePhoto event associations`);
+                            
+                            npEventRows.forEach(r => {
+                                // Map filename to event ID (take first event if multiple)
+                                if (!npEventLookup[r.npFileName]) {
+                                    npEventLookup[r.npFileName] = r.npID;
+                                }
+                            });
+                        }
                     } catch (npErr) {
                         context.log.error('Error building NamePhoto event lookup:', npErr);
                         // Don't throw - continue anyway
