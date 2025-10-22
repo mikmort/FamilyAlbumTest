@@ -20,63 +20,24 @@ export default function MediaDetailModal({
   const [description, setDescription] = useState(media.PDescription || '');
   const [month, setMonth] = useState<number | ''>(media.PMonth || '');
   const [year, setYear] = useState<number | ''>(media.PYear || '');
-  // Initialize selectedEvent from media.Event if available (server now returns Event info)
-  const [selectedEvent, setSelectedEvent] = useState<number | ''>(media?.Event?.ID || '');
+  // Events are now part of TaggedPeople; initialize selectedEvent from first event in TaggedPeople or from numeric token in PPeopleList
+  const [selectedEvent, setSelectedEvent] = useState<number | ''>(() => {
+    const eventInTagged = media.TaggedPeople?.find(p => p.neType === 'E');
+    return eventInTagged?.ID || '';
+  });
   const computeOrderedTaggedPeople = (
-    tagged: Array<{ ID: number; neName: string }> | undefined,
+    tagged: Array<{ ID: number; neName: string; neType?: string }> | undefined,
     peopleList: string | undefined
   ) => {
     const taggedArr = tagged || [];
     if (!peopleList) return taggedArr;
-    // PPeopleList historically stored comma-separated person IDs. Some older
-    // data or migrations used names. Support both: prefer matching by ID when
-    // tokens are numeric, otherwise fall back to matching by name.
-    const tokens = peopleList
-      .split(',')
-      .map((s) => s.trim())
-      .filter(Boolean);
-
-    if (tokens.length === 0) return taggedArr;
-
-  const byId = new Map(taggedArr.map((p) => [String(p.ID), p]));
-  const byName = new Map(taggedArr.map((p) => [String(p.neName).toLowerCase(), p]));
-
-    const ordered: Array<{ ID: number; neName: string }> = [];
-    const used = new Set<number>();
-
-    for (const tok of tokens) {
-      // Prefer ID match for numeric tokens (PPeopleList is an ordered list of NameEvent IDs)
-      const byIdMatch = byId.get(tok);
-      if (byIdMatch) {
-        ordered.push(byIdMatch);
-        used.add(byIdMatch.ID);
-        continue;
-      }
-
-      // If token looks numeric but wasn't found in the tagged people list,
-      // it's likely an event ID or a missing person; skip it for people ordering.
-      if (/^\d+$/.test(tok)) {
-        continue;
-      }
-
-      // Fallback to name match for non-numeric tokens (case-insensitive)
-      const byNameMatch = byName.get(tok.toLowerCase());
-      if (byNameMatch) {
-        ordered.push(byNameMatch);
-        used.add(byNameMatch.ID);
-      }
-    }
-
-    // Append any tagged people not present in PPeopleList at the end
-    for (const p of taggedArr) {
-      if (!used.has(p.ID)) ordered.push(p);
-    }
-
-    return ordered;
+    // PPeopleList contains comma-separated IDs that reference NameEvent records.
+    // The server now returns them in the correct order, so just return them as-is.
+    return taggedArr;
   };
 
   const [taggedPeople, setTaggedPeople] = useState<
-    Array<{ ID: number; neName: string }>
+    Array<{ ID: number; neName: string; neType?: string }>
   >(() => computeOrderedTaggedPeople(media.TaggedPeople, media.PPeopleList));
 
   // Keep taggedPeople in sync if the media prop updates
@@ -85,30 +46,14 @@ export default function MediaDetailModal({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [media.PPeopleList, JSON.stringify(media.TaggedPeople || [])]);
 
-  // Initialize selectedEvent from server-provided Event or from numeric token in PPeopleList
+  // Initialize selectedEvent from TaggedPeople (events now included there)
   useEffect(() => {
-    // Prefer the server-provided Event when available (server now validates tokens anywhere in the list)
-    if (media?.Event && media.Event.ID) {
-      setSelectedEvent(media.Event.ID);
-      return;
+    // Pick the first event from TaggedPeople if available
+    const eventInTagged = media.TaggedPeople?.find(p => p.neType === 'E');
+    if (eventInTagged?.ID) {
+      setSelectedEvent(eventInTagged.ID);
     }
-
-    // Fallback: walk PPeopleList tokens in order and pick the first numeric token that does not
-    // correspond to an already-tagged person (so we don't accidentally treat a person ID as an event).
-    if (media?.PPeopleList) {
-      const tokens = media.PPeopleList.split(',').map(s => s.trim()).filter(Boolean);
-      const taggedIds = new Set((media.TaggedPeople || []).map(p => p.ID));
-      for (const tok of tokens) {
-        if (/^\d+$/.test(tok)) {
-          const id = parseInt(tok);
-          if (!taggedIds.has(id)) {
-            setSelectedEvent(id);
-            break;
-          }
-        }
-      }
-    }
-  }, [media.PPeopleList, media.Event]);
+  }, [media.PPeopleList, JSON.stringify(media.TaggedPeople || [])]);
   
   const [allPeople, setAllPeople] = useState<Person[]>([]);
   const [allEvents, setAllEvents] = useState<Event[]>([]);
@@ -607,7 +552,10 @@ export default function MediaDetailModal({
                   </>
                 )
               ) : (
-                <p>{selectedEvent ? allEvents.find(e => e.ID === selectedEvent)?.neName || 'Not set' : 'Not set'}</p>
+                (() => {
+                  const eventInTagged = taggedPeople.find(p => p.neType === 'E');
+                  return <p>{eventInTagged ? eventInTagged.neName : (selectedEvent ? allEvents.find(e => e.ID === selectedEvent)?.neName || 'Not set' : 'Not set')}</p>;
+                })()
               )}
             </div>
 
@@ -616,8 +564,11 @@ export default function MediaDetailModal({
               {taggedPeople.length > 0 ? (
                 <div className="tagged-people-list">
                   {taggedPeople.map((person) => (
-                    <div key={person.ID} className="tagged-person-item">
-                      <span>{person.neName}</span>
+                    <div key={person.ID} className={`tagged-person-item ${person.neType === 'E' ? 'event' : 'person'}`}>
+                      <span>
+                        {person.neName}
+                        {person.neType === 'E' && <span className="event-badge">(Event)</span>}
+                      </span>
                       {editing && (
                         <button
                           onClick={() => handleRemovePerson(person.ID)}
