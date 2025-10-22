@@ -484,20 +484,20 @@ module.exports = async function (context, req) {
             // Filter by people
             if (peopleIds.length > 0) {
                 if (exclusiveFilter) {
-                    // Exclusive: photo must have ONLY the selected people (and no others)
-                    // This is complex - for now, implement inclusive filter
-                    const personPlaceholders = peopleIds.map((_, i) => `@person${i}`).join(',');
-                    whereClauses.push(`
-                        EXISTS (
-                            SELECT 1 FROM dbo.NamePhoto np 
-                            INNER JOIN dbo.NameEvent ne ON np.npID = ne.ID
-                            WHERE np.npFileName = p.PFileName 
-                            AND np.npID IN (${personPlaceholders})
-                            AND ne.neType = 'N'
-                        )
-                    `);
+                    // Exclusive: photo must have ALL selected people
+                    // Add one EXISTS clause for each person to ensure all are present
                     peopleIds.forEach((id, i) => {
-                        params[`person${i}`] = id;
+                        const paramName = `person${i}`;
+                        params[paramName] = id;
+                        whereClauses.push(`
+                            EXISTS (
+                                SELECT 1 FROM dbo.NamePhoto np 
+                                INNER JOIN dbo.NameEvent ne ON np.npID = ne.ID
+                                WHERE np.npFileName = p.PFileName 
+                                AND np.npID = @${paramName}
+                                AND ne.neType = 'N'
+                            )
+                        `);
                     });
                 } else {
                     // Inclusive: photo must have at least one of the selected people
