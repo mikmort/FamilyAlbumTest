@@ -651,7 +651,7 @@ module.exports = async function (context, req) {
 
                     // Build TaggedPeople strictly from PPeopleList order.
                     // PPeopleList contains comma-separated IDs that map to NameEvent records.
-                    // Only people records (neType === 'N') are included in TaggedPeople.
+                    // Only include people (neType === 'N'); events (neType === 'E') are displayed separately.
                     let orderedTagged = [];
 
                     if (item.PPeopleList) {
@@ -665,7 +665,7 @@ module.exports = async function (context, req) {
                                 const id = parseInt(tok, 10);
                                 const lookup = eventLookup[id];
                                 
-                                // Only add if it's a person record (neType === 'N')
+                                // Only add people (neType === 'N'), exclude events (neType === 'E')
                                 if (lookup && lookup.neType === 'N') {
                                     orderedTagged.push({
                                         ID: lookup.ID,
