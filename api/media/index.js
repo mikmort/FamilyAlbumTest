@@ -564,91 +564,41 @@ module.exports = async function (context, req) {
                 throw queryError;
             }
 
-            // Fetch tagged people for all photos in one query
-            let taggedPeopleMap = {};
-            // Ensure eventLookup exists even if we skip the batched queries for very large result sets
-            // (avoids ReferenceError during the transform step)
+            // Build NameEvent lookup for all IDs in PPeopleList across all media.
+            // PPeopleList contains comma-separated IDs that reference NameEvent records.
+            // We use only PPeopleList for the order; NamePhoto is not used for TaggedPeople.
             let eventLookup = {};
 
-            // Defensive guard: if the media result set is extremely large we
-            // avoid building a huge parameter list (SQL Server has a max of
-            // ~2100 parameters). In that case skip the batched fetch and
-            // leave TaggedPeople empty to avoid a 500 error. A better long
-            // term solution is to use a table-valued parameter or a join
-            // based approach, but for now this prevents the site from
-            // breaking on very large result sets.
             if (media.length > 0) {
-                if (media.length > 2000) {
-                    context.log(`Skipping tagged-people batch fetch: media.length=${media.length} exceeds safe threshold`);
-                } else {
-                    context.log('Fetching tagged people for media items...');
-                                        const peopleQuery = `
-                                                SELECT np.npFileName, ne.ID, ne.neName, ne.neType
-                                                FROM dbo.NamePhoto np
-                                                INNER JOIN dbo.NameEvent ne ON np.npID = ne.ID
-                                                WHERE np.npFileName IN (${media.map((_, i) => `@filename${i}`).join(',')})
-                                                ORDER BY np.npFileName, np.npPosition
-                                        `;
-
-                    const peopleParams = {};
-                    media.forEach((item, i) => {
-                        peopleParams[`filename${i}`] = item.PFileName;
+                // Collect all numeric IDs from PPeopleList across all media items
+                const candidateIds = new Set();
+                media.forEach(item => {
+                    const ppl = item.PPeopleList || '';
+                    if (!ppl) return;
+                    const tokens = ppl.split(',').map(s => s.trim()).filter(Boolean);
+                    tokens.forEach(tok => {
+                        if (/^\d+$/.test(tok)) candidateIds.add(parseInt(tok));
                     });
+                });
 
-                    context.log('Executing tagged people query...');
-                    context.log(`Query will fetch people for ${media.length} media items`);
-
-                    let taggedPeopleResults;
+                // Batch query NameEvent for all candidate IDs
+                if (candidateIds.size > 0) {
+                    const ids = Array.from(candidateIds);
+                    const idPlaceholders = ids.map((_, i) => `@id${i}`).join(',');
+                    const eventQuery = `SELECT ID, neName, neType FROM dbo.NameEvent WHERE ID IN (${idPlaceholders})`;
+                    const eventParams = {};
+                    ids.forEach((id, i) => { eventParams[`id${i}`] = id; });
+                    
                     try {
-                        taggedPeopleResults = await query(peopleQuery, peopleParams);
-                        context.log(`Found ${taggedPeopleResults.length} people tags`);
-                    } catch (peopleQueryError) {
-                        context.log.error('Error fetching tagged people:', peopleQueryError);
-                        throw peopleQueryError;
-                    }
-
-                    // Group by filename, only include people (neType === 'N') in taggedPeopleMap
-                    taggedPeopleResults.forEach(row => {
-                        if (row.neType && row.neType === 'N') {
-                            const key = normalizeFileName(row.npFileName);
-                            if (!taggedPeopleMap[key]) {
-                                taggedPeopleMap[key] = [];
-                            }
-                            taggedPeopleMap[key].push({
-                                ID: row.ID,
-                                neName: row.neName
-                            });
-                        }
-                    });
-
-                    // Now, determine events from PPeopleList tokens: only treat a numeric token as an event
-                    // if the ID actually points to a NameEvent with neType = 'E'. Collect all numeric tokens
-                    // from PPeopleList across media and query them in a single batch to avoid per-row queries.
-                    const candidateEventIds = new Set();
-                    media.forEach(item => {
-                        const ppl = item.PPeopleList || '';
-                        if (!ppl) return;
-                        const tokens = ppl.split(',').map(s => s.trim()).filter(Boolean);
-                        tokens.forEach(tok => {
-                            if (/^\d+$/.test(tok)) candidateEventIds.add(parseInt(tok));
+                        context.log(`Fetching NameEvent records for ${ids.length} IDs from PPeopleList...`);
+                        const eventRows = await query(eventQuery, eventParams);
+                        context.log(`Found ${eventRows.length} NameEvent records`);
+                        eventRows.forEach(r => {
+                            eventLookup[r.ID] = { ID: r.ID, neName: r.neName, neType: r.neType };
                         });
-                    });
-
-                    let eventLookup = {};
-                    if (candidateEventIds.size > 0) {
-                        const ids = Array.from(candidateEventIds);
-                        const idPlaceholders = ids.map((_, i) => `@id${i}`).join(',');
-                        const eventQuery = `SELECT ID, neName, neType FROM dbo.NameEvent WHERE ID IN (${idPlaceholders})`;
-                        const eventParams = {};
-                        ids.forEach((id, i) => { eventParams[`id${i}`] = id; });
-                        try {
-                            const eventRows = await query(eventQuery, eventParams);
-                            eventRows.forEach(r => {
-                                eventLookup[r.ID] = { ID: r.ID, neName: r.neName, neType: r.neType };
-                            });
-                        } catch (evErr) {
-                            context.log.error('Error querying candidate NameEvent IDs:', evErr);
-                        }
+                    } catch (evErr) {
+                        context.log.error('Error querying NameEvent IDs:', evErr);
+                        throw evErr;
                     }
                 }
             }
@@ -699,57 +649,30 @@ module.exports = async function (context, req) {
                         }
                     }
 
-                    // Compute ordered TaggedPeople strictly according to PPeopleList tokens (IDs first).
-                    // Use NamePhoto rows (rawTagged) when available; if a numeric ID from PPeopleList
-                    // has no corresponding NamePhoto row, fall back to NameEvent lookup (eventLookup)
-                    // for neType === 'N'. This ensures the final order exactly follows PPeopleList.
-                    const rawTagged = taggedPeopleMap[normalizeFileName(item.PFileName)] || [];
-                    let orderedTagged = rawTagged;
+                    // Build TaggedPeople strictly from PPeopleList order.
+                    // PPeopleList contains comma-separated IDs that map to NameEvent records.
+                    // Only people records (neType === 'N') are included in TaggedPeople.
+                    let orderedTagged = [];
 
                     if (item.PPeopleList) {
                         const tokens = item.PPeopleList.split(',').map(s => s.trim()).filter(Boolean);
 
-                        // Maps built from existing NamePhoto-tagged people
-                        const byId = new Map(rawTagged.map(p => [String(p.ID), p]));
-                        const byName = new Map(rawTagged.map(p => [String(p.neName).toLowerCase(), p]));
-                        const used = new Set();
-                        orderedTagged = [];
-
                         for (const tok of tokens) {
                             if (!tok) continue;
 
-                            // Numeric tokens: prefer exact ID match from NamePhoto; if missing,
-                            // try eventLookup for a person row (neType === 'N').
+                            // All tokens in PPeopleList are numeric IDs
                             if (/^\d+$/.test(tok)) {
                                 const id = parseInt(tok, 10);
-                                let person = byId.get(String(id));
-                                if (!person) {
-                                    const lookup = eventLookup && eventLookup[id];
-                                    if (lookup && lookup.neType === 'N') {
-                                        person = { ID: lookup.ID, neName: lookup.neName };
-                                    }
+                                const lookup = eventLookup[id];
+                                
+                                // Only add if it's a person record (neType === 'N')
+                                if (lookup && lookup.neType === 'N') {
+                                    orderedTagged.push({
+                                        ID: lookup.ID,
+                                        neName: lookup.neName
+                                    });
                                 }
-
-                                if (person && !used.has(person.ID)) {
-                                    orderedTagged.push(person);
-                                    used.add(person.ID);
-                                }
-
-                                continue;
                             }
-
-                            // Non-numeric tokens: try to match by name (case-insensitive)
-                            const nameKey = tok.toLowerCase();
-                            const pn = byName.get(nameKey);
-                            if (pn && !used.has(pn.ID)) {
-                                orderedTagged.push(pn);
-                                used.add(pn.ID);
-                            }
-                        }
-
-                        // Append any tagged people (from NamePhoto) not present in PPeopleList at the end
-                        for (const p of rawTagged) {
-                            if (!used.has(p.ID)) orderedTagged.push(p);
                         }
                     }
 
