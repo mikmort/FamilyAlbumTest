@@ -581,40 +581,13 @@ module.exports = async function (context, req) {
                     });
                 });
 
-                // Also collect event IDs from NamePhoto table
-                // Batch the query to avoid SQL parameter limits
-                const fileNames = media.map(item => item.PFileName);
-                if (fileNames.length > 0) {
-                    const batchSize = 500;
-                    
-                    try {
-                        context.log(`Fetching event associations from NamePhoto for ${fileNames.length} media items (batching in groups of ${batchSize})...`);
-                        
-                        for (let batchStart = 0; batchStart < fileNames.length; batchStart += batchSize) {
-                            const batchEnd = Math.min(batchStart + batchSize, fileNames.length);
-                            const batchFileNames = fileNames.slice(batchStart, batchEnd);
-                            
-                            const fileNamePlaceholders = batchFileNames.map((_, i) => `@file${i}`).join(',');
-                            const eventParams = {};
-                            batchFileNames.forEach((fn, i) => { eventParams[`file${i}`] = fn; });
-                            
-                            const npEventQuery = `
-                                SELECT DISTINCT np.npID 
-                                FROM dbo.NamePhoto np
-                                INNER JOIN dbo.NameEvent ne ON np.npID = ne.ID
-                                WHERE np.npFileName IN (${fileNamePlaceholders})
-                                AND ne.neType = 'E'
-                            `;
-                            const npEventRows = await query(npEventQuery, eventParams);
-                            context.log(`Batch ${Math.floor(batchStart / batchSize) + 1}: Found ${npEventRows.length} event associations in NamePhoto`);
-                            npEventRows.forEach(r => {
-                                candidateIds.add(r.npID);
-                            });
-                        }
-                    } catch (npErr) {
-                        context.log.error('Error querying NamePhoto for events:', npErr);
-                        // Don't throw - continue anyway
-                    }
+                // Also collect event IDs from NamePhoto table - ONLY if we're filtering by event
+                // For general media lists, NamePhoto events are too expensive to query for all items
+                if (eventId) {
+                    // User is filtering by event, so NamePhoto events might be needed
+                    // But eventId is already used in the WHERE clause for the main query
+                    // so we don't need to do additional NamePhoto queries here
+                    context.log(`Event filter requested (eventId=${eventId}), relying on query WHERE clause for NamePhoto events`);
                 }
 
                 // Batch query NameEvent for all candidate IDs
@@ -638,49 +611,10 @@ module.exports = async function (context, req) {
                     }
                 }
 
-                // Build NamePhoto event lookup: for each media file, map to its event ID (if any)
-                // Batch in groups to avoid SQL parameter limits (max 2100 per query)
+                // Build NamePhoto event lookup for individual media items
+                // Note: For media lists, this is too expensive and is disabled
+                // Events from NamePhoto will only be included when viewing single items
                 let npEventLookup = {};
-                const mediaFileNames = media.map(item => item.PFileName);
-                if (mediaFileNames.length > 0) {
-                    const batchSize = 500; // Conservative batch size to avoid parameter limits
-                    
-                    try {
-                        context.log(`Building NamePhoto event lookup for ${mediaFileNames.length} media items (batching in groups of ${batchSize})...`);
-                        
-                        for (let batchStart = 0; batchStart < mediaFileNames.length; batchStart += batchSize) {
-                            const batchEnd = Math.min(batchStart + batchSize, mediaFileNames.length);
-                            const batchFileNames = mediaFileNames.slice(batchStart, batchEnd);
-                            
-                            const fileNamePlaceholders = batchFileNames.map((_, i) => `@file${i}`).join(',');
-                            const npParams = {};
-                            batchFileNames.forEach((fn, i) => { npParams[`file${i}`] = fn; });
-                            
-                            const npEventQuery = `
-                                SELECT 
-                                    np.npFileName,
-                                    np.npID
-                                FROM dbo.NamePhoto np
-                                INNER JOIN dbo.NameEvent ne ON np.npID = ne.ID
-                                WHERE np.npFileName IN (${fileNamePlaceholders})
-                                AND ne.neType = 'E'
-                            `;
-                            
-                            const npEventRows = await query(npEventQuery, npParams);
-                            context.log(`Batch ${Math.floor(batchStart / batchSize) + 1}: Found ${npEventRows.length} NamePhoto event associations`);
-                            
-                            npEventRows.forEach(r => {
-                                // Map filename to event ID (take first event if multiple)
-                                if (!npEventLookup[r.npFileName]) {
-                                    npEventLookup[r.npFileName] = r.npID;
-                                }
-                            });
-                        }
-                    } catch (npErr) {
-                        context.log.error('Error building NamePhoto event lookup:', npErr);
-                        // Don't throw - continue anyway
-                    }
-                }
             }
 
             // Transform results to construct proper blob URLs
