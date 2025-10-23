@@ -73,11 +73,16 @@ module.exports = async function (context, req) {
     }
     
     // Extract filename from URL path: /api/media/{filename}
-    // Support additional trailing segments like /tags or /tags/{id} by capturing
-    // only the filename segment between /api/media/ and the next / or ? or end.
+    // Filename can contain forward slashes (e.g., Events/Birthday/photo.jpg)
+    // Support additional trailing segments like /tags or /tags/{id}
     let filename = null;
     if (req.url) {
-        const urlMatch = req.url.match(/^\/api\/media\/([^\/\?]+)(?:[\/\?]|$)/);
+        // Extract path without query string first
+        const pathOnly = req.url.split('?')[0];
+        
+        // Match: /api/media/ then capture everything up to /tags, or end of string
+        // This allows paths with forward slashes like: /api/media/Events/Birthday/photo.jpg
+        const urlMatch = pathOnly.match(/^\/api\/media\/(.+?)(?:\/tags(?:\/|$)|$)/);
         if (urlMatch && urlMatch[1]) {
             filename = decodeURIComponent(urlMatch[1]);
         }
@@ -706,13 +711,15 @@ module.exports = async function (context, req) {
                     // Use stored PThumbnailUrl if available, otherwise generate on-demand URL
                     // PThumbnailUrl is a pre-generated thumbnail URL stored in the database
                     // If it's empty, fall back to on-demand generation via ?thumbnail=true
+                    // URL encode the blob path for use in the API endpoint
+                    const encodedBlobPath = blobPath.split('/').map(encodeURIComponent).join('/');
                     const thumbnailUrl = item.PThumbnailUrl 
                         ? item.PThumbnailUrl 
-                        : `/api/media/${blobPath}?thumbnail=true`;
+                        : `/api/media/${encodedBlobPath}?thumbnail=true`;
 
                     return {
                         ...item,
-                        PBlobUrl: `/api/media/${blobPath}`,
+                        PBlobUrl: `/api/media/${encodedBlobPath}`,
                         PThumbnailUrl: thumbnailUrl,
                         TaggedPeople: orderedTagged,
                         Event: eventForItem
