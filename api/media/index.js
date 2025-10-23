@@ -105,9 +105,10 @@ module.exports = async function (context, req) {
         // Extract path without query string first
         const pathOnly = req.url.split('?')[0];
         
-        // Match: /api/media/ then capture everything up to /tags, or end of string
+        // Match: /api/media/ then capture everything up to /tags (if present), or end of string
         // This allows paths with forward slashes like: /api/media/Events/Birthday/photo.jpg
-        const urlMatch = pathOnly.match(/^\/api\/media\/(.+?)(?:\/tags(?:\/|$)|$)/);
+        // Or: /api/media/Events/Birthday/photo.jpg/tags
+        const urlMatch = pathOnly.match(/^\/api\/media\/(.+?)(?:\/tags(?:\/\d+)?)?$/);
         if (urlMatch && urlMatch[1]) {
             filename = decodeURIComponent(urlMatch[1]);
         }
