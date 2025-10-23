@@ -585,6 +585,7 @@ module.exports = async function (context, req) {
             // PPeopleList contains comma-separated IDs that reference NameEvent records.
             // PPeopleList is the source of truth for people ordering.
             let eventLookup = {};
+            let npEventLookup = {};
 
             if (media.length > 0) {
                 // Collect all numeric IDs from PPeopleList across all media items
