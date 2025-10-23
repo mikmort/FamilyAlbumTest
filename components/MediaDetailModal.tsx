@@ -58,7 +58,7 @@ export default function MediaDetailModal({
   const [loadingPeople, setLoadingPeople] = useState(false);
   const [loadingEvents, setLoadingEvents] = useState(false);
   const [savingTag, setSavingTag] = useState(false);
-  const [insertPosition, setInsertPosition] = useState<number | 'end'>(0);
+  const [insertPosition, setInsertPosition] = useState<number | 'end'>('end');
   
   // Inline creation state
   const [showCreatePerson, setShowCreatePerson] = useState(false);
@@ -187,7 +187,7 @@ export default function MediaDetailModal({
       }
       
       // Reset position for next add
-      setInsertPosition(0);
+      setInsertPosition('end');
       setShowPeopleSelector(false);
     } catch (error) {
       console.error('❌ MediaDetailModal handleAddPerson error:', error);
