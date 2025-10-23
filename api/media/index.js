@@ -787,7 +787,10 @@ module.exports = async function (context, req) {
             const { personId, position } = req.body;
 
             context.log('=== TAG PERSON REQUEST ===');
-            context.log('Filename:', filename);
+            context.log('Raw URL:', req.url);
+            context.log('Decoded filename:', filename);
+            context.log('Filename length:', filename.length);
+            context.log('Filename bytes:', Buffer.from(filename).toString('hex'));
             context.log('PersonId:', personId);
             context.log('Position:', position);
             context.log('Request body:', JSON.stringify(req.body));
@@ -801,28 +804,55 @@ module.exports = async function (context, req) {
             }
 
             try {
+                // First, let's check if ANY pictures exist
+                context.log('Checking if Pictures table has any records...');
+                const countQuery = `SELECT COUNT(*) as cnt FROM dbo.Pictures`;
+                const countResult = await execute(countQuery, {});
+                context.log('Total pictures in database:', countResult[0].cnt);
+                
                 // Get current picture to access PPeopleList
                 const pictureQuery = `
                     SELECT PFileName, PPeopleList, PNameCount
                     FROM dbo.Pictures
                     WHERE PFileName = @filename
                 `;
-                context.log('Executing picture query:', pictureQuery);
-                context.log('Query parameter - filename:', filename);
+                context.log('Executing picture query for filename:', filename);
+                context.log('Query:', pictureQuery);
                 const pictures = await execute(pictureQuery, { filename });
-                context.log('Pictures found:', pictures.length);
-                context.log('Full pictures result:', JSON.stringify(pictures));
+                context.log('Query returned', pictures ? pictures.length : 'null', 'results');
                 
                 if (!pictures || pictures.length === 0) {
-                    context.log.error('❌ Picture not found:', filename);
+                    context.log.error('❌ Picture not found for filename:', filename);
+                    
+                    // Try to find similar filenames
+                    context.log('Searching for similar filenames...');
+                    const searchQuery = `
+                        SELECT TOP 5 PFileName 
+                        FROM dbo.Pictures 
+                        WHERE PFileName LIKE @pattern
+                        ORDER BY PFileName
+                    `;
+                    const searchPattern = '%' + filename.split('/').pop() + '%';
+                    const similar = await execute(searchQuery, { pattern: searchPattern });
+                    context.log('Similar files found:', similar.length);
+                    if (similar.length > 0) {
+                        context.log('Sample similar filenames:', similar.map(s => s.PFileName));
+                    }
+                    
                     context.res = {
                         status: 404,
-                        body: { error: 'Picture not found' }
+                        body: { 
+                            error: 'Picture not found',
+                            searchedFor: filename,
+                            totalPicturesInDb: countResult[0].cnt,
+                            similarFilesFound: similar.length
+                        }
                     };
                     return;
                 }
 
                 const picture = pictures[0];
+                context.log('✅ Picture found!');
                 context.log('Picture object:', JSON.stringify(picture));
                 
                 if (!picture) {
@@ -835,6 +865,7 @@ module.exports = async function (context, req) {
                 }
                 
                 context.log('Current picture data:');
+                context.log('  PFileName:', picture.PFileName);
                 context.log('  PPeopleList:', picture.PPeopleList);
                 context.log('  PNameCount:', picture.PNameCount);
                 
