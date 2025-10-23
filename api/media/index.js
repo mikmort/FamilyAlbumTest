@@ -786,6 +786,12 @@ module.exports = async function (context, req) {
         if (method === 'POST' && filename) {
             const { personId, position } = req.body;
 
+            context.log('=== TAG PERSON REQUEST ===');
+            context.log('Filename:', filename);
+            context.log('PersonId:', personId);
+            context.log('Position:', position);
+            context.log('Request body:', JSON.stringify(req.body));
+
             if (!personId) {
                 context.res = {
                     status: 400,
@@ -801,9 +807,12 @@ module.exports = async function (context, req) {
                     FROM dbo.Pictures
                     WHERE PFileName = @filename
                 `;
+                context.log('Executing picture query:', pictureQuery);
                 const pictures = await execute(pictureQuery, { filename });
+                context.log('Pictures found:', pictures.length);
                 
                 if (pictures.length === 0) {
+                    context.log.error('❌ Picture not found:', filename);
                     context.res = {
                         status: 404,
                         body: { error: 'Picture not found' }
@@ -812,14 +821,19 @@ module.exports = async function (context, req) {
                 }
 
                 const picture = pictures[0];
+                context.log('Current picture data:');
+                context.log('  PPeopleList:', picture.PPeopleList);
+                context.log('  PNameCount:', picture.PNameCount);
                 
                 // Parse current PPeopleList
                 const currentPeopleIds = picture.PPeopleList 
                     ? picture.PPeopleList.split(',').map(s => s.trim()).filter(Boolean).map(s => parseInt(s, 10))
                     : [];
+                context.log('Parsed people IDs:', currentPeopleIds);
                 
                 // Check if person is already tagged
                 if (currentPeopleIds.includes(personId)) {
+                    context.log.warn(`⚠️ Person ${personId} already tagged in ${filename}`);
                     context.res = {
                         status: 409,
                         body: { error: 'This person is already tagged in this photo' }
@@ -829,16 +843,20 @@ module.exports = async function (context, req) {
                 
                 const insertPos = position || 0;
                 const clampedPos = Math.max(0, Math.min(insertPos, currentPeopleIds.length));
+                context.log('Insert position:', clampedPos);
                 
                 // Insert the new person at the specified position
                 currentPeopleIds.splice(clampedPos, 0, personId);
+                context.log('New people IDs after insert:', currentPeopleIds);
 
                 // Check if NamePhoto record already exists (shouldn't happen if UI is correct)
                 const checkQuery = `
                     SELECT COUNT(*) as cnt FROM dbo.NamePhoto
                     WHERE npFileName = @filename AND npID = @personId
                 `;
+                context.log('Checking for existing NamePhoto record...');
                 const checkResult = await execute(checkQuery, { filename, personId });
+                context.log('Existing NamePhoto records:', checkResult[0].cnt);
                 
                 if (checkResult[0].cnt === 0) {
                     // Insert the NamePhoto record
@@ -846,14 +864,21 @@ module.exports = async function (context, req) {
                         INSERT INTO dbo.NamePhoto (npFileName, npID)
                         VALUES (@filename, @personId)
                     `;
+                    context.log('Inserting NamePhoto record...');
                     await execute(insertQuery, {
                         filename,
                         personId
                     });
+                    context.log('✅ NamePhoto record inserted');
+                } else {
+                    context.log('⚠️ NamePhoto record already exists, skipping insert');
                 }
 
                 // Update PPeopleList and PNameCount in Pictures table
                 const newPeopleList = currentPeopleIds.join(',');
+                context.log('New PPeopleList:', newPeopleList);
+                context.log('New PNameCount:', currentPeopleIds.length);
+                
                 const updatePictureQuery = `
                     UPDATE dbo.Pictures
                     SET PPeopleList = @peopleList,
@@ -861,21 +886,31 @@ module.exports = async function (context, req) {
                         PLastModifiedDate = GETDATE()
                     WHERE PFileName = @filename
                 `;
+                context.log('Updating Pictures table...');
                 await execute(updatePictureQuery, {
                     filename,
                     peopleList: newPeopleList,
                     nameCount: currentPeopleIds.length
                 });
+                context.log('✅ Pictures table updated');
 
+                context.log('=== TAG PERSON SUCCESS ===');
                 context.res = {
                     status: 201,
                     body: { success: true, peopleList: newPeopleList, nameCount: currentPeopleIds.length }
                 };
             } catch (error) {
-                context.log('❌ Error tagging person:', error);
+                context.log.error('❌ Error tagging person:');
+                context.log.error('  Message:', error.message);
+                context.log.error('  Stack:', error.stack);
+                context.log.error('  Full error:', error);
                 context.res = {
                     status: 500,
-                    body: { error: error.message || 'Failed to tag person' }
+                    body: { 
+                        error: error.message || 'Failed to tag person',
+                        details: error.message,
+                        stack: error.stack
+                    }
                 };
             }
             return;
