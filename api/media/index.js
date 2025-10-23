@@ -808,7 +808,7 @@ module.exports = async function (context, req) {
                 context.log('Checking if Pictures table has any records...');
                 try {
                     const countQuery = `SELECT COUNT(*) as cnt FROM dbo.Pictures`;
-                    const countResult = await execute(countQuery, {});
+                    const countResult = await query(countQuery, {});
                     context.log('Count query executed');
                     context.log('Count result type:', typeof countResult);
                     context.log('Count result is array:', Array.isArray(countResult));
@@ -849,7 +849,7 @@ module.exports = async function (context, req) {
                 `;
                 context.log('Executing picture query for filename:', filename);
                 context.log('Query:', pictureQuery);
-                const pictures = await execute(pictureQuery, { filename });
+                const pictures = await query(pictureQuery, { filename });
                 context.log('Query returned', pictures ? pictures.length : 'null', 'results');
                 
                 if (!pictures || pictures.length === 0) {
@@ -864,7 +864,7 @@ module.exports = async function (context, req) {
                         ORDER BY PFileName
                     `;
                     const searchPattern = '%' + filename.split('/').pop() + '%';
-                    const similar = await execute(searchQuery, { pattern: searchPattern });
+                    const similar = await query(searchQuery, { pattern: searchPattern });
                     context.log('Similar files found:', similar ? similar.length : 0);
                     if (similar && similar.length > 0) {
                         context.log('Sample similar filenames:', similar.map(s => s.PFileName));
@@ -930,7 +930,7 @@ module.exports = async function (context, req) {
                     WHERE npFileName = @filename AND npID = @personId
                 `;
                 context.log('Checking for existing NamePhoto record...');
-                const checkResult = await execute(checkQuery, { filename, personId });
+                const checkResult = await query(checkQuery, { filename, personId });
                 context.log('Check result:', JSON.stringify(checkResult));
                 
                 if (!checkResult || !Array.isArray(checkResult) || checkResult.length === 0) {
