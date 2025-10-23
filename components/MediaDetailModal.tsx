@@ -20,13 +20,12 @@ export default function MediaDetailModal({
   const [description, setDescription] = useState(media.PDescription || '');
   const [month, setMonth] = useState<number | ''>(media.PMonth || '');
   const [year, setYear] = useState<number | ''>(media.PYear || '');
-  // Events are now part of TaggedPeople; initialize selectedEvent from first event in TaggedPeople or from numeric token in PPeopleList
+  // Initialize selectedEvent from media.Event if available
   const [selectedEvent, setSelectedEvent] = useState<number | ''>(() => {
-    const eventInTagged = media.TaggedPeople?.find(p => p.neType === 'E');
-    return eventInTagged?.ID || '';
+    return media.Event?.ID || '';
   });
   const computeOrderedTaggedPeople = (
-    tagged: Array<{ ID: number; neName: string; neType?: string }> | undefined,
+    tagged: Array<{ ID: number; neName: string }> | undefined,
     peopleList: string | undefined
   ) => {
     const taggedArr = tagged || [];
@@ -37,7 +36,7 @@ export default function MediaDetailModal({
   };
 
   const [taggedPeople, setTaggedPeople] = useState<
-    Array<{ ID: number; neName: string; neType?: string }>
+    Array<{ ID: number; neName: string }>
   >(() => computeOrderedTaggedPeople(media.TaggedPeople, media.PPeopleList));
 
   // Keep taggedPeople in sync if the media prop updates
@@ -46,14 +45,12 @@ export default function MediaDetailModal({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [media.PPeopleList, JSON.stringify(media.TaggedPeople || [])]);
 
-  // Initialize selectedEvent from TaggedPeople (events now included there)
+  // Initialize selectedEvent from media.Event
   useEffect(() => {
-    // Pick the first event from TaggedPeople if available
-    const eventInTagged = media.TaggedPeople?.find(p => p.neType === 'E');
-    if (eventInTagged?.ID) {
-      setSelectedEvent(eventInTagged.ID);
+    if (media.Event?.ID) {
+      setSelectedEvent(media.Event.ID);
     }
-  }, [media.PPeopleList, JSON.stringify(media.TaggedPeople || [])]);
+  }, [media.Event]);
   
   const [allPeople, setAllPeople] = useState<Person[]>([]);
   const [allEvents, setAllEvents] = useState<Event[]>([]);
@@ -567,8 +564,7 @@ export default function MediaDetailModal({
                 )
               ) : (
                 (() => {
-                  const eventInTagged = taggedPeople.find(p => p.neType === 'E');
-                  return <p>{eventInTagged ? eventInTagged.neName : (selectedEvent ? allEvents.find(e => e.ID === selectedEvent)?.neName || 'Not set' : 'Not set')}</p>;
+                  return <p>{selectedEvent ? allEvents.find(e => e.ID === selectedEvent)?.neName || 'Not set' : 'Not set'}</p>;
                 })()
               )}
             </div>
@@ -578,10 +574,9 @@ export default function MediaDetailModal({
               {taggedPeople.length > 0 ? (
                 <div className="tagged-people-list">
                   {taggedPeople.map((person) => (
-                    <div key={person.ID} className={`tagged-person-item ${person.neType === 'E' ? 'event' : 'person'}`}>
+                    <div key={person.ID} className="tagged-person-item">
                       <span>
                         {person.neName}
-                        {person.neType === 'E' && <span className="event-badge">(Event)</span>}
                       </span>
                       {editing && (
                         <button
