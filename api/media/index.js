@@ -808,10 +808,12 @@ module.exports = async function (context, req) {
                     WHERE PFileName = @filename
                 `;
                 context.log('Executing picture query:', pictureQuery);
+                context.log('Query parameter - filename:', filename);
                 const pictures = await execute(pictureQuery, { filename });
                 context.log('Pictures found:', pictures.length);
+                context.log('Full pictures result:', JSON.stringify(pictures));
                 
-                if (pictures.length === 0) {
+                if (!pictures || pictures.length === 0) {
                     context.log.error('❌ Picture not found:', filename);
                     context.res = {
                         status: 404,
@@ -821,13 +823,25 @@ module.exports = async function (context, req) {
                 }
 
                 const picture = pictures[0];
+                context.log('Picture object:', JSON.stringify(picture));
+                
+                if (!picture) {
+                    context.log.error('❌ Picture object is null/undefined');
+                    context.res = {
+                        status: 500,
+                        body: { error: 'Picture object is null or undefined' }
+                    };
+                    return;
+                }
+                
                 context.log('Current picture data:');
                 context.log('  PPeopleList:', picture.PPeopleList);
                 context.log('  PNameCount:', picture.PNameCount);
                 
-                // Parse current PPeopleList
-                const currentPeopleIds = picture.PPeopleList 
-                    ? picture.PPeopleList.split(',').map(s => s.trim()).filter(Boolean).map(s => parseInt(s, 10))
+                // Parse current PPeopleList - handle null/undefined
+                const peopleListStr = picture.PPeopleList || '';
+                const currentPeopleIds = peopleListStr 
+                    ? peopleListStr.split(',').map(s => s.trim()).filter(Boolean).map(s => parseInt(s, 10))
                     : [];
                 context.log('Parsed people IDs:', currentPeopleIds);
                 
@@ -856,6 +870,7 @@ module.exports = async function (context, req) {
                 `;
                 context.log('Checking for existing NamePhoto record...');
                 const checkResult = await execute(checkQuery, { filename, personId });
+                context.log('Check result:', JSON.stringify(checkResult));
                 context.log('Existing NamePhoto records:', checkResult[0].cnt);
                 
                 if (checkResult[0].cnt === 0) {
