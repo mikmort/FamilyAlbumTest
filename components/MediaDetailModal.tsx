@@ -637,25 +637,19 @@ export default function MediaDetailModal({
                           <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500' }}>
                             Insert position:
                           </label>
-                          <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                          <select 
+                            value={typeof insertPosition === 'number' ? insertPosition : 'end'}
+                            onChange={(e) => setInsertPosition(e.target.value === 'end' ? 'end' : parseInt(e.target.value))}
+                            className="form-select form-select-sm"
+                            style={{ maxWidth: '300px' }}
+                          >
                             {taggedPeople.map((person, idx) => (
-                              <button
-                                key={idx}
-                                className={`btn btn-sm ${insertPosition === idx ? 'btn-primary' : 'btn-outline-primary'}`}
-                                onClick={() => setInsertPosition(idx)}
-                                title={`Insert before: ${person.neName}`}
-                              >
-                                Before {idx + 1}
-                              </button>
+                              <option key={idx} value={idx}>
+                                Before {person.neName}
+                              </option>
                             ))}
-                            <button
-                              className={`btn btn-sm ${insertPosition === 'end' ? 'btn-primary' : 'btn-outline-primary'}`}
-                              onClick={() => setInsertPosition('end')}
-                              title="Insert at end"
-                            >
-                              At end
-                            </button>
-                          </div>
+                            <option value="end">At end</option>
+                          </select>
                         </div>
                       )}
                       
