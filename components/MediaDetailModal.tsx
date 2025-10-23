@@ -170,7 +170,20 @@ export default function MediaDetailModal({
           url: response.url,
           errorData: errorData
         });
-        throw new Error(errorData.message || 'Failed to tag person');
+        
+        // Construct detailed error message for user
+        let errorMessage = 'Failed to tag person';
+        if (errorData.error) {
+          errorMessage = errorData.error;
+        }
+        if (errorData.details) {
+          errorMessage += ` - ${errorData.details}`;
+        }
+        if (errorData.stack && errorData.stack.includes('constraint')) {
+          errorMessage += ' (Database constraint violation)';
+        }
+        
+        throw new Error(errorMessage);
       }
 
       // Find the person details
@@ -191,11 +204,17 @@ export default function MediaDetailModal({
       setShowPeopleSelector(false);
     } catch (error) {
       console.error('❌ MediaDetailModal handleAddPerson error:', error);
+      
+      let displayMessage = 'Failed to tag person';
       if (error instanceof Error) {
-        alert(`Failed to tag person: ${error.message}`);
-      } else {
-        alert('Failed to tag person');
+        displayMessage = error.message;
+        console.error('📋 Full error details:');
+        console.error('  Message:', error.message);
+        console.error('  Stack:', error.stack);
       }
+      
+      // Show all details in a single alert so user can copy/paste
+      alert(`❌ Failed to tag person\n\nError: ${displayMessage}\n\nCheck browser console (F12) for more details.`);
     } finally {
       setSavingTag(false);
     }
