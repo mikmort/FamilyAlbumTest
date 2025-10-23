@@ -806,9 +806,40 @@ module.exports = async function (context, req) {
             try {
                 // First, let's check if ANY pictures exist
                 context.log('Checking if Pictures table has any records...');
-                const countQuery = `SELECT COUNT(*) as cnt FROM dbo.Pictures`;
-                const countResult = await execute(countQuery, {});
-                context.log('Total pictures in database:', countResult[0].cnt);
+                try {
+                    const countQuery = `SELECT COUNT(*) as cnt FROM dbo.Pictures`;
+                    const countResult = await execute(countQuery, {});
+                    context.log('Count query executed');
+                    context.log('Count result type:', typeof countResult);
+                    context.log('Count result is array:', Array.isArray(countResult));
+                    context.log('Count result length:', countResult ? countResult.length : 'undefined');
+                    context.log('Full count result:', JSON.stringify(countResult));
+                    
+                    if (!countResult || !Array.isArray(countResult) || countResult.length === 0) {
+                        context.log.error('❌ Count query returned invalid result');
+                        context.res = {
+                            status: 500,
+                            body: { 
+                                error: 'Database query failed - COUNT query returned no results',
+                                countResultType: typeof countResult
+                            }
+                        };
+                        return;
+                    }
+                    
+                    const totalCount = countResult[0].cnt;
+                    context.log('✅ Total pictures in database:', totalCount);
+                } catch (countError) {
+                    context.log.error('❌ Error executing COUNT query:', countError.message);
+                    context.res = {
+                        status: 500,
+                        body: { 
+                            error: 'Failed to count pictures',
+                            details: countError.message
+                        }
+                    };
+                    return;
+                }
                 
                 // Get current picture to access PPeopleList
                 const pictureQuery = `
@@ -834,8 +865,8 @@ module.exports = async function (context, req) {
                     `;
                     const searchPattern = '%' + filename.split('/').pop() + '%';
                     const similar = await execute(searchQuery, { pattern: searchPattern });
-                    context.log('Similar files found:', similar.length);
-                    if (similar.length > 0) {
+                    context.log('Similar files found:', similar ? similar.length : 0);
+                    if (similar && similar.length > 0) {
                         context.log('Sample similar filenames:', similar.map(s => s.PFileName));
                     }
                     
@@ -844,8 +875,7 @@ module.exports = async function (context, req) {
                         body: { 
                             error: 'Picture not found',
                             searchedFor: filename,
-                            totalPicturesInDb: countResult[0].cnt,
-                            similarFilesFound: similar.length
+                            similarFilesFound: similar ? similar.length : 0
                         }
                     };
                     return;
@@ -902,6 +932,16 @@ module.exports = async function (context, req) {
                 context.log('Checking for existing NamePhoto record...');
                 const checkResult = await execute(checkQuery, { filename, personId });
                 context.log('Check result:', JSON.stringify(checkResult));
+                
+                if (!checkResult || !Array.isArray(checkResult) || checkResult.length === 0) {
+                    context.log.error('❌ Check query returned invalid result');
+                    context.res = {
+                        status: 500,
+                        body: { error: 'Database check failed' }
+                    };
+                    return;
+                }
+                
                 context.log('Existing NamePhoto records:', checkResult[0].cnt);
                 
                 if (checkResult[0].cnt === 0) {
