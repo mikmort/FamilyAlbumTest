@@ -172,15 +172,18 @@ export default function MediaDetailModal({
         });
         
         // Construct detailed error message for user
-        let errorMessage = 'Failed to tag person';
-        if (errorData.error) {
-          errorMessage = errorData.error;
-        }
+        let errorMessage = errorData.error || 'Failed to tag person';
         if (errorData.details) {
-          errorMessage += ` - ${errorData.details}`;
+          errorMessage += `\n\nDetails: ${errorData.details}`;
         }
-        if (errorData.stack && errorData.stack.includes('constraint')) {
-          errorMessage += ' (Database constraint violation)';
+        if (errorData.searchedFor) {
+          errorMessage += `\n\nSearched for: ${errorData.searchedFor}`;
+        }
+        if (errorData.similarFilesFound !== undefined) {
+          errorMessage += `\nSimilar files found: ${errorData.similarFilesFound}`;
+        }
+        if (errorData.stack) {
+          errorMessage += `\n\nStack: ${errorData.stack}`;
         }
         
         throw new Error(errorMessage);
