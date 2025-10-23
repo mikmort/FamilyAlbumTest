@@ -191,7 +191,11 @@ export default function MediaDetailModal({
       setShowPeopleSelector(false);
     } catch (error) {
       console.error('❌ MediaDetailModal handleAddPerson error:', error);
-      alert('Failed to tag person');
+      if (error instanceof Error) {
+        alert(`Failed to tag person: ${error.message}`);
+      } else {
+        alert('Failed to tag person');
+      }
     } finally {
       setSavingTag(false);
     }

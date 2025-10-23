@@ -818,21 +818,39 @@ module.exports = async function (context, req) {
                     ? picture.PPeopleList.split(',').map(s => s.trim()).filter(Boolean).map(s => parseInt(s, 10))
                     : [];
                 
+                // Check if person is already tagged
+                if (currentPeopleIds.includes(personId)) {
+                    context.res = {
+                        status: 409,
+                        body: { error: 'This person is already tagged in this photo' }
+                    };
+                    return;
+                }
+                
                 const insertPos = position || 0;
                 const clampedPos = Math.max(0, Math.min(insertPos, currentPeopleIds.length));
                 
                 // Insert the new person at the specified position
                 currentPeopleIds.splice(clampedPos, 0, personId);
 
-                // Insert the NamePhoto record
-                const insertQuery = `
-                    INSERT INTO dbo.NamePhoto (npFileName, npID)
-                    VALUES (@filename, @personId)
+                // Check if NamePhoto record already exists (shouldn't happen if UI is correct)
+                const checkQuery = `
+                    SELECT COUNT(*) as cnt FROM dbo.NamePhoto
+                    WHERE npFileName = @filename AND npID = @personId
                 `;
-                await execute(insertQuery, {
-                    filename,
-                    personId
-                });
+                const checkResult = await execute(checkQuery, { filename, personId });
+                
+                if (checkResult[0].cnt === 0) {
+                    // Insert the NamePhoto record
+                    const insertQuery = `
+                        INSERT INTO dbo.NamePhoto (npFileName, npID)
+                        VALUES (@filename, @personId)
+                    `;
+                    await execute(insertQuery, {
+                        filename,
+                        personId
+                    });
+                }
 
                 // Update PPeopleList and PNameCount in Pictures table
                 const newPeopleList = currentPeopleIds.join(',');
