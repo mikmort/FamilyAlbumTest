@@ -262,9 +262,8 @@ module.exports = async function (context, req) {
             // If thumbnail requested, check if it exists
             // Use the actual found blob name (foundPath) for thumbnail operations
             if (thumbnail) {
-                // Get just the filename part from the found path for thumbnail naming
-                const foundFilenamePart = foundPath.split('/').pop();
-                const thumbnailPath = `thumbnails/${foundFilenamePart}`;
+                // Use full path (including directory) to avoid conflicts with duplicate filenames
+                const thumbnailPath = `thumbnails/${foundPath}`;
                 const thumbnailExists = await blobExists(thumbnailPath);
                 
                 let shouldRegenerate = false;
