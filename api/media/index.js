@@ -699,10 +699,17 @@ module.exports = async function (context, req) {
                         }
                     }
 
+                    // Use stored PThumbnailUrl if available, otherwise generate on-demand URL
+                    // PThumbnailUrl is a pre-generated thumbnail URL stored in the database
+                    // If it's empty, fall back to on-demand generation via ?thumbnail=true
+                    const thumbnailUrl = item.PThumbnailUrl 
+                        ? item.PThumbnailUrl 
+                        : `/api/media/${blobPath}?thumbnail=true`;
+
                     return {
                         ...item,
                         PBlobUrl: `/api/media/${blobPath}`,
-                        PThumbnailUrl: `/api/media/${blobPath}?thumbnail=true`,
+                        PThumbnailUrl: thumbnailUrl,
                         TaggedPeople: orderedTagged,
                         Event: eventForItem
                     };
