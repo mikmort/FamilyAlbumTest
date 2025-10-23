@@ -61,6 +61,7 @@ export default function MediaDetailModal({
   const [loadingPeople, setLoadingPeople] = useState(false);
   const [loadingEvents, setLoadingEvents] = useState(false);
   const [savingTag, setSavingTag] = useState(false);
+  const [insertPosition, setInsertPosition] = useState<number | 'end'>(0);
   
   // Inline creation state
   const [showCreatePerson, setShowCreatePerson] = useState(false);
@@ -148,10 +149,20 @@ export default function MediaDetailModal({
 
     try {
       setSavingTag(true);
+      
+      // Determine the actual position to use
+      let positionValue = 0;
+      if (insertPosition === 'end') {
+        positionValue = taggedPeople.length;
+      } else {
+        // Clamp position to valid range
+        positionValue = Math.max(0, Math.min(insertPosition as number, taggedPeople.length));
+      }
+
       const response = await fetch(`/api/media/${encodeURIComponent(media.PFileName)}/tags`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ personId, position: 0 }),
+        body: JSON.stringify({ personId, position: positionValue }),
       });
 
       if (!response.ok) {
@@ -168,7 +179,8 @@ export default function MediaDetailModal({
       // Find the person details
       const person = allPeople.find(p => p.ID === personId);
       if (person) {
-        const newTaggedPeople = [...taggedPeople, { ID: person.ID, neName: person.neName }];
+        const newTaggedPeople = [...taggedPeople];
+        newTaggedPeople.splice(positionValue, 0, { ID: person.ID, neName: person.neName });
         setTaggedPeople(newTaggedPeople);
         
         // Update parent component if callback provided
@@ -177,6 +189,8 @@ export default function MediaDetailModal({
         }
       }
       
+      // Reset position for next add
+      setInsertPosition(0);
       setShowPeopleSelector(false);
     } catch (error) {
       console.error('❌ MediaDetailModal handleAddPerson error:', error);
@@ -615,6 +629,40 @@ export default function MediaDetailModal({
                           </button>
                         </div>
                       </div>
+                      
+                      {/* Position selector */}
+                      {taggedPeople.length > 0 && (
+                        <div style={{ 
+                          padding: '0.75rem', 
+                          marginBottom: '1rem', 
+                          backgroundColor: '#f8f9fa', 
+                          borderRadius: '4px',
+                          border: '1px solid #dee2e6'
+                        }}>
+                          <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500' }}>
+                            Insert position:
+                          </label>
+                          <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                            {taggedPeople.map((person, idx) => (
+                              <button
+                                key={idx}
+                                className={`btn btn-sm ${insertPosition === idx ? 'btn-primary' : 'btn-outline-primary'}`}
+                                onClick={() => setInsertPosition(idx)}
+                                title={`Insert before: ${person.neName}`}
+                              >
+                                Before {idx + 1}
+                              </button>
+                            ))}
+                            <button
+                              className={`btn btn-sm ${insertPosition === 'end' ? 'btn-primary' : 'btn-outline-primary'}`}
+                              onClick={() => setInsertPosition('end')}
+                              title="Insert at end"
+                            >
+                              At end
+                            </button>
+                          </div>
+                        </div>
+                      )}
                       
                       {/* Inline Person Creation Form */}
                       {showCreatePerson && (

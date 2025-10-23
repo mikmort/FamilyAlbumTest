@@ -752,21 +752,75 @@ module.exports = async function (context, req) {
                 return;
             }
 
-            const insertQuery = `
-                INSERT INTO dbo.NamePhoto (npFileName, npID, npPosition)
-                VALUES (@filename, @personId, @position)
-            `;
+            try {
+                // Get current people tagged in this photo
+                const currentPeopleQuery = `
+                    SELECT npID, npPosition FROM dbo.NamePhoto 
+                    WHERE npFileName = @filename
+                    ORDER BY npPosition ASC
+                `;
+                const currentPeople = await execute(currentPeopleQuery, { filename });
+                
+                const insertPos = position || 0;
+                
+                // Update positions for people at or after the insert position
+                if (currentPeople.length > 0) {
+                    const updatePositionQuery = `
+                        UPDATE dbo.NamePhoto
+                        SET npPosition = npPosition + 1
+                        WHERE npFileName = @filename AND npPosition >= @position
+                    `;
+                    await execute(updatePositionQuery, { 
+                        filename, 
+                        position: insertPos
+                    });
+                }
 
-            await execute(insertQuery, {
-                filename,
-                personId,
-                position: position || 0
-            });
+                // Insert the new person
+                const insertQuery = `
+                    INSERT INTO dbo.NamePhoto (npFileName, npID, npPosition)
+                    VALUES (@filename, @personId, @position)
+                `;
+                await execute(insertQuery, {
+                    filename,
+                    personId,
+                    position: insertPos
+                });
 
-            context.res = {
-                status: 201,
-                body: { success: true }
-            };
+                // Get updated list of all people tagged
+                const allPeopleQuery = `
+                    SELECT npID FROM dbo.NamePhoto 
+                    WHERE npFileName = @filename
+                    ORDER BY npPosition ASC
+                `;
+                const allPeople = await execute(allPeopleQuery, { filename });
+                const peopleIds = allPeople.map(p => p.npID).join(',');
+                
+                // Update PPeopleList and PNameCount in Pictures table
+                const updatePictureQuery = `
+                    UPDATE dbo.Pictures
+                    SET PPeopleList = @peopleList,
+                        PNameCount = @nameCount,
+                        PLastModifiedDate = GETDATE()
+                    WHERE PFileName = @filename
+                `;
+                await execute(updatePictureQuery, {
+                    filename,
+                    peopleList: peopleIds || '',
+                    nameCount: allPeople.length
+                });
+
+                context.res = {
+                    status: 201,
+                    body: { success: true, peopleList: peopleIds, nameCount: allPeople.length }
+                };
+            } catch (error) {
+                context.log('❌ Error tagging person:', error);
+                context.res = {
+                    status: 500,
+                    body: { error: error.message || 'Failed to tag person' }
+                };
+            }
             return;
         }
 
@@ -782,16 +836,76 @@ module.exports = async function (context, req) {
                 return;
             }
 
-            const deleteQuery = `
-                DELETE FROM dbo.NamePhoto
-                WHERE npFileName = @filename AND npID = @personId
-            `;
+            try {
+                // Get the position of the person being removed
+                const getPositionQuery = `
+                    SELECT npPosition FROM dbo.NamePhoto
+                    WHERE npFileName = @filename AND npID = @personId
+                `;
+                const posResult = await execute(getPositionQuery, { filename, personId });
+                
+                if (posResult.length === 0) {
+                    context.res = {
+                        status: 404,
+                        body: { error: 'Person tag not found' }
+                    };
+                    return;
+                }
 
-            await execute(deleteQuery, { filename, personId });
+                const removedPosition = posResult[0].npPosition;
 
-            context.res = {
-                status: 204
-            };
+                // Delete the person tag
+                const deleteQuery = `
+                    DELETE FROM dbo.NamePhoto
+                    WHERE npFileName = @filename AND npID = @personId
+                `;
+                await execute(deleteQuery, { filename, personId });
+
+                // Update positions of people after the removed position
+                const updatePositionQuery = `
+                    UPDATE dbo.NamePhoto
+                    SET npPosition = npPosition - 1
+                    WHERE npFileName = @filename AND npPosition > @position
+                `;
+                await execute(updatePositionQuery, { 
+                    filename, 
+                    position: removedPosition
+                });
+
+                // Get updated list of all people tagged
+                const allPeopleQuery = `
+                    SELECT npID FROM dbo.NamePhoto 
+                    WHERE npFileName = @filename
+                    ORDER BY npPosition ASC
+                `;
+                const allPeople = await execute(allPeopleQuery, { filename });
+                const peopleIds = allPeople.map(p => p.npID).join(',');
+                
+                // Update PPeopleList and PNameCount in Pictures table
+                const updatePictureQuery = `
+                    UPDATE dbo.Pictures
+                    SET PPeopleList = @peopleList,
+                        PNameCount = @nameCount,
+                        PLastModifiedDate = GETDATE()
+                    WHERE PFileName = @filename
+                `;
+                await execute(updatePictureQuery, {
+                    filename,
+                    peopleList: peopleIds || '',
+                    nameCount: allPeople.length
+                });
+
+                context.res = {
+                    status: 200,
+                    body: { success: true, peopleList: peopleIds, nameCount: allPeople.length }
+                };
+            } catch (error) {
+                context.log('❌ Error removing person tag:', error);
+                context.res = {
+                    status: 500,
+                    body: { error: error.message || 'Failed to remove person tag' }
+                };
+            }
             return;
         }
 
