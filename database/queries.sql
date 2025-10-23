@@ -49,16 +49,16 @@ WHERE np.npID = 1 -- Replace with actual event ID
 ORDER BY p.PYear DESC, p.PMonth DESC;
 
 -- Query 6: Get people tagged in a specific photo
+-- Note: Order is determined by PPeopleList in Pictures table, not by position
 SELECT 
     ne.ID,
     ne.neName as Name,
-    ne.neRelation as Relationship,
-    np.npPosition as Position
+    ne.neRelation as Relationship
 FROM dbo.NameEvent ne
 INNER JOIN dbo.NamePhoto np ON ne.ID = np.npID
 WHERE ne.neType = 'N'
     AND np.npFileName = 'photo.jpg' -- Replace with actual filename
-ORDER BY np.npPosition;
+ORDER BY ne.ID;
 
 -- Query 7: Get unindexed files ready for processing
 SELECT 

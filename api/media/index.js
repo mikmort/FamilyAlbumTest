@@ -127,7 +127,7 @@ module.exports = async function (context, req) {
             const pattern = `%${raw.replace(/\\/g, '/')}%`;
             context.log(`Debug route: searching NamePhoto for pattern "${pattern}"`);
             try {
-                const rows = await query(`SELECT TOP 100 npFileName, npID, npPosition FROM dbo.NamePhoto WHERE npFileName LIKE @pattern ORDER BY npFileName, npPosition`, { pattern });
+                const rows = await query(`SELECT TOP 100 npFileName, npID FROM dbo.NamePhoto WHERE npFileName LIKE @pattern ORDER BY npFileName`, { pattern });
                 context.res = { status: 200, headers: { 'Content-Type': 'application/json' }, body: { pattern, count: rows.length, rows } };
                 return;
             } catch (err) {
@@ -146,7 +146,7 @@ module.exports = async function (context, req) {
             context.log(`Debug wildcard limited: searching NamePhoto for pattern "${pattern}"`);
             try {
                 const rows = await query(
-                    `SELECT TOP 100 npFileName, npID, npPosition FROM dbo.NamePhoto WHERE npFileName LIKE @pattern ORDER BY npFileName, npPosition`,
+                    `SELECT TOP 100 npFileName, npID FROM dbo.NamePhoto WHERE npFileName LIKE @pattern ORDER BY npFileName`,
                     { pattern }
                 );
                 context.res = { status: 200, headers: { 'Content-Type': 'application/json' }, body: { raw, pattern, count: rows.length, rows } };
@@ -177,7 +177,7 @@ module.exports = async function (context, req) {
                 placeholders.push(`@v${i}`);
             });
 
-            const debugQuery = `SELECT npFileName, npID, npPosition FROM dbo.NamePhoto WHERE npFileName IN (${placeholders.join(',')}) ORDER BY npFileName, npPosition`;
+            const debugQuery = `SELECT npFileName, npID FROM dbo.NamePhoto WHERE npFileName IN (${placeholders.join(',')}) ORDER BY npFileName`;
             let debugRows = [];
             try {
                 debugRows = await query(debugQuery, params);
@@ -577,7 +577,7 @@ module.exports = async function (context, req) {
 
             // Build NameEvent lookup for all IDs in PPeopleList across all media.
             // PPeopleList contains comma-separated IDs that reference NameEvent records.
-            // We use only PPeopleList for the order; NamePhoto is not used for TaggedPeople.
+            // PPeopleList is the source of truth for people ordering.
             let eventLookup = {};
 
             if (media.length > 0) {
@@ -684,7 +684,7 @@ module.exports = async function (context, req) {
                     }
 
                     // Build TaggedPeople strictly from PPeopleList order.
-                    // PPeopleList contains comma-separated IDs that map to NameEvent records.
+                    // PPeopleList contains comma-separated IDs that map to NameEvent records (source of truth).
                     // Only include people (neType === 'N'); events (neType === 'E') are displayed separately.
                     let orderedTagged = [];
 
@@ -753,50 +753,47 @@ module.exports = async function (context, req) {
             }
 
             try {
-                // Get current people tagged in this photo
-                const currentPeopleQuery = `
-                    SELECT npID, npPosition FROM dbo.NamePhoto 
-                    WHERE npFileName = @filename
-                    ORDER BY npPosition ASC
+                // Get current picture to access PPeopleList
+                const pictureQuery = `
+                    SELECT PFileName, PPeopleList, PNameCount
+                    FROM dbo.Pictures
+                    WHERE PFileName = @filename
                 `;
-                const currentPeople = await execute(currentPeopleQuery, { filename });
+                const pictures = await execute(pictureQuery, { filename });
                 
-                const insertPos = position || 0;
-                
-                // Update positions for people at or after the insert position
-                if (currentPeople.length > 0) {
-                    const updatePositionQuery = `
-                        UPDATE dbo.NamePhoto
-                        SET npPosition = npPosition + 1
-                        WHERE npFileName = @filename AND npPosition >= @position
-                    `;
-                    await execute(updatePositionQuery, { 
-                        filename, 
-                        position: insertPos
-                    });
+                if (pictures.length === 0) {
+                    context.res = {
+                        status: 404,
+                        body: { error: 'Picture not found' }
+                    };
+                    return;
                 }
 
-                // Insert the new person
+                const picture = pictures[0];
+                
+                // Parse current PPeopleList
+                const currentPeopleIds = picture.PPeopleList 
+                    ? picture.PPeopleList.split(',').map(s => s.trim()).filter(Boolean).map(s => parseInt(s, 10))
+                    : [];
+                
+                const insertPos = position || 0;
+                const clampedPos = Math.max(0, Math.min(insertPos, currentPeopleIds.length));
+                
+                // Insert the new person at the specified position
+                currentPeopleIds.splice(clampedPos, 0, personId);
+
+                // Insert the NamePhoto record
                 const insertQuery = `
-                    INSERT INTO dbo.NamePhoto (npFileName, npID, npPosition)
-                    VALUES (@filename, @personId, @position)
+                    INSERT INTO dbo.NamePhoto (npFileName, npID)
+                    VALUES (@filename, @personId)
                 `;
                 await execute(insertQuery, {
                     filename,
-                    personId,
-                    position: insertPos
+                    personId
                 });
 
-                // Get updated list of all people tagged
-                const allPeopleQuery = `
-                    SELECT npID FROM dbo.NamePhoto 
-                    WHERE npFileName = @filename
-                    ORDER BY npPosition ASC
-                `;
-                const allPeople = await execute(allPeopleQuery, { filename });
-                const peopleIds = allPeople.map(p => p.npID).join(',');
-                
                 // Update PPeopleList and PNameCount in Pictures table
+                const newPeopleList = currentPeopleIds.join(',');
                 const updatePictureQuery = `
                     UPDATE dbo.Pictures
                     SET PPeopleList = @peopleList,
@@ -806,13 +803,13 @@ module.exports = async function (context, req) {
                 `;
                 await execute(updatePictureQuery, {
                     filename,
-                    peopleList: peopleIds || '',
-                    nameCount: allPeople.length
+                    peopleList: newPeopleList,
+                    nameCount: currentPeopleIds.length
                 });
 
                 context.res = {
                     status: 201,
-                    body: { success: true, peopleList: peopleIds, nameCount: allPeople.length }
+                    body: { success: true, peopleList: newPeopleList, nameCount: currentPeopleIds.length }
                 };
             } catch (error) {
                 context.log('❌ Error tagging person:', error);
@@ -837,14 +834,32 @@ module.exports = async function (context, req) {
             }
 
             try {
-                // Get the position of the person being removed
-                const getPositionQuery = `
-                    SELECT npPosition FROM dbo.NamePhoto
-                    WHERE npFileName = @filename AND npID = @personId
+                // Get current picture to access PPeopleList
+                const pictureQuery = `
+                    SELECT PFileName, PPeopleList, PNameCount
+                    FROM dbo.Pictures
+                    WHERE PFileName = @filename
                 `;
-                const posResult = await execute(getPositionQuery, { filename, personId });
+                const pictures = await execute(pictureQuery, { filename });
                 
-                if (posResult.length === 0) {
+                if (pictures.length === 0) {
+                    context.res = {
+                        status: 404,
+                        body: { error: 'Picture not found' }
+                    };
+                    return;
+                }
+
+                const picture = pictures[0];
+                
+                // Parse current PPeopleList
+                const currentPeopleIds = picture.PPeopleList 
+                    ? picture.PPeopleList.split(',').map(s => s.trim()).filter(Boolean).map(s => parseInt(s, 10))
+                    : [];
+                
+                // Check if person is in the list
+                const personIndex = currentPeopleIds.indexOf(personId);
+                if (personIndex === -1) {
                     context.res = {
                         status: 404,
                         body: { error: 'Person tag not found' }
@@ -852,36 +867,18 @@ module.exports = async function (context, req) {
                     return;
                 }
 
-                const removedPosition = posResult[0].npPosition;
-
-                // Delete the person tag
+                // Delete the person tag from NamePhoto
                 const deleteQuery = `
                     DELETE FROM dbo.NamePhoto
                     WHERE npFileName = @filename AND npID = @personId
                 `;
                 await execute(deleteQuery, { filename, personId });
 
-                // Update positions of people after the removed position
-                const updatePositionQuery = `
-                    UPDATE dbo.NamePhoto
-                    SET npPosition = npPosition - 1
-                    WHERE npFileName = @filename AND npPosition > @position
-                `;
-                await execute(updatePositionQuery, { 
-                    filename, 
-                    position: removedPosition
-                });
-
-                // Get updated list of all people tagged
-                const allPeopleQuery = `
-                    SELECT npID FROM dbo.NamePhoto 
-                    WHERE npFileName = @filename
-                    ORDER BY npPosition ASC
-                `;
-                const allPeople = await execute(allPeopleQuery, { filename });
-                const peopleIds = allPeople.map(p => p.npID).join(',');
+                // Remove person from the list
+                currentPeopleIds.splice(personIndex, 1);
                 
                 // Update PPeopleList and PNameCount in Pictures table
+                const newPeopleList = currentPeopleIds.join(',');
                 const updatePictureQuery = `
                     UPDATE dbo.Pictures
                     SET PPeopleList = @peopleList,
@@ -891,13 +888,13 @@ module.exports = async function (context, req) {
                 `;
                 await execute(updatePictureQuery, {
                     filename,
-                    peopleList: peopleIds || '',
-                    nameCount: allPeople.length
+                    peopleList: newPeopleList,
+                    nameCount: currentPeopleIds.length
                 });
 
                 context.res = {
                     status: 200,
-                    body: { success: true, peopleList: peopleIds, nameCount: allPeople.length }
+                    body: { success: true, peopleList: newPeopleList, nameCount: currentPeopleIds.length }
                 };
             } catch (error) {
                 context.log('❌ Error removing person tag:', error);

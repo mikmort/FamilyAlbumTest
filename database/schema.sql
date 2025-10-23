@@ -50,10 +50,10 @@ GO
 
 -- Table: NamePhoto
 -- Many-to-many relationship between People/Events and Pictures
+-- Order is determined by PPeopleList in Pictures table, not by position here
 CREATE TABLE dbo.NamePhoto (
     npID INT NOT NULL,
     npFileName NVARCHAR(500) NOT NULL,
-    npPosition INT DEFAULT 0, -- Position/order of person in photo
     PRIMARY KEY (npID, npFileName),
     FOREIGN KEY (npID) REFERENCES dbo.NameEvent(ID) ON DELETE CASCADE,
     FOREIGN KEY (npFileName) REFERENCES dbo.Pictures(PFileName) ON DELETE CASCADE,
