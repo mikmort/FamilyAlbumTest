@@ -4,6 +4,9 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 
+// Lock map to prevent concurrent thumbnail generation for the same file
+const thumbnailGenerationLocks = new Map();
+
 // Make sharp optional - only needed for thumbnail generation
 let sharp = null;
 try {
@@ -25,6 +28,28 @@ try {
 } catch (err) {
     console.warn('⚠️ FFmpeg module not available - video thumbnail generation disabled:', err.message);
     console.warn('Error stack:', err.stack);
+}
+
+// Helper to acquire a lock for thumbnail generation (prevent concurrent generation of same file)
+async function acquireThumbnailLock(filepath) {
+    const maxWaitTime = 30000; // 30 second max wait
+    const pollInterval = 100; // Check every 100ms
+    const startTime = Date.now();
+    
+    while (thumbnailGenerationLocks.has(filepath)) {
+        if (Date.now() - startTime > maxWaitTime) {
+            console.warn(`⚠️ Timeout waiting for thumbnail lock on ${filepath}, proceeding anyway`);
+            break;
+        }
+        await new Promise(resolve => setTimeout(resolve, pollInterval));
+    }
+    
+    thumbnailGenerationLocks.set(filepath, true);
+}
+
+// Helper to release a lock
+function releaseThumbnailLock(filepath) {
+    thumbnailGenerationLocks.delete(filepath);
 }
 
 module.exports = async function (context, req) {
@@ -267,22 +292,26 @@ module.exports = async function (context, req) {
             // If thumbnail requested, check if it exists
             // Use the actual found blob name (foundPath) for thumbnail operations
             if (thumbnail) {
-                // Use full path (including directory) to avoid conflicts with duplicate filenames
-                const thumbnailPath = `thumbnails/${foundPath}`;
-                const thumbnailExists = await blobExists(thumbnailPath);
+                // Acquire lock to prevent concurrent generation of the same thumbnail
+                await acquireThumbnailLock(foundPath);
                 
-                let shouldRegenerate = false;
-                
-                // If thumbnail exists, check if it's a placeholder (too small)
-                if (thumbnailExists) {
-                    context.log(`Thumbnail exists at ${thumbnailPath}, checking size...`);
-                    const containerClient = getContainerClient();
-                    const thumbnailBlobClient = containerClient.getBlobClient(thumbnailPath);
-                    const properties = await thumbnailBlobClient.getProperties();
-                    const thumbnailSize = properties.contentLength;
+                try {
+                    // Use full path (including directory) to avoid conflicts with duplicate filenames
+                    const thumbnailPath = `thumbnails/${foundPath}`;
+                    const thumbnailExists = await blobExists(thumbnailPath);
                     
-                    context.log(`Existing thumbnail size: ${thumbnailSize} bytes`);
+                    let shouldRegenerate = false;
                     
+                    // If thumbnail exists, check if it's a placeholder (too small)
+                    if (thumbnailExists) {
+                        context.log(`Thumbnail exists at ${thumbnailPath}, checking size...`);
+                        const containerClient = getContainerClient();
+                        const thumbnailBlobClient = containerClient.getBlobClient(thumbnailPath);
+                        const properties = await thumbnailBlobClient.getProperties();
+                        const thumbnailSize = properties.contentLength;
+                        
+                        context.log(`Existing thumbnail size: ${thumbnailSize} bytes`);
+                        
                     // If thumbnail is less than 100 bytes, it's likely a placeholder - regenerate it
                     if (thumbnailSize < 100) {
                         context.log(`⚠️ Thumbnail is too small (${thumbnailSize} bytes), likely a placeholder. Regenerating...`);
@@ -401,6 +430,10 @@ module.exports = async function (context, req) {
                     // Thumbnail already exists, use it
                     context.log(`Using existing thumbnail: ${thumbnailPath}`);
                     blobPath = thumbnailPath;
+                }
+                } finally {
+                    // Release the lock when done
+                    releaseThumbnailLock(foundPath);
                 }
             } else {
                 // No thumbnail requested, use the found path
