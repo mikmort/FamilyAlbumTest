@@ -335,7 +335,7 @@ export default function PeopleSelector({
               onChange={(e) => onExclusiveFilterChange(e.target.checked)}
               style={{ marginRight: '0.75rem', cursor: 'pointer' }}
             />
-            <span>Show only photos with <strong>ALL</strong> selected people (AND logic)</span>
+            <span>Only these people (no one else tagged)</span>
           </label>
         </div>
       )}

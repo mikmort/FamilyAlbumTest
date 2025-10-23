@@ -488,7 +488,7 @@ module.exports = async function (context, req) {
             // Filter by people
             if (peopleIds.length > 0) {
                 if (exclusiveFilter) {
-                    // Exclusive: photo must have ALL selected people and ONLY these people (no others)
+                    // Exclusive "only these people" mode: photo must have ALL selected people and NO other people
                     // Check 1: All selected people must be tagged
                     peopleIds.forEach((id, i) => {
                         const paramName = `person${i}`;
@@ -504,24 +504,32 @@ module.exports = async function (context, req) {
                         `);
                     });
                     
-                    // Check 2: The total number of people tagged must equal the number of selected people
-                    // This ensures no OTHER people are tagged
-                    params.nameCount = peopleIds.length;
-                    whereClauses.push(`p.PNameCount = @nameCount`);
-                } else {
-                    // Inclusive: photo must have at least one of the selected people
+                    // Check 2: NO other people can be tagged (only the selected ones)
                     const personPlaceholders = peopleIds.map((_, i) => `@person${i}`).join(',');
                     whereClauses.push(`
-                        EXISTS (
+                        NOT EXISTS (
                             SELECT 1 FROM dbo.NamePhoto np 
                             INNER JOIN dbo.NameEvent ne ON np.npID = ne.ID
                             WHERE np.npFileName = p.PFileName 
-                            AND np.npID IN (${personPlaceholders})
+                            AND np.npID NOT IN (${personPlaceholders})
                             AND ne.neType = 'N'
                         )
                     `);
+                } else {
+                    // Inclusive mode: photo must have ALL selected people (and can have other people too)
+                    // All selected people must be tagged
                     peopleIds.forEach((id, i) => {
-                        params[`person${i}`] = id;
+                        const paramName = `person${i}`;
+                        params[paramName] = id;
+                        whereClauses.push(`
+                            EXISTS (
+                                SELECT 1 FROM dbo.NamePhoto np 
+                                INNER JOIN dbo.NameEvent ne ON np.npID = ne.ID
+                                WHERE np.npFileName = p.PFileName 
+                                AND np.npID = @${paramName}
+                                AND ne.neType = 'N'
+                            )
+                        `);
                     });
                 }
             }
