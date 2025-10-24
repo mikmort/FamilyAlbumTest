@@ -32,6 +32,8 @@ interface Event {
 
 export default function ProcessNewFiles() {
   const [currentFile, setCurrentFile] = useState<UnindexedFile | null>(null);
+  const [allFiles, setAllFiles] = useState<UnindexedFile[]>([]);
+  const [currentIndex, setCurrentIndex] = useState(0);
   const [remainingCount, setRemainingCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -58,9 +60,24 @@ export default function ProcessNewFiles() {
 
   // Load next file on mount and after processing
   useEffect(() => {
-    loadNextFile();
+    loadAllFiles();
     loadRemainingCount();
   }, []);
+
+  // Update current file when index changes
+  useEffect(() => {
+    if (allFiles.length > 0 && currentIndex >= 0 && currentIndex < allFiles.length) {
+      setCurrentFile(allFiles[currentIndex]);
+      // Reset form when changing files
+      setDescription('');
+      setMonth('');
+      setYear('');
+      setSelectedEvent('');
+      setSelectedPeople([]);
+    } else if (allFiles.length === 0) {
+      setCurrentFile(null);
+    }
+  }, [currentIndex, allFiles]);
 
   const loadPeople = async () => {
     setPeopleLoading(true);
@@ -89,6 +106,30 @@ export default function ProcessNewFiles() {
       console.error('Error loading events:', err);
     } finally {
       setEventsLoading(false);
+    }
+  };
+
+  const loadAllFiles = async () => {
+    setLoading(true);
+    setError('');
+    try {
+      const res = await fetch('/api/unindexed/list');
+      const data = await res.json();
+      
+      if (data.success) {
+        setAllFiles(data.files || []);
+        setCurrentIndex(0);
+      } else {
+        console.error('❌ Unindexed API error:', data);
+        setError(data.error || 'Failed to load files');
+        setAllFiles([]);
+      }
+    } catch (err: any) {
+      console.error('❌ ProcessNewFiles loadAllFiles error:', err);
+      setError(err.message || 'Failed to load files');
+      setAllFiles([]);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -169,9 +210,10 @@ export default function ProcessNewFiles() {
       const data = await res.json();
       
       if (data.success) {
-        // Load next file
-        await loadNextFile();
+        // Reload all files to refresh the list
+        await loadAllFiles();
         await loadRemainingCount();
+        // Stay at same index (will show next file since current was removed)
       } else {
         console.error('❌ Process file API error:', data);
         setError(data.error || 'Failed to process file');
@@ -185,8 +227,22 @@ export default function ProcessNewFiles() {
   };
 
   const handleSkip = () => {
-    // For now, skip just loads next - could implement a skip mechanism
-    loadNextFile();
+    // Move to next file without saving
+    if (currentIndex < allFiles.length - 1) {
+      setCurrentIndex(currentIndex + 1);
+    }
+  };
+
+  const handlePrevious = () => {
+    if (currentIndex > 0) {
+      setCurrentIndex(currentIndex - 1);
+    }
+  };
+
+  const handleNext = () => {
+    if (currentIndex < allFiles.length - 1) {
+      setCurrentIndex(currentIndex + 1);
+    }
   };
 
   const handleDelete = async () => {
@@ -207,8 +263,9 @@ export default function ProcessNewFiles() {
       const data = await res.json();
       
       if (data.success) {
-        await loadNextFile();
+        await loadAllFiles();
         await loadRemainingCount();
+        // Stay at same index (will show next file since current was removed)
       } else {
         console.error('❌ Delete file API error:', data);
         setError(data.error || 'Failed to delete file');
@@ -260,9 +317,39 @@ export default function ProcessNewFiles() {
       <div className="process-header">
         <h2>Process New Files</h2>
         <div className="process-count">
-          {remainingCount} file{remainingCount !== 1 ? 's' : ''} remaining
+          {allFiles.length > 0 ? (
+            <>
+              File {currentIndex + 1} of {allFiles.length} 
+              {remainingCount > 0 && ` (${remainingCount} unprocessed)`}
+            </>
+          ) : (
+            <>0 files remaining</>
+          )}
         </div>
       </div>
+
+      {/* Navigation buttons */}
+      {allFiles.length > 1 && (
+        <div className="navigation-controls">
+          <button
+            onClick={handlePrevious}
+            disabled={currentIndex === 0 || processing}
+            className="btn btn-secondary"
+          >
+            ← Previous
+          </button>
+          <span className="nav-indicator">
+            {currentIndex + 1} / {allFiles.length}
+          </span>
+          <button
+            onClick={handleNext}
+            disabled={currentIndex >= allFiles.length - 1 || processing}
+            className="btn btn-secondary"
+          >
+            Next →
+          </button>
+        </div>
+      )}
 
       {error && (
         <div className="error-banner">
@@ -410,14 +497,7 @@ export default function ProcessNewFiles() {
               disabled={processing}
               className="btn btn-primary"
             >
-              {processing ? 'Processing...' : 'Save & Next'}
-            </button>
-            <button
-              onClick={handleSkip}
-              disabled={processing}
-              className="btn btn-secondary"
-            >
-              Skip
+              {processing ? 'Processing...' : 'Save & Continue'}
             </button>
             <button
               onClick={handleDelete}

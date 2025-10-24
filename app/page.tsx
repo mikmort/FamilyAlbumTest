@@ -8,10 +8,11 @@ import MediaDetailModal from '@/components/MediaDetailModal';
 import PeopleManager from '@/components/PeopleManager';
 import EventManager from '@/components/EventManager';
 import ProcessNewFiles from '@/components/ProcessNewFiles';
+import UploadMedia from '@/components/UploadMedia';
 import { Person, Event, MediaItem } from '../lib/types';
 
 export default function Home() {
-  const [view, setView] = useState<'select' | 'gallery' | 'manage-people' | 'manage-events' | 'process-files'>('select');
+  const [view, setView] = useState<'select' | 'gallery' | 'manage-people' | 'manage-events' | 'process-files' | 'upload-media'>('select');
   const [selectedPeople, setSelectedPeople] = useState<number[]>([]);
   const [selectedEvent, setSelectedEvent] = useState<number | null>(null);
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
@@ -47,6 +48,7 @@ export default function Home() {
         onManageEvents={() => setView('manage-events')}
         onSelectPeople={() => setView('select')}
         onProcessFiles={() => setView('process-files')}
+        onUploadMedia={() => setView('upload-media')}
         onBackup={() => {
           // TODO: Implement backup
           alert('Backup functionality coming soon');
@@ -122,6 +124,15 @@ export default function Home() {
               ← Back
             </button>
             <ProcessNewFiles />
+          </>
+        )}
+
+        {view === 'upload-media' && (
+          <>
+            <button className="btn btn-secondary mb-2" onClick={() => setView('select')}>
+              ← Back
+            </button>
+            <UploadMedia onProcessFiles={() => setView('process-files')} />
           </>
         )}
 
