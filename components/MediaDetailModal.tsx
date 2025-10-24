@@ -156,8 +156,9 @@ export default function MediaDetailModal({
         positionValue = Math.max(0, Math.min(insertPosition as number, taggedPeople.length));
       }
 
-      // Encode each path segment separately to preserve forward slashes in the path
-      const encodedPath = media.PFileName.split('/').map(encodeURIComponent).join('/');
+      // Normalize backslashes to forward slashes, then encode each path segment separately
+      const normalizedPath = media.PFileName.replace(/\\/g, '/');
+      const encodedPath = normalizedPath.split('/').map(encodeURIComponent).join('/');
       const response = await fetch(`/api/media/${encodedPath}/tags`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -229,7 +230,9 @@ export default function MediaDetailModal({
     if (!confirm('Remove this person tag?')) return;
 
     try {
-      const encodedPath = media.PFileName.split('/').map(encodeURIComponent).join('/');
+      // Normalize backslashes to forward slashes, then encode each path segment separately
+      const normalizedPath = media.PFileName.replace(/\\/g, '/');
+      const encodedPath = normalizedPath.split('/').map(encodeURIComponent).join('/');
       const response = await fetch(`/api/media/${encodedPath}/tags/${personId}`, {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
@@ -262,7 +265,9 @@ export default function MediaDetailModal({
 
   const handleSave = async () => {
     try {
-      const encodedPath = media.PFileName.split('/').map(encodeURIComponent).join('/');
+      // Normalize backslashes to forward slashes, then encode each segment
+      const normalizedPath = media.PFileName.replace(/\\/g, '/');
+      const encodedPath = normalizedPath.split('/').map(encodeURIComponent).join('/');
       const response = await fetch(`/api/media/${encodedPath}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
