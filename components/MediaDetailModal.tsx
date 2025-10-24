@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { MediaItem, Person, Event } from '../lib/types';
 
 interface MediaDetailModalProps {
@@ -16,6 +16,7 @@ export default function MediaDetailModal({
 }: MediaDetailModalProps) {
   const [editing, setEditing] = useState(false);
   const [isFullScreen, setIsFullScreen] = useState(false);
+  const videoRef = useRef<HTMLVideoElement>(null);
   
   const [description, setDescription] = useState(media.PDescription || '');
   const [month, setMonth] = useState<number | ''>(media.PMonth || '');
@@ -305,6 +306,13 @@ export default function MediaDetailModal({
     }
   };
 
+  const handleReplayVideo = () => {
+    if (videoRef.current) {
+      videoRef.current.currentTime = 0;
+      videoRef.current.play();
+    }
+  };
+
   const handleCreatePerson = async () => {
     if (!newPersonName.trim()) {
       alert('Please enter a name');
@@ -457,14 +465,40 @@ export default function MediaDetailModal({
                 style={{ cursor: 'pointer' }}
               />
             ) : (
-              <video 
-                controls 
-                src={media.PBlobUrl}
-                onClick={() => setIsFullScreen(true)}
-                style={{ cursor: 'pointer' }}
-              >
-                Your browser does not support the video tag.
-              </video>
+              <div style={{ position: 'relative' }}>
+                <video 
+                  ref={videoRef}
+                  controls 
+                  autoPlay
+                  src={media.PBlobUrl}
+                  onClick={() => setIsFullScreen(true)}
+                  style={{ cursor: 'pointer', width: '100%' }}
+                >
+                  Your browser does not support the video tag.
+                </video>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleReplayVideo();
+                  }}
+                  style={{
+                    position: 'absolute',
+                    bottom: '10px',
+                    right: '10px',
+                    padding: '8px 16px',
+                    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '4px',
+                    cursor: 'pointer',
+                    fontSize: '14px',
+                    fontWeight: 'bold',
+                  }}
+                  title="Replay video from beginning"
+                >
+                  ↻ Replay
+                </button>
+              </div>
             )}
           </div>
 
