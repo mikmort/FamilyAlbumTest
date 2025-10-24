@@ -855,14 +855,20 @@ module.exports = async function (context, req) {
                 }
                 
                 // Get current picture to access PPeopleList
+                // Try both forward and backslash versions since database might have either
+                const filenameWithBackslash = filename.replace(/\//g, '\\');
                 const pictureQuery = `
                     SELECT PFileName, PPeopleList, PNameCount
                     FROM dbo.Pictures
-                    WHERE PFileName = @filename
+                    WHERE PFileName = @filename OR PFileName = @filenameAlt
                 `;
                 context.log('Executing picture query for filename:', filename);
+                context.log('Also trying with backslashes:', filenameWithBackslash);
                 context.log('Query:', pictureQuery);
-                const pictures = await query(pictureQuery, { filename });
+                const pictures = await query(pictureQuery, { 
+                    filename: filename,
+                    filenameAlt: filenameWithBackslash 
+                });
                 context.log('Query returned', pictures ? pictures.length : 'null', 'results');
                 
                 if (!pictures || pictures.length === 0) {
