@@ -677,7 +677,6 @@ module.exports = async function (context, req) {
 
                 // Build NamePhoto event lookup for individual media items
                 // Query NamePhoto for event associations (neType = 'E')
-                let npEventLookup = {};
                 
                 try {
                     context.log('Querying NamePhoto for event associations...');
