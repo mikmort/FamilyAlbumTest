@@ -711,13 +711,35 @@ module.exports = async function (context, req) {
                         const npRows = await query(npQuery, npParams);
                         context.log(`Found ${npRows.length} NamePhoto event associations`);
                         
+                        // Add these event IDs to candidateIds so they get looked up in NameEvent
+                        const npEventIds = new Set();
+                        
                         npRows.forEach(row => {
                             // Normalize the filename to use forward slashes as key
                             const normalizedFilename = row.npFileName.replace(/\\/g, '/');
                             npEventLookup[normalizedFilename] = row.npID;
                             // Also store with backslash variant as key
                             npEventLookup[row.npFileName] = row.npID;
+                            // Collect event IDs
+                            npEventIds.add(row.npID);
                         });
+                        
+                        // Query NameEvent for these event IDs if not already in eventLookup
+                        if (npEventIds.size > 0) {
+                            const missingEventIds = Array.from(npEventIds).filter(id => !eventLookup[id]);
+                            if (missingEventIds.length > 0) {
+                                const eventIdPlaceholders = missingEventIds.map((_, i) => `@eid${i}`).join(',');
+                                const eventQuery = `SELECT ID, neName, neType FROM dbo.NameEvent WHERE ID IN (${eventIdPlaceholders})`;
+                                const eventParams = {};
+                                missingEventIds.forEach((id, i) => { eventParams[`eid${i}`] = id; });
+                                
+                                const eventRows = await query(eventQuery, eventParams);
+                                context.log(`Fetched ${eventRows.length} NameEvent records for NamePhoto events`);
+                                eventRows.forEach(r => {
+                                    eventLookup[r.ID] = { ID: r.ID, neName: r.neName, neType: r.neType };
+                                });
+                            }
+                        }
                     }
                 } catch (npErr) {
                     context.log.error('Error querying NamePhoto for events:', npErr);
