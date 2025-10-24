@@ -7,15 +7,17 @@ interface MediaDetailModalProps {
   media: MediaItem;
   onClose: () => void;
   onUpdate?: (updatedMedia: MediaItem) => void;
+  startFullscreen?: boolean;
 }
 
 export default function MediaDetailModal({
   media,
   onClose,
   onUpdate,
+  startFullscreen = false,
 }: MediaDetailModalProps) {
   const [editing, setEditing] = useState(false);
-  const [isFullScreen, setIsFullScreen] = useState(false);
+  const [isFullScreen, setIsFullScreen] = useState(startFullscreen);
   const videoRef = useRef<HTMLVideoElement>(null);
   
   const [description, setDescription] = useState(media.PDescription || '');
@@ -313,6 +315,34 @@ export default function MediaDetailModal({
     }
   };
 
+  const handleDownload = async () => {
+    try {
+      // Fetch the blob URL
+      const response = await fetch(media.PBlobUrl);
+      const blob = await response.blob();
+      
+      // Create a download link
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      
+      // Extract filename from PFileName
+      const filename = media.PFileName.split(/[\/\\]/).pop() || 'download';
+      link.download = filename;
+      
+      // Trigger download
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+      // Clean up
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error('Download failed:', error);
+      alert('Failed to download file');
+    }
+  };
+
   const handleCreatePerson = async () => {
     if (!newPersonName.trim()) {
       alert('Please enter a name');
@@ -439,6 +469,25 @@ export default function MediaDetailModal({
       {/* Detail Modal */}
       <div className="modal-overlay" onClick={onClose}>
       <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+        <button
+          onClick={handleDownload}
+          style={{
+            position: 'absolute',
+            top: '1rem',
+            right: '4rem',
+            background: '#007bff',
+            color: 'white',
+            border: 'none',
+            borderRadius: '4px',
+            padding: '0.5rem 1rem',
+            fontSize: '1rem',
+            cursor: 'pointer',
+            zIndex: 10,
+          }}
+          title="Download"
+        >
+          ⬇ Download
+        </button>
         <button
           onClick={onClose}
           style={{

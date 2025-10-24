@@ -18,6 +18,7 @@ export default function Home() {
   const [showNoPeople, setShowNoPeople] = useState(false);
   const [exclusiveFilter, setExclusiveFilter] = useState(false);
   const [selectedMedia, setSelectedMedia] = useState<MediaItem | null>(null);
+  const [startFullscreen, setStartFullscreen] = useState(false);
 
   const handleContinue = () => {
     setView('gallery');
@@ -26,6 +27,17 @@ export default function Home() {
   const handleBack = () => {
     setView('select');
     setSelectedMedia(null);
+    setStartFullscreen(false);
+  };
+
+  const handleMediaClick = (media: MediaItem) => {
+    setSelectedMedia(media);
+    setStartFullscreen(false);
+  };
+
+  const handleMediaFullscreen = (media: MediaItem) => {
+    setSelectedMedia(media);
+    setStartFullscreen(true);
   };
 
   return (
@@ -80,7 +92,8 @@ export default function Home() {
               noPeople={showNoPeople}
               sortOrder={sortOrder}
               exclusiveFilter={exclusiveFilter}
-              onMediaClick={setSelectedMedia}
+              onMediaClick={handleMediaClick}
+              onMediaFullscreen={handleMediaFullscreen}
             />
           </>
         )}
@@ -115,7 +128,11 @@ export default function Home() {
         {selectedMedia && (
           <MediaDetailModal
             media={selectedMedia}
-            onClose={() => setSelectedMedia(null)}
+            onClose={() => {
+              setSelectedMedia(null);
+              setStartFullscreen(false);
+            }}
+            startFullscreen={startFullscreen}
           />
         )}
       </main>

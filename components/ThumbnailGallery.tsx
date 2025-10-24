@@ -10,6 +10,7 @@ interface ThumbnailGalleryProps {
   sortOrder: 'asc' | 'desc';
   exclusiveFilter: boolean;
   onMediaClick: (media: MediaItem) => void;
+  onMediaFullscreen?: (media: MediaItem) => void;
 }
 
 export default function ThumbnailGallery({
@@ -19,6 +20,7 @@ export default function ThumbnailGallery({
   sortOrder,
   exclusiveFilter,
   onMediaClick,
+  onMediaFullscreen,
 }: ThumbnailGalleryProps) {
   const [media, setMedia] = useState<MediaItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -197,6 +199,12 @@ export default function ThumbnailGallery({
             key={item.PFileName}
             className={`thumbnail-item ${item.PType === 2 ? 'video-thumbnail' : ''}`}
             onClick={() => onMediaClick(item)}
+            onContextMenu={(e) => {
+              e.preventDefault(); // Prevent default context menu
+              if (onMediaFullscreen) {
+                onMediaFullscreen(item);
+              }
+            }}
           >
             <img
               src={item.PThumbnailUrl || '/placeholder.svg'}
