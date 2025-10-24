@@ -1117,9 +1117,33 @@ module.exports = async function (context, req) {
             context.log('Updating media:', filename);
             context.log('Update data:', { description, month, year, eventID });
 
+            // First, find the picture with either slash format
+            const filenameWithBackslash = filename.replace(/\//g, '\\');
+            const findQuery = `
+                SELECT PFileName
+                FROM dbo.Pictures
+                WHERE PFileName = @filename OR PFileName = @filenameAlt
+            `;
+            const findResult = await query(findQuery, { 
+                filename: filename,
+                filenameAlt: filenameWithBackslash 
+            });
+            
+            if (!findResult || findResult.length === 0) {
+                context.res = {
+                    status: 404,
+                    body: { error: 'Media not found' }
+                };
+                return;
+            }
+            
+            // Use the actual database filename for the update
+            const dbFileName = findResult[0].PFileName;
+            context.log('Found database filename:', dbFileName);
+
             // Build update query dynamically based on provided fields
             const updates = [];
-            const params = { filename };
+            const params = { filename: dbFileName };
 
             if (description !== undefined) {
                 updates.push('PDescription = @description');
@@ -1183,7 +1207,7 @@ module.exports = async function (context, req) {
                 WHERE PFileName = @filename
             `;
 
-            const result = await query(selectQuery, { filename });
+            const result = await query(selectQuery, { filename: dbFileName });
             
             if (result.length === 0) {
                 context.res = {
