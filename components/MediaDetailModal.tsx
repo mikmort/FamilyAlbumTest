@@ -156,7 +156,9 @@ export default function MediaDetailModal({
         positionValue = Math.max(0, Math.min(insertPosition as number, taggedPeople.length));
       }
 
-      const response = await fetch(`/api/media/${encodeURIComponent(media.PFileName)}/tags`, {
+      // Encode each path segment separately to preserve forward slashes in the path
+      const encodedPath = media.PFileName.split('/').map(encodeURIComponent).join('/');
+      const response = await fetch(`/api/media/${encodedPath}/tags`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ personId, position: positionValue }),
@@ -227,7 +229,8 @@ export default function MediaDetailModal({
     if (!confirm('Remove this person tag?')) return;
 
     try {
-      const response = await fetch(`/api/media/${encodeURIComponent(media.PFileName)}/tags/${personId}`, {
+      const encodedPath = media.PFileName.split('/').map(encodeURIComponent).join('/');
+      const response = await fetch(`/api/media/${encodedPath}/tags/${personId}`, {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ personId }),
