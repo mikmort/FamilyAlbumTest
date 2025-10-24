@@ -102,28 +102,22 @@ module.exports = async function (context, req) {
     // Support additional trailing segments like /tags or /tags/{id}
     let filename = null;
     if (req.url) {
-        console.log('RAW URL:', req.url);
+        context.log('RAW URL:', req.url);
         // Extract path without query string first
         const pathOnly = req.url.split('?')[0];
-        console.log('PATH ONLY:', pathOnly);
+        context.log('PATH ONLY:', pathOnly);
         
-        // Match: /api/media/ then capture everything up to /tags (if present), or end of string
-        // This allows paths with forward slashes like: /api/media/Events/Birthday/photo.jpg
-        // Or: /api/media/Events/Birthday/photo.jpg/tags
-        const urlMatch = pathOnly.match(/^\/api\/media\/(.+?)(?:\/tags(?:\/\d+)?)?$/);
-        console.log('REGEX MATCH:', urlMatch);
-        if (urlMatch && urlMatch[1]) {
-            filename = decodeURIComponent(urlMatch[1]);
-            console.log('DECODED FILENAME:', filename);
-        } else {
-            console.log('REGEX DID NOT MATCH');
-            // Try simpler approach - just remove /tags from the end if present
-            let tempPath = pathOnly.replace(/^\/api\/media\//, '');
-            console.log('AFTER REMOVING /api/media/:', tempPath);
-            tempPath = tempPath.replace(/\/tags(\/\d+)?$/, '');
-            console.log('AFTER REMOVING /tags:', tempPath);
+        // Simple approach: remove /api/media/ prefix and /tags suffix
+        if (pathOnly.startsWith('/api/media/')) {
+            let tempPath = pathOnly.substring('/api/media/'.length);
+            context.log('AFTER REMOVING PREFIX:', tempPath);
+            
+            // Remove /tags or /tags/{id} from the end
+            tempPath = tempPath.replace(/\/tags(?:\/\d+)?$/, '');
+            context.log('AFTER REMOVING /tags SUFFIX:', tempPath);
+            
             filename = decodeURIComponent(tempPath);
-            console.log('FINAL FILENAME:', filename);
+            context.log('DECODED FILENAME:', filename);
         }
     }
     
