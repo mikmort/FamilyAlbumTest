@@ -151,6 +151,8 @@ button {
   overflow: hidden;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
   transition: transform 0.2s;
+  background-color: #f0f0f0; /* Light gray background for letterboxing */
+  height: 200px; /* Fixed height for consistent grid */
 }
 
 .thumbnail-item:hover {
@@ -159,8 +161,8 @@ button {
 
 .thumbnail-item img {
   width: 100%;
-  height: 200px;
-  object-fit: cover;
+  height: 100%;
+  object-fit: contain; /* Preserve aspect ratio, letterbox if needed */
 }
 
 .video-thumbnail img {
@@ -173,9 +175,9 @@ button {
 
 .video-indicator {
   position: absolute;
-  top: 50%;
+  bottom: 8px; /* Position at bottom instead of center */
   left: 50%;
-  transform: translate(-50%, -50%);
+  transform: translateX(-50%);
   background-color: rgba(0, 0, 0, 0.8);
   color: white;
   padding: 8px 16px;
