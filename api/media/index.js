@@ -676,9 +676,54 @@ module.exports = async function (context, req) {
                 }
 
                 // Build NamePhoto event lookup for individual media items
-                // Note: For media lists, this is too expensive and is disabled
-                // Events from NamePhoto will only be included when viewing single items
+                // Query NamePhoto for event associations (neType = 'E')
                 let npEventLookup = {};
+                
+                try {
+                    context.log('Querying NamePhoto for event associations...');
+                    // Get all filenames from our media results
+                    const filenames = media.map(m => m.PFileName).filter(Boolean);
+                    
+                    if (filenames.length > 0) {
+                        // Query NamePhoto with both forward and backslash variants
+                        const npParams = {};
+                        const placeholders = [];
+                        
+                        filenames.forEach((fn, i) => {
+                            npParams[`fn${i}`] = fn;
+                            placeholders.push(`@fn${i}`);
+                            
+                            // Also try backslash variant
+                            const backslashVariant = fn.replace(/\//g, '\\');
+                            if (backslashVariant !== fn) {
+                                npParams[`fn${i}_bs`] = backslashVariant;
+                                placeholders.push(`@fn${i}_bs`);
+                            }
+                        });
+                        
+                        const npQuery = `
+                            SELECT DISTINCT np.npFileName, np.npID
+                            FROM dbo.NamePhoto np
+                            INNER JOIN dbo.NameEvent ne ON np.npID = ne.ID
+                            WHERE ne.neType = 'E'
+                            AND np.npFileName IN (${placeholders.join(',')})
+                        `;
+                        
+                        const npRows = await query(npQuery, npParams);
+                        context.log(`Found ${npRows.length} NamePhoto event associations`);
+                        
+                        npRows.forEach(row => {
+                            // Normalize the filename to use forward slashes as key
+                            const normalizedFilename = row.npFileName.replace(/\\/g, '/');
+                            npEventLookup[normalizedFilename] = row.npID;
+                            // Also store with backslash variant as key
+                            npEventLookup[row.npFileName] = row.npID;
+                        });
+                    }
+                } catch (npErr) {
+                    context.log.error('Error querying NamePhoto for events:', npErr);
+                    // Continue without event data rather than failing completely
+                }
             }
 
             // Transform results to construct proper blob URLs
