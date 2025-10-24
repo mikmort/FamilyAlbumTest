@@ -943,13 +943,17 @@ module.exports = async function (context, req) {
                 currentPeopleIds.splice(clampedPos, 0, personId);
                 context.log('New people IDs after insert:', currentPeopleIds);
 
+                // Use the actual filename from database (with backslashes) for all DB operations
+                const dbFileName = picture.PFileName;
+                context.log('Using database filename for operations:', dbFileName);
+                
                 // Check if NamePhoto record already exists (shouldn't happen if UI is correct)
                 const checkQuery = `
                     SELECT COUNT(*) as cnt FROM dbo.NamePhoto
                     WHERE npFileName = @filename AND npID = @personId
                 `;
                 context.log('Checking for existing NamePhoto record...');
-                const checkResult = await query(checkQuery, { filename, personId });
+                const checkResult = await query(checkQuery, { filename: dbFileName, personId });
                 context.log('Check result:', JSON.stringify(checkResult));
                 
                 if (!checkResult || !Array.isArray(checkResult) || checkResult.length === 0) {
@@ -971,7 +975,7 @@ module.exports = async function (context, req) {
                     `;
                     context.log('Inserting NamePhoto record...');
                     await execute(insertQuery, {
-                        filename,
+                        filename: dbFileName,
                         personId
                     });
                     context.log('✅ NamePhoto record inserted');
@@ -993,7 +997,7 @@ module.exports = async function (context, req) {
                 `;
                 context.log('Updating Pictures table...');
                 await execute(updatePictureQuery, {
-                    filename,
+                    filename: dbFileName,
                     peopleList: newPeopleList,
                     nameCount: currentPeopleIds.length
                 });
