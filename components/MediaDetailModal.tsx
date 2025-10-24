@@ -262,7 +262,8 @@ export default function MediaDetailModal({
 
   const handleSave = async () => {
     try {
-      const response = await fetch(`/api/media/${encodeURIComponent(media.PFileName)}`, {
+      const encodedPath = media.PFileName.split('/').map(encodeURIComponent).join('/');
+      const response = await fetch(`/api/media/${encodedPath}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
