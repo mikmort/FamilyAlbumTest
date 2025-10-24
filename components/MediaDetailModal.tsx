@@ -632,9 +632,7 @@ export default function MediaDetailModal({
                   </>
                 )
               ) : (
-                (() => {
-                  return <p>{selectedEvent ? allEvents.find(e => e.ID === selectedEvent)?.neName || 'Not set' : 'Not set'}</p>;
-                })()
+                <p>{media.Event?.neName || 'Not set'}</p>
               )}
             </div>
 
