@@ -123,7 +123,11 @@ module.exports = async function (context, req) {
     
     // Fallback to route params if URL parsing didn't work
     if (!filename && req.params && req.params.filename) {
-        filename = decodeURIComponent(req.params.filename);
+        let paramFilename = req.params.filename;
+        // Remove /tags or /tags/{id} from the end
+        paramFilename = paramFilename.replace(/\/tags(?:\/\d+)?$/, '');
+        filename = decodeURIComponent(paramFilename);
+        context.log('FILENAME FROM PARAMS (after stripping tags):', filename);
         if (filename === '' || filename === '/') {
             filename = null;
         }
@@ -132,6 +136,7 @@ module.exports = async function (context, req) {
     // Normalize path: convert backslashes to forward slashes for blob storage
     if (filename) {
         filename = filename.replace(/\\/g, '/');
+        context.log('NORMALIZED FILENAME:', filename);
     }
 
     // Check if thumbnail is requested
