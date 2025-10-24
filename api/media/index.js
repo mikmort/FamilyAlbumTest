@@ -1038,15 +1038,19 @@ module.exports = async function (context, req) {
             }
 
             try {
-                // Get current picture to access PPeopleList
-                const pictureQuery = `
+                // First, find the picture with either slash format
+                const filenameWithBackslash = filename.replace(/\//g, '\\');
+                const findQuery = `
                     SELECT PFileName, PPeopleList, PNameCount
                     FROM dbo.Pictures
-                    WHERE PFileName = @filename
+                    WHERE PFileName = @filename OR PFileName = @filenameAlt
                 `;
-                const pictures = await execute(pictureQuery, { filename });
+                const pictures = await query(findQuery, { 
+                    filename: filename,
+                    filenameAlt: filenameWithBackslash 
+                });
                 
-                if (pictures.length === 0) {
+                if (!pictures || pictures.length === 0) {
                     context.res = {
                         status: 404,
                         body: { error: 'Picture not found' }
@@ -1055,6 +1059,9 @@ module.exports = async function (context, req) {
                 }
 
                 const picture = pictures[0];
+                // Use the actual database filename for all operations
+                const dbFileName = picture.PFileName;
+                context.log('Found database filename:', dbFileName);
                 
                 // Parse current PPeopleList
                 const currentPeopleIds = picture.PPeopleList 
@@ -1076,7 +1083,7 @@ module.exports = async function (context, req) {
                     DELETE FROM dbo.NamePhoto
                     WHERE npFileName = @filename AND npID = @personId
                 `;
-                await execute(deleteQuery, { filename, personId });
+                await execute(deleteQuery, { filename: dbFileName, personId });
 
                 // Remove person from the list
                 currentPeopleIds.splice(personIndex, 1);
@@ -1091,7 +1098,7 @@ module.exports = async function (context, req) {
                     WHERE PFileName = @filename
                 `;
                 await execute(updatePictureQuery, {
-                    filename,
+                    filename: dbFileName,
                     peopleList: newPeopleList,
                     nameCount: currentPeopleIds.length
                 });
