@@ -1339,30 +1339,61 @@ module.exports = async function (context, req) {
                 context.log('Blob URL:', picture.PBlobUrl);
                 context.log('Thumbnail URL:', picture.PThumbnailUrl);
 
-                // Extract blob names from URLs
-                const blobName = picture.PBlobUrl ? picture.PBlobUrl.split('/').pop() : null;
-                const thumbBlobName = picture.PThumbnailUrl ? picture.PThumbnailUrl.split('/').pop() : null;
+                // Extract blob paths from URLs
+                // URLs look like: https://account.blob.core.windows.net/container/media/filename.jpg
+                // We need just: media/filename.jpg
+                const extractBlobPath = (url) => {
+                    if (!url) return null;
+                    
+                    // If it's a full URL, extract the path after the container name
+                    if (url.includes('blob.core.windows.net')) {
+                        const parts = url.split('/');
+                        // Find 'media' or similar container path
+                        const mediaIndex = parts.findIndex(p => p === 'media' || p.startsWith('media/'));
+                        if (mediaIndex !== -1) {
+                            return parts.slice(mediaIndex).join('/');
+                        }
+                        // Fallback: take everything after the container (4th slash)
+                        const afterDomain = url.split('.blob.core.windows.net/')[1];
+                        if (afterDomain) {
+                            // Skip container name, get the rest
+                            const pathParts = afterDomain.split('/');
+                            if (pathParts.length > 1) {
+                                return pathParts.slice(1).join('/');
+                            }
+                        }
+                    }
+                    
+                    // If not a full URL, might already be just the filename
+                    return url;
+                };
+
+                const blobPath = extractBlobPath(picture.PBlobUrl);
+                const thumbBlobPath = extractBlobPath(picture.PThumbnailUrl);
+
+                context.log('Extracted blob path:', blobPath);
+                context.log('Extracted thumb path:', thumbBlobPath);
 
                 // Delete from blob storage
                 let blobDeleted = false;
                 let thumbDeleted = false;
 
-                if (blobName) {
+                if (blobPath) {
                     try {
-                        await deleteBlob(`media/${blobName}`);
+                        await deleteBlob(blobPath);
                         blobDeleted = true;
-                        context.log('✅ Deleted main blob:', blobName);
+                        context.log('✅ Deleted main blob:', blobPath);
                     } catch (blobError) {
                         context.log.warn('⚠️ Failed to delete main blob:', blobError.message);
                         // Continue anyway - file might not exist in storage
                     }
                 }
 
-                if (thumbBlobName && thumbBlobName !== blobName) {
+                if (thumbBlobPath && thumbBlobPath !== blobPath) {
                     try {
-                        await deleteBlob(`media/${thumbBlobName}`);
+                        await deleteBlob(thumbBlobPath);
                         thumbDeleted = true;
-                        context.log('✅ Deleted thumbnail blob:', thumbBlobName);
+                        context.log('✅ Deleted thumbnail blob:', thumbBlobPath);
                     } catch (thumbError) {
                         context.log.warn('⚠️ Failed to delete thumbnail blob:', thumbError.message);
                         // Continue anyway
