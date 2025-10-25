@@ -1310,22 +1310,30 @@ module.exports = async function (context, req) {
 
         // DELETE /api/media/{filename} - Delete media file completely
         if (method === 'DELETE' && filename) {
+            context.log('=== DELETE REQUEST ===');
             context.log('Deleting media:', filename);
 
             try {
                 // First, find the picture with either slash format
                 const filenameWithBackslash = filename.replace(/\//g, '\\');
+                context.log('Searching for:', filename, 'OR', filenameWithBackslash);
+                
                 const findQuery = `
                     SELECT PFileName, PBlobUrl, PThumbnailUrl
                     FROM dbo.Pictures
                     WHERE PFileName = @filename OR PFileName = @filenameAlt
                 `;
+                
+                context.log('Executing find query...');
                 const findResult = await query(findQuery, { 
                     filename: filename,
                     filenameAlt: filenameWithBackslash 
                 });
                 
+                context.log('Find result:', findResult ? findResult.length : 'null', 'rows');
+                
                 if (!findResult || findResult.length === 0) {
+                    context.log('❌ File not found in database');
                     context.res = {
                         status: 404,
                         body: { error: 'Media file not found in database' }
@@ -1401,6 +1409,7 @@ module.exports = async function (context, req) {
                 }
 
                 // Delete from NamePhoto table (person tags)
+                context.log('Deleting person tags...');
                 const deleteTagsQuery = `
                     DELETE FROM dbo.NamePhoto
                     WHERE npFileName = @filename
@@ -1409,6 +1418,7 @@ module.exports = async function (context, req) {
                 context.log('✅ Deleted person tags');
 
                 // Delete from Pictures table
+                context.log('Deleting from Pictures table...');
                 const deletePictureQuery = `
                     DELETE FROM dbo.Pictures
                     WHERE PFileName = @filename
@@ -1417,6 +1427,7 @@ module.exports = async function (context, req) {
                 context.log('✅ Deleted from Pictures table');
 
                 // Update person counts
+                context.log('Updating person counts...');
                 const updateCountsQuery = `
                     UPDATE dbo.NameEvent
                     SET neCount = (
@@ -1443,12 +1454,18 @@ module.exports = async function (context, req) {
                 return;
 
             } catch (deleteError) {
-                context.log.error('Delete error:', deleteError);
+                context.log.error('❌ Delete error:', deleteError);
+                context.log.error('Error stack:', deleteError.stack);
                 context.res = {
                     status: 500,
                     body: { 
                         error: 'Failed to delete media',
-                        message: deleteError.message 
+                        message: deleteError.message,
+                        stack: deleteError.stack,
+                        details: {
+                            filename: filename,
+                            step: 'Check error message for details'
+                        }
                     }
                 };
                 return;
