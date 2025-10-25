@@ -256,13 +256,21 @@ module.exports = async function (context, req) {
             const directory = pathParts.slice(0, -1).join('/');
             const filenamePart = pathParts[pathParts.length - 1];
             
-            // Add variation with spaces encoded only
+            // Try with entire path encoded (directory AND filename)
+            const fullyEncodedPath = pathParts.map(part => 
+                encodeURIComponent(part).replace(/'/g, '%27')
+            ).join('/');
+            if (fullyEncodedPath !== blobPath) {
+                pathsToTry.push(fullyEncodedPath);
+            }
+            
+            // Add variation with spaces encoded only in filename
             if (filenamePart.includes(' ') && !filenamePart.includes('%20')) {
                 const spacesEncoded = directory + (directory ? '/' : '') + filenamePart.replace(/ /g, '%20');
                 pathsToTry.push(spacesEncoded);
             }
             
-            // Add variation with full encoding (apostrophes AND spaces)
+            // Add variation with full encoding (apostrophes AND spaces) in filename only
             // Note: encodeURIComponent doesn't encode apostrophes, so we do it manually
             // This handles blobs like "Devorah%27s%20Wedding%20003.jpg"
             const fullyEncoded = directory + (directory ? '/' : '') + 
