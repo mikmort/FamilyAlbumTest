@@ -32,11 +32,17 @@ export default function Home() {
   };
 
   const handleMediaClick = (media: MediaItem) => {
+    console.log('handleMediaClick called with:', {
+      fileName: media.PFileName,
+      blobUrl: media.PBlobUrl,
+      type: media.PType
+    });
     setSelectedMedia(media);
     setStartFullscreen(false);
   };
 
   const handleMediaFullscreen = (media: MediaItem) => {
+    console.log('handleMediaFullscreen called with:', media.PFileName);
     setSelectedMedia(media);
     setStartFullscreen(true);
   };

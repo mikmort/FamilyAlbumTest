@@ -19,6 +19,8 @@ export default function MediaDetailModal({
   const [editing, setEditing] = useState(false);
   const [isFullScreen, setIsFullScreen] = useState(startFullscreen);
   const videoRef = useRef<HTMLVideoElement>(null);
+  const [videoError, setVideoError] = useState(false);
+  const [imageError, setImageError] = useState(false);
   
   const [description, setDescription] = useState(media.PDescription || '');
   const [month, setMonth] = useState<number | ''>(media.PMonth || '');
@@ -448,11 +450,23 @@ export default function MediaDetailModal({
             ✕
           </button>
           {media.PType === 1 ? (
-            <img 
-              src={media.PBlobUrl} 
-              alt={media.PDescription || media.PFileName}
-              className="fullscreen-image"
-            />
+            imageError ? (
+              <div style={{
+                color: 'white',
+                textAlign: 'center',
+                padding: '2rem'
+              }}>
+                <p style={{ fontSize: '1.5rem' }}>⚠️ Image failed to load</p>
+                <p style={{ marginTop: '1rem' }}>{media.PFileName}</p>
+              </div>
+            ) : (
+              <img 
+                src={media.PBlobUrl} 
+                alt={media.PDescription || media.PFileName}
+                className="fullscreen-image"
+                onError={() => setImageError(true)}
+              />
+            )
           ) : (
             <video 
               controls 
@@ -507,46 +521,157 @@ export default function MediaDetailModal({
         <div className="detail-view">
           <div className="media-display">
             {media.PType === 1 ? (
-              <img 
-                src={media.PBlobUrl} 
-                alt={media.PDescription || media.PFileName}
-                onClick={() => setIsFullScreen(true)}
-                style={{ cursor: 'pointer' }}
-              />
+              imageError ? (
+                <div style={{
+                  background: '#f8f9fa',
+                  border: '2px dashed #dee2e6',
+                  borderRadius: '8px',
+                  padding: '3rem',
+                  textAlign: 'center',
+                  color: '#6c757d',
+                  minHeight: '400px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  justifyContent: 'center',
+                  alignItems: 'center'
+                }}>
+                  <p style={{ fontSize: '1.2rem', marginBottom: '1rem' }}>
+                    ⚠️ Image failed to load
+                  </p>
+                  <p style={{ marginBottom: '0.5rem', color: '#495057' }}>
+                    <strong>File:</strong> {media.PFileName}
+                  </p>
+                  <p style={{ marginBottom: '1.5rem', fontSize: '0.9rem' }}>
+                    The image may have a path encoding issue or may not exist in blob storage.
+                  </p>
+                  <div style={{ display: 'flex', gap: '1rem' }}>
+                    <button
+                      onClick={() => {
+                        setImageError(false);
+                        // Force reload
+                        const img = document.createElement('img');
+                        img.src = media.PBlobUrl + '?t=' + Date.now();
+                      }}
+                      style={{
+                        padding: '10px 20px',
+                        backgroundColor: '#6c757d',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '4px',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      ↻ Retry
+                    </button>
+                    <button
+                      onClick={handleDownload}
+                      style={{
+                        padding: '10px 20px',
+                        backgroundColor: '#007bff',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '4px',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      ⬇️ Try Download
+                    </button>
+                  </div>
+                  <p style={{ marginTop: '1.5rem', fontSize: '0.85rem', color: '#868e96' }}>
+                    URL: {media.PBlobUrl}
+                  </p>
+                </div>
+              ) : (
+                <img 
+                  src={media.PBlobUrl} 
+                  alt={media.PDescription || media.PFileName}
+                  onClick={() => setIsFullScreen(true)}
+                  style={{ cursor: 'pointer' }}
+                  onError={(e) => {
+                    console.error('Image load error:', media.PFileName);
+                    console.error('Image URL:', media.PBlobUrl);
+                    setImageError(true);
+                  }}
+                />
+              )
             ) : (
               <div style={{ position: 'relative' }}>
-                <video 
-                  ref={videoRef}
-                  controls 
-                  autoPlay
-                  src={media.PBlobUrl}
-                  onClick={() => setIsFullScreen(true)}
-                  style={{ cursor: 'pointer', width: '100%' }}
-                >
-                  Your browser does not support the video tag.
-                </video>
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleReplayVideo();
-                  }}
-                  style={{
-                    position: 'absolute',
-                    bottom: '10px',
-                    right: '10px',
-                    padding: '8px 16px',
-                    backgroundColor: 'rgba(0, 0, 0, 0.7)',
-                    color: 'white',
-                    border: 'none',
-                    borderRadius: '4px',
-                    cursor: 'pointer',
-                    fontSize: '14px',
-                    fontWeight: 'bold',
-                  }}
-                  title="Replay video from beginning"
-                >
-                  ↻ Replay
-                </button>
+                {videoError ? (
+                  <div style={{
+                    background: '#f8f9fa',
+                    border: '2px dashed #dee2e6',
+                    borderRadius: '8px',
+                    padding: '3rem',
+                    textAlign: 'center',
+                    color: '#6c757d'
+                  }}>
+                    <p style={{ fontSize: '1.2rem', marginBottom: '1rem' }}>
+                      ⚠️ This video format cannot be played in your browser
+                    </p>
+                    <p style={{ marginBottom: '1.5rem' }}>
+                      MOV files often use codecs (like H.265/HEVC) that aren't supported in web browsers.
+                    </p>
+                    <button
+                      onClick={handleDownload}
+                      style={{
+                        padding: '12px 24px',
+                        backgroundColor: '#007bff',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '4px',
+                        cursor: 'pointer',
+                        fontSize: '1rem'
+                      }}
+                    >
+                      ⬇️ Download Video to Play Locally
+                    </button>
+                  </div>
+                ) : (
+                  <>
+                    <video 
+                      ref={videoRef}
+                      controls 
+                      autoPlay
+                      src={media.PBlobUrl}
+                      onClick={() => setIsFullScreen(true)}
+                      style={{ cursor: 'pointer', width: '100%' }}
+                      onError={(e) => {
+                        console.error('Video playback error:', e);
+                        setVideoError(true);
+                      }}
+                      onLoadedMetadata={() => {
+                        // Check if video duration is valid
+                        if (videoRef.current && (isNaN(videoRef.current.duration) || videoRef.current.duration === 0)) {
+                          console.warn('Video has invalid duration, may not be playable');
+                        }
+                      }}
+                    >
+                      Your browser does not support the video tag.
+                    </video>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleReplayVideo();
+                      }}
+                      style={{
+                        position: 'absolute',
+                        bottom: '10px',
+                        right: '10px',
+                        padding: '8px 16px',
+                        backgroundColor: 'rgba(0, 0, 0, 0.7)',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '4px',
+                        cursor: 'pointer',
+                        fontSize: '14px',
+                        fontWeight: 'bold',
+                      }}
+                      title="Replay video from beginning"
+                    >
+                      ↻ Replay
+                    </button>
+                  </>
+                )}
               </div>
             )}
           </div>

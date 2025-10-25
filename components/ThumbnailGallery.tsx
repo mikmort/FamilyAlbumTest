@@ -198,7 +198,15 @@ export default function ThumbnailGallery({
           <div
             key={item.PFileName}
             className={`thumbnail-item ${item.PType === 2 ? 'video-thumbnail' : ''}`}
-            onClick={() => onMediaClick(item)}
+            onClick={() => {
+              console.log('Thumbnail clicked:', {
+                fileName: item.PFileName,
+                blobUrl: item.PBlobUrl,
+                thumbnailUrl: item.PThumbnailUrl,
+                type: item.PType
+              });
+              onMediaClick(item);
+            }}
             onContextMenu={(e) => {
               e.preventDefault(); // Prevent default context menu
               if (onMediaFullscreen) {
