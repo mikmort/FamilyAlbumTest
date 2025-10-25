@@ -1,5 +1,5 @@
 const { query, execute } = require('../shared/db');
-const { blobExists, getContainerClient, uploadBlob } = require('../shared/storage');
+const { blobExists, getContainerClient, uploadBlob, deleteBlob } = require('../shared/storage');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
@@ -1306,6 +1306,122 @@ module.exports = async function (context, req) {
                 }
             };
             return;
+        }
+
+        // DELETE /api/media/{filename} - Delete media file completely
+        if (method === 'DELETE' && filename) {
+            context.log('Deleting media:', filename);
+
+            try {
+                // First, find the picture with either slash format
+                const filenameWithBackslash = filename.replace(/\//g, '\\');
+                const findQuery = `
+                    SELECT PFileName, PBlobUrl, PThumbnailUrl
+                    FROM dbo.Pictures
+                    WHERE PFileName = @filename OR PFileName = @filenameAlt
+                `;
+                const findResult = await query(findQuery, { 
+                    filename: filename,
+                    filenameAlt: filenameWithBackslash 
+                });
+                
+                if (!findResult || findResult.length === 0) {
+                    context.res = {
+                        status: 404,
+                        body: { error: 'Media file not found in database' }
+                    };
+                    return;
+                }
+                
+                const picture = findResult[0];
+                const dbFileName = picture.PFileName;
+                context.log('Found database filename:', dbFileName);
+                context.log('Blob URL:', picture.PBlobUrl);
+                context.log('Thumbnail URL:', picture.PThumbnailUrl);
+
+                // Extract blob names from URLs
+                const blobName = picture.PBlobUrl ? picture.PBlobUrl.split('/').pop() : null;
+                const thumbBlobName = picture.PThumbnailUrl ? picture.PThumbnailUrl.split('/').pop() : null;
+
+                // Delete from blob storage
+                let blobDeleted = false;
+                let thumbDeleted = false;
+
+                if (blobName) {
+                    try {
+                        await deleteBlob(`media/${blobName}`);
+                        blobDeleted = true;
+                        context.log('✅ Deleted main blob:', blobName);
+                    } catch (blobError) {
+                        context.log.warn('⚠️ Failed to delete main blob:', blobError.message);
+                        // Continue anyway - file might not exist in storage
+                    }
+                }
+
+                if (thumbBlobName && thumbBlobName !== blobName) {
+                    try {
+                        await deleteBlob(`media/${thumbBlobName}`);
+                        thumbDeleted = true;
+                        context.log('✅ Deleted thumbnail blob:', thumbBlobName);
+                    } catch (thumbError) {
+                        context.log.warn('⚠️ Failed to delete thumbnail blob:', thumbError.message);
+                        // Continue anyway
+                    }
+                }
+
+                // Delete from NamePhoto table (person tags)
+                const deleteTagsQuery = `
+                    DELETE FROM dbo.NamePhoto
+                    WHERE npFileName = @filename
+                `;
+                await execute(deleteTagsQuery, { filename: dbFileName });
+                context.log('✅ Deleted person tags');
+
+                // Delete from Pictures table
+                const deletePictureQuery = `
+                    DELETE FROM dbo.Pictures
+                    WHERE PFileName = @filename
+                `;
+                await execute(deletePictureQuery, { filename: dbFileName });
+                context.log('✅ Deleted from Pictures table');
+
+                // Update person counts
+                const updateCountsQuery = `
+                    UPDATE dbo.NameEvent
+                    SET neCount = (
+                        SELECT COUNT(*)
+                        FROM dbo.NamePhoto
+                        WHERE npID = NameEvent.ID
+                    )
+                `;
+                await execute(updateCountsQuery);
+                context.log('✅ Updated person counts');
+
+                context.res = {
+                    status: 200,
+                    body: {
+                        success: true,
+                        message: 'Media file deleted successfully',
+                        deleted: {
+                            database: true,
+                            blob: blobDeleted,
+                            thumbnail: thumbDeleted
+                        }
+                    }
+                };
+                return;
+
+            } catch (deleteError) {
+                context.log.error('Delete error:', deleteError);
+                context.res = {
+                    status: 500,
+                    body: { 
+                        error: 'Failed to delete media',
+                        message: deleteError.message 
+                    }
+                };
+                return;
+            }
         }
 
         context.res = {
