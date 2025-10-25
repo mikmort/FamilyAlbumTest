@@ -357,14 +357,32 @@ export default function MediaDetailModal({
       const normalizedPath = media.PFileName.replace(/\\/g, '/');
       const encodedPath = normalizedPath.split('/').map(encodeURIComponent).join('/');
       
+      console.log('DELETE request to:', `/api/media/${encodedPath}`);
+      
       const response = await fetch(`/api/media/${encodedPath}`, {
         method: 'DELETE',
       });
 
+      console.log('DELETE response status:', response.status);
+      console.log('DELETE response headers:', Object.fromEntries(response.headers.entries()));
+
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ error: 'Delete failed' }));
-        throw new Error(errorData.error || `Failed to delete: ${response.status}`);
+        let errorData;
+        const contentType = response.headers.get('content-type');
+        
+        if (contentType && contentType.includes('application/json')) {
+          errorData = await response.json();
+        } else {
+          const text = await response.text();
+          errorData = { error: 'Non-JSON response', body: text };
+        }
+        
+        console.error('DELETE error response:', errorData);
+        throw new Error(errorData.error || errorData.message || `Failed to delete: ${response.status}`);
       }
+
+      const result = await response.json();
+      console.log('DELETE success:', result);
 
       alert('File deleted successfully');
       onClose(); // Close the modal
@@ -373,6 +391,7 @@ export default function MediaDetailModal({
       window.location.reload();
     } catch (error: any) {
       console.error('Delete failed:', error);
+      console.error('Error stack:', error.stack);
       alert(`Failed to delete file: ${error.message}`);
     }
   };
