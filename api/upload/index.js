@@ -1,4 +1,4 @@
-const { execute } = require('../shared/db');
+const { execute, query } = require('../shared/db');
 const { uploadBlob } = require('../shared/storage');
 const sharp = require('sharp');
 const ffmpeg = require('fluent-ffmpeg');
@@ -6,6 +6,65 @@ const ffmpegPath = require('@ffmpeg-installer/ffmpeg').path;
 const { Readable } = require('stream');
 
 ffmpeg.setFfmpegPath(ffmpegPath);
+
+/**
+ * Check if filename exists and generate Windows-style duplicate name if needed
+ * E.g., IMG_5033.jpg -> IMG_5033 (1).jpg -> IMG_5033 (2).jpg
+ * Note: Uses exact match queries only - no wildcards for performance
+ */
+async function getUniqueFilename(originalFilename) {
+    const fileExt = originalFilename.substring(originalFilename.lastIndexOf('.'));
+    const fileNameWithoutExt = originalFilename.substring(0, originalFilename.lastIndexOf('.'));
+    
+    // Check if the exact original filename exists
+    const exactCheckQuery = `
+        SELECT PFileName 
+        FROM dbo.Pictures 
+        WHERE PFileName = @filename
+    `;
+    
+    const existingExact = await query(exactCheckQuery, { 
+        filename: originalFilename
+    });
+    
+    // If no duplicate, return original filename
+    if (!existingExact || existingExact.length === 0) {
+        return originalFilename;
+    }
+    
+    // Original exists, need to find numbered version
+    // Check numbered versions one by one (no wildcards)
+    const existingNumbers = new Set([0]); // 0 represents the base filename
+    let counter = 1;
+    let foundGap = false;
+    
+    // Check sequentially for numbered versions: (1), (2), (3), etc.
+    // Stop when we find a gap (missing number)
+    while (!foundGap && counter < 1000) { // Safety limit of 1000
+        const numberedFilename = `${fileNameWithoutExt} (${counter})${fileExt}`;
+        const numberedCheckQuery = `
+            SELECT PFileName 
+            FROM dbo.Pictures 
+            WHERE PFileName = @filename
+        `;
+        
+        const numberedExists = await query(numberedCheckQuery, { 
+            filename: numberedFilename
+        });
+        
+        if (numberedExists && numberedExists.length > 0) {
+            existingNumbers.add(counter);
+            counter++;
+        } else {
+            // Found a gap - this number is available
+            foundGap = true;
+            return numberedFilename;
+        }
+    }
+    
+    // Safety fallback (shouldn't reach here)
+    return `${fileNameWithoutExt} (${counter})${fileExt}`;
+}
 
 module.exports = async function (context, req) {
     context.log('Upload API function processed a request.');
@@ -113,11 +172,14 @@ module.exports = async function (context, req) {
             }
         }
 
-        // Generate unique filename to prevent collisions
-        const timestamp = Date.now();
-        const fileExt = fileName.substring(fileName.lastIndexOf('.'));
-        const fileNameWithoutExt = fileName.substring(0, fileName.lastIndexOf('.'));
-        const uniqueFilename = `${fileNameWithoutExt}-${timestamp}${fileExt}`;
+        // Check for duplicate filenames and generate Windows-style numbered name if needed
+        // E.g., IMG_5033.jpg -> IMG_5033 (1).jpg -> IMG_5033 (2).jpg
+        const uniqueFilename = await getUniqueFilename(fileName);
+        
+        if (uniqueFilename !== fileName) {
+            context.log(`Duplicate detected. Renamed: ${fileName} -> ${uniqueFilename}`);
+        }
+        
         const mediaType = actualContentType.startsWith('image/') ? 1 : 2; // 1=image, 2=video
 
         let thumbnailUrl = null;
@@ -144,7 +206,8 @@ module.exports = async function (context, req) {
                     .toBuffer();
 
                 // Upload thumbnail
-                const thumbFilename = `thumb_${uniqueFilename.replace(fileExt, '.jpg')}`;
+                const fileExt = uniqueFilename.substring(uniqueFilename.lastIndexOf('.'));
+                const thumbFilename = `thumb_${uniqueFilename.substring(0, uniqueFilename.lastIndexOf('.'))}.jpg`;
                 thumbnailUrl = await uploadBlob(
                     `media/${thumbFilename}`,
                     thumbnailBuffer,
@@ -189,7 +252,7 @@ module.exports = async function (context, req) {
                 });
 
                 // Upload thumbnail
-                const thumbFilename = `thumb_${uniqueFilename.replace(fileExt, '.jpg')}`;
+                const thumbFilename = `thumb_${uniqueFilename.substring(0, uniqueFilename.lastIndexOf('.'))}.jpg`;
                 thumbnailUrl = await uploadBlob(
                     `media/${thumbFilename}`,
                     thumbnailBuffer,
@@ -225,7 +288,7 @@ module.exports = async function (context, req) {
 
         await execute(insertQuery, {
             fileName: uniqueFilename,
-            directory: '',
+            directory: '', // Not used - duplicate prevention handled by numbered filenames
             thumbUrl: thumbnailUrl,
             type: mediaType,
             width: width,

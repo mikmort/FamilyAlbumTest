@@ -345,6 +345,38 @@ export default function MediaDetailModal({
     }
   };
 
+  const handleDelete = async () => {
+    const filename = media.PFileName.split(/[\/\\]/).pop() || media.PFileName;
+    
+    if (!confirm(`Are you sure you want to permanently delete "${filename}"?\n\nThis will:\n- Remove the file from blob storage\n- Delete all database records\n- Remove all tags and metadata\n\nThis action cannot be undone!`)) {
+      return;
+    }
+
+    try {
+      // Normalize the path for the API call
+      const normalizedPath = media.PFileName.replace(/\\/g, '/');
+      const encodedPath = normalizedPath.split('/').map(encodeURIComponent).join('/');
+      
+      const response = await fetch(`/api/media/${encodedPath}`, {
+        method: 'DELETE',
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: 'Delete failed' }));
+        throw new Error(errorData.error || `Failed to delete: ${response.status}`);
+      }
+
+      alert('File deleted successfully');
+      onClose(); // Close the modal
+      
+      // Refresh the page to update the gallery
+      window.location.reload();
+    } catch (error: any) {
+      console.error('Delete failed:', error);
+      alert(`Failed to delete file: ${error.message}`);
+    }
+  };
+
   const handleCreatePerson = async () => {
     if (!newPersonName.trim()) {
       alert('Please enter a name');
@@ -980,9 +1012,14 @@ export default function MediaDetailModal({
                   </button>
                 </>
               ) : (
-                <button className="btn btn-primary" onClick={() => setEditing(true)}>
-                  Edit
-                </button>
+                <>
+                  <button className="btn btn-primary" onClick={() => setEditing(true)}>
+                    Edit
+                  </button>
+                  <button className="btn btn-danger" onClick={handleDelete} style={{ marginLeft: '0.5rem' }}>
+                    Delete Picture
+                  </button>
+                </>
               )}
             </div>
           </div>
