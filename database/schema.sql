@@ -76,6 +76,8 @@ CREATE TABLE dbo.UnindexedFiles (
     uiStatus CHAR(1) DEFAULT 'N' CHECK (uiStatus IN ('N', 'P')), -- N=new, P=processed
     uiBlobUrl NVARCHAR(1000), -- URL to actual file in Azure Blob Storage
     uiDateAdded DATETIME2 DEFAULT GETDATE(),
+    uiMonth INT NULL, -- Extracted from EXIF/metadata
+    uiYear INT NULL, -- Extracted from EXIF/metadata
     INDEX IX_UnindexedFiles_Status (uiStatus)
 );
 GO
