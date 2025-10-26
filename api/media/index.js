@@ -1100,7 +1100,8 @@ module.exports = async function (context, req) {
         }
 
         // DELETE /api/media/{filename}/tags/{personId} - Remove person tag
-        if (method === 'DELETE' && filename) {
+        // Only match if URL contains /tags/ pattern
+        if (method === 'DELETE' && filename && req.url && req.url.includes('/tags/')) {
             const { personId } = req.body;
 
             if (!personId) {
