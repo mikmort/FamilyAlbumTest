@@ -68,28 +68,57 @@ async function getUniqueFilename(originalFilename) {
 
 module.exports = async function (context, req) {
     context.log('Upload API function processed a request.');
+    context.log('Content-Type:', req.headers['content-type']);
+    context.log('Body type:', typeof req.body);
+    context.log('Body is Buffer?', Buffer.isBuffer(req.body));
 
     try {
         // Handle both multipart/form-data and JSON (base64) uploads
         let fileName, buffer, contentType;
 
         if (req.headers['content-type']?.includes('multipart/form-data')) {
+            context.log('Processing multipart/form-data upload');
+            
             // Parse multipart form data manually (simple implementation)
-            const contentType = req.headers['content-type'];
-            const boundary = contentType.split('boundary=')[1];
+            const contentTypeHeader = req.headers['content-type'];
+            const boundary = contentTypeHeader.split('boundary=')[1];
             
             if (!boundary) {
+                context.log.error('No boundary found in Content-Type header');
                 context.res = {
                     status: 400,
-                    body: { error: 'Invalid multipart request' }
+                    body: { error: 'Invalid multipart request - no boundary found' }
                 };
                 return;
             }
 
+            context.log('Boundary:', boundary);
+
             // Parse the raw body
-            const bodyBuffer = Buffer.isBuffer(req.body) ? req.body : Buffer.from(req.body);
+            let bodyBuffer;
+            try {
+                if (Buffer.isBuffer(req.body)) {
+                    bodyBuffer = req.body;
+                } else if (typeof req.body === 'string') {
+                    bodyBuffer = Buffer.from(req.body, 'binary');
+                } else if (req.body && typeof req.body === 'object') {
+                    // Azure Functions sometimes provides the body as an object
+                    // Try to access the raw body buffer
+                    bodyBuffer = req.rawBody ? Buffer.from(req.rawBody, 'binary') : Buffer.from(JSON.stringify(req.body));
+                } else {
+                    throw new Error(`Unexpected body type: ${typeof req.body}`);
+                }
+                
+                context.log('Body buffer size:', bodyBuffer.length);
+            } catch (bufferError) {
+                context.log.error('Error creating body buffer:', bufferError);
+                throw new Error(`Failed to parse request body: ${bufferError.message}`);
+            }
+
             const bodyStr = bodyBuffer.toString('binary');
             const parts = bodyStr.split(`--${boundary}`);
+            
+            context.log('Number of parts:', parts.length);
             
             for (const part of parts) {
                 if (part.includes('Content-Disposition') && part.includes('filename=')) {
@@ -97,12 +126,14 @@ module.exports = async function (context, req) {
                     const filenameMatch = part.match(/filename="([^"]+)"/);
                     if (filenameMatch) {
                         fileName = filenameMatch[1];
+                        context.log('Extracted filename:', fileName);
                     }
                     
                     // Extract content type
                     const contentTypeMatch = part.match(/Content-Type: ([^\r\n]+)/);
                     if (contentTypeMatch) {
                         contentType = contentTypeMatch[1].trim();
+                        context.log('Extracted content type:', contentType);
                     }
                     
                     // Extract binary data (everything after the headers)
@@ -111,6 +142,7 @@ module.exports = async function (context, req) {
                     if (dataStart > 3 && dataEnd > dataStart) {
                         const binaryData = part.substring(dataStart, dataEnd);
                         buffer = Buffer.from(binaryData, 'binary');
+                        context.log('Extracted buffer size:', buffer.length);
                     }
                     break;
                 }
@@ -133,9 +165,22 @@ module.exports = async function (context, req) {
         }
 
         if (!fileName || !buffer) {
+            context.log.error('Missing required data:', { 
+                hasFileName: !!fileName, 
+                hasBuffer: !!buffer,
+                bufferSize: buffer ? buffer.length : 0,
+                fileName: fileName || 'missing'
+            });
             context.res = {
                 status: 400,
-                body: { error: 'File name and data are required' }
+                body: { 
+                    error: 'File name and data are required',
+                    details: {
+                        fileName: fileName || 'missing',
+                        bufferReceived: !!buffer,
+                        bufferSize: buffer ? buffer.length : 0
+                    }
+                }
             };
             return;
         }
@@ -311,9 +356,14 @@ module.exports = async function (context, req) {
 
     } catch (error) {
         context.log.error('Upload error:', error);
+        context.log.error('Error stack:', error.stack);
         context.res = {
             status: 500,
-            body: { error: 'Internal server error', message: error.message }
+            body: { 
+                error: 'Internal server error', 
+                message: error.message,
+                stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+            }
         };
     }
 };
