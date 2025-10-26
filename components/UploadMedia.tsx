@@ -105,12 +105,43 @@ export default function UploadMedia({ onProcessFiles }: UploadMediaProps) {
 
         const urlResponse = await fetch(`/api/upload/get-upload-url?fileName=${encodeURIComponent(fileName)}`);
         
+        console.log('Get upload URL response status:', urlResponse.status);
+        console.log('Get upload URL response headers:', Object.fromEntries(urlResponse.headers.entries()));
+        
         if (!urlResponse.ok) {
-          const error = await urlResponse.json();
-          throw new Error(error.error || 'Failed to get upload URL');
+          const contentType = urlResponse.headers.get('content-type');
+          let errorMessage = 'Failed to get upload URL';
+          
+          if (contentType && contentType.includes('application/json')) {
+            try {
+              const error = await urlResponse.json();
+              errorMessage = error.error || error.message || errorMessage;
+            } catch (e) {
+              const text = await urlResponse.text();
+              console.error('Non-JSON error response:', text);
+              errorMessage = `HTTP ${urlResponse.status}: ${text.substring(0, 100)}`;
+            }
+          } else {
+            const text = await urlResponse.text();
+            console.error('Non-JSON error response:', text);
+            errorMessage = `HTTP ${urlResponse.status}: ${text.substring(0, 100)}`;
+          }
+          
+          throw new Error(errorMessage);
         }
 
-        const { uploadUrl, fileName: uniqueFileName, renamed } = await urlResponse.json();
+        const responseText = await urlResponse.text();
+        console.log('Get upload URL response body:', responseText.substring(0, 200));
+        
+        let uploadData;
+        try {
+          uploadData = JSON.parse(responseText);
+        } catch (e) {
+          console.error('Failed to parse JSON:', responseText);
+          throw new Error('Invalid JSON response from server');
+        }
+        
+        const { uploadUrl, fileName: uniqueFileName, renamed } = uploadData;
         
         if (renamed) {
           console.log(`File renamed to avoid duplicate: ${fileName} -> ${uniqueFileName}`);
