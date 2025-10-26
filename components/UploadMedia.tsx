@@ -301,40 +301,106 @@ export default function UploadMedia({ onProcessFiles }: UploadMediaProps) {
             </div>
           </div>
 
-          {files.map((file, index) => (
-            <div key={index} className="file-item">
-              <div className="file-info">
-                <span className="file-name">{file.name}</span>
-                <span className="file-size">{formatFileSize(file.size)}</span>
-                <span className="file-type">
-                  {file.type.startsWith('image/') ? '🖼️ Image' : '🎬 Video'}
-                </span>
+          {/* Overall Progress */}
+          {uploading && (
+            <div style={{ marginBottom: '1rem', padding: '1rem', background: '#f0f8ff', borderRadius: '4px' }}>
+              <div style={{ marginBottom: '0.5rem', fontWeight: '500' }}>
+                Overall Progress: {Object.values(uploadStatus).filter(s => s === 'success').length} / {files.length} completed
               </div>
-              
-              {uploadStatus[file.name] && (
-                <div className="upload-status">
-                  {uploadStatus[file.name] === 'uploading' && (
-                    <span style={{ color: '#007bff' }}>⏳ Uploading...</span>
-                  )}
-                  {uploadStatus[file.name] === 'success' && (
-                    <span style={{ color: '#28a745' }}>✅ Uploaded</span>
-                  )}
-                  {uploadStatus[file.name]?.startsWith('error') && (
-                    <span style={{ color: '#dc3545' }}>{uploadStatus[file.name]}</span>
-                  )}
-                </div>
-              )}
-
-              {!uploading && !uploadStatus[file.name] && (
-                <button
-                  className="btn btn-sm btn-danger"
-                  onClick={() => handleRemoveFile(index)}
-                >
-                  Remove
-                </button>
-              )}
+              <div style={{ width: '100%', height: '8px', background: '#e0e0e0', borderRadius: '4px', overflow: 'hidden' }}>
+                <div style={{ 
+                  width: `${(Object.values(uploadStatus).filter(s => s === 'success').length / files.length) * 100}%`,
+                  height: '100%',
+                  background: '#28a745',
+                  transition: 'width 0.3s'
+                }}></div>
+              </div>
             </div>
-          ))}
+          )}
+
+          {/* Compact list view */}
+          <div style={{ maxHeight: '400px', overflowY: 'auto', border: '1px solid #e0e0e0', borderRadius: '4px' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+              <thead style={{ position: 'sticky', top: 0, background: '#f8f9fa', borderBottom: '2px solid #dee2e6' }}>
+                <tr>
+                  <th style={{ padding: '0.75rem', textAlign: 'left', fontSize: '0.9rem', fontWeight: '600' }}>Filename</th>
+                  <th style={{ padding: '0.75rem', textAlign: 'right', fontSize: '0.9rem', fontWeight: '600', width: '80px' }}>Size</th>
+                  <th style={{ padding: '0.75rem', textAlign: 'center', fontSize: '0.9rem', fontWeight: '600', width: '80px' }}>Type</th>
+                  <th style={{ padding: '0.75rem', textAlign: 'center', fontSize: '0.9rem', fontWeight: '600', width: '200px' }}>Status</th>
+                  <th style={{ padding: '0.75rem', textAlign: 'center', fontSize: '0.9rem', fontWeight: '600', width: '80px' }}>Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                {files.map((file, index) => (
+                  <tr key={index} style={{ borderBottom: '1px solid #e0e0e0' }}>
+                    <td style={{ padding: '0.75rem', fontSize: '0.9rem' }}>{file.name}</td>
+                    <td style={{ padding: '0.75rem', textAlign: 'right', fontSize: '0.85rem', color: '#666' }}>
+                      {formatFileSize(file.size)}
+                    </td>
+                    <td style={{ padding: '0.75rem', textAlign: 'center', fontSize: '0.85rem' }}>
+                      {file.type.startsWith('image/') ? '🖼️' : '🎬'}
+                    </td>
+                    <td style={{ padding: '0.75rem', textAlign: 'center', fontSize: '0.85rem' }}>
+                      {uploadStatus[file.name] ? (
+                        <>
+                          {uploadStatus[file.name] === 'uploading' && (
+                            <span style={{ color: '#007bff' }}>⏳ Uploading...</span>
+                          )}
+                          {uploadStatus[file.name] === 'Getting upload URL...' && (
+                            <span style={{ color: '#6c757d' }}>🔗 Preparing...</span>
+                          )}
+                          {uploadStatus[file.name] === 'Uploading to storage...' && (
+                            <div>
+                              <div style={{ fontSize: '0.8rem', color: '#007bff', marginBottom: '2px' }}>
+                                {uploadProgress[file.name]}%
+                              </div>
+                              <div style={{ width: '100%', height: '4px', background: '#e0e0e0', borderRadius: '2px', overflow: 'hidden' }}>
+                                <div style={{ 
+                                  width: `${uploadProgress[file.name]}%`,
+                                  height: '100%',
+                                  background: '#007bff',
+                                  transition: 'width 0.2s'
+                                }}></div>
+                              </div>
+                            </div>
+                          )}
+                          {uploadStatus[file.name] === 'Processing...' && (
+                            <span style={{ color: '#ffc107' }}>⚙️ Processing...</span>
+                          )}
+                          {uploadStatus[file.name] === 'success' && (
+                            <span style={{ color: '#28a745', fontWeight: '500' }}>✅ Done</span>
+                          )}
+                          {uploadStatus[file.name]?.startsWith('error') && (
+                            <span style={{ color: '#dc3545', fontSize: '0.8rem' }} title={uploadStatus[file.name]}>
+                              ❌ Error
+                            </span>
+                          )}
+                          {uploadStatus[file.name]?.includes('Renamed to') && (
+                            <span style={{ color: '#ff8800', fontSize: '0.8rem' }}>
+                              📝 {uploadProgress[file.name]}%
+                            </span>
+                          )}
+                        </>
+                      ) : (
+                        <span style={{ color: '#999' }}>—</span>
+                      )}
+                    </td>
+                    <td style={{ padding: '0.75rem', textAlign: 'center' }}>
+                      {!uploading && !uploadStatus[file.name] && (
+                        <button
+                          className="btn btn-sm btn-danger"
+                          onClick={() => handleRemoveFile(index)}
+                          style={{ padding: '0.25rem 0.5rem', fontSize: '0.85rem' }}
+                        >
+                          ✕
+                        </button>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
 
@@ -373,36 +439,12 @@ export default function UploadMedia({ onProcessFiles }: UploadMediaProps) {
           box-shadow: 0 2px 4px rgba(0,0,0,0.1);
         }
 
-        .file-item {
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          padding: 1rem;
-          border: 1px solid #e0e0e0;
-          border-radius: 4px;
-          margin-bottom: 0.5rem;
-          background: #f8f9fa;
+        .files-list table {
+          font-size: 0.95rem;
         }
 
-        .file-info {
-          display: flex;
-          gap: 1rem;
-          align-items: center;
-          flex: 1;
-        }
-
-        .file-name {
-          font-weight: 500;
-          flex: 1;
-        }
-
-        .file-size, .file-type {
-          color: #666;
-          font-size: 0.9rem;
-        }
-
-        .upload-status {
-          margin: 0 1rem;
+        .files-list tbody tr:hover {
+          background-color: #f8f9fa;
         }
 
         .upload-success-banner {
