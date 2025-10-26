@@ -14,6 +14,8 @@ interface UnindexedFile {
   uiStatus: string;
   uiBlobUrl: string;
   uiDateAdded: string;
+  uiMonth?: number; // extracted from EXIF/metadata
+  uiYear?: number; // extracted from EXIF/metadata
 }
 
 interface Person {
@@ -68,10 +70,12 @@ export default function ProcessNewFiles() {
   useEffect(() => {
     if (allFiles.length > 0 && currentIndex >= 0 && currentIndex < allFiles.length) {
       setCurrentFile(allFiles[currentIndex]);
+      const file = allFiles[currentIndex];
       // Reset form when changing files
       setDescription('');
-      setMonth('');
-      setYear('');
+      // Pre-populate month/year if extracted from metadata
+      setMonth(file.uiMonth || '');
+      setYear(file.uiYear || '');
       setSelectedEvent('');
       setSelectedPeople([]);
     } else if (allFiles.length === 0) {
@@ -376,6 +380,18 @@ export default function ProcessNewFiles() {
                 <div className="info-row">
                   <span className="label">Duration:</span>
                   <span className="value">{Math.floor(currentFile.uiVtime / 60)}:{(currentFile.uiVtime % 60).toString().padStart(2, '0')}</span>
+                </div>
+              )}
+              {(currentFile.uiMonth || currentFile.uiYear) && (
+                <div className="info-row">
+                  <span className="label">Date Taken:</span>
+                  <span className="value">
+                    {currentFile.uiMonth && currentFile.uiYear 
+                      ? `${currentFile.uiMonth}/${currentFile.uiYear}`
+                      : currentFile.uiYear || ''}
+                    {' '}
+                    <span style={{color: '#10b981', fontSize: '0.85em'}}>(from metadata)</span>
+                  </span>
                 </div>
               )}
             </div>
