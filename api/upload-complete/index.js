@@ -47,6 +47,10 @@ module.exports = async function (context, req) {
         const blobUrl = blockBlobClient.url;
         const mediaType = contentType?.startsWith('image/') ? 1 : 2;
 
+        // Generate API URLs instead of direct blob URLs (storage has public access disabled)
+        const apiUrl = `/api/media/${fileName}`;
+        const apiThumbUrl = `/api/media/${fileName}?thumbnail=true`;
+
         let thumbnailUrl = null;
         let width = 0;
         let height = 0;
@@ -73,13 +77,13 @@ module.exports = async function (context, req) {
 
                 context.log(`Image dimensions: ${width}x${height}`);
 
-                // Thumbnail will be generated dynamically via ?thumbnail=true
-                thumbnailUrl = blobUrl + '?thumbnail=true';
+                // Thumbnail will be generated dynamically via API
+                thumbnailUrl = apiThumbUrl;
 
             } catch (err) {
                 context.log.error('Error processing image:', err);
                 // Continue without thumbnail
-                thumbnailUrl = blobUrl;
+                thumbnailUrl = apiUrl;
             }
         } else if (mediaType === 2) {
             // Video processing
@@ -105,13 +109,13 @@ module.exports = async function (context, req) {
                     });
                 });
 
-                // Thumbnail will be generated dynamically via ?thumbnail=true
-                thumbnailUrl = blobUrl + '?thumbnail=true';
+                // Thumbnail will be generated dynamically via API
+                thumbnailUrl = apiThumbUrl;
 
             } catch (err) {
                 context.log.error('Error processing video:', err);
                 // Continue without thumbnail
-                thumbnailUrl = blobUrl;
+                thumbnailUrl = apiUrl;
             }
         }
 
@@ -131,7 +135,7 @@ module.exports = async function (context, req) {
             width: width,
             height: height,
             duration: duration,
-            blobUrl: blobUrl,
+            blobUrl: apiUrl,  // Store API URL instead of direct blob URL
         });
 
         context.log(`File registered in database: ${fileName}`);
@@ -141,7 +145,7 @@ module.exports = async function (context, req) {
             body: {
                 success: true,
                 fileName: fileName,
-                blobUrl: blobUrl,
+                blobUrl: apiUrl,  // Return API URL instead of direct blob URL
                 thumbnailUrl: thumbnailUrl,
                 width: width,
                 height: height,
