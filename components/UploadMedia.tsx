@@ -97,25 +97,99 @@ export default function UploadMedia({ onProcessFiles }: UploadMediaProps) {
       setUploadStatus({ ...newStatus });
 
       try {
-        const formData = new FormData();
-        formData.append('file', file);
+        console.log(`Uploading ${fileName} (${formatFileSize(file.size)})`);
 
-        const response = await fetch('/api/upload', {
-          method: 'POST',
-          body: formData,
+        // Step 1: Get SAS URL for direct upload
+        newStatus[fileName] = 'Getting upload URL...';
+        setUploadStatus({ ...newStatus });
+
+        const urlResponse = await fetch(`/api/upload/get-upload-url?fileName=${encodeURIComponent(fileName)}`);
+        
+        if (!urlResponse.ok) {
+          const error = await urlResponse.json();
+          throw new Error(error.error || 'Failed to get upload URL');
+        }
+
+        const { uploadUrl, fileName: uniqueFileName, renamed } = await urlResponse.json();
+        
+        if (renamed) {
+          console.log(`File renamed to avoid duplicate: ${fileName} -> ${uniqueFileName}`);
+          newStatus[fileName] = `Renamed to ${uniqueFileName}, uploading...`;
+          setUploadStatus({ ...newStatus });
+        }
+
+        // Step 2: Upload directly to blob storage with progress tracking
+        newStatus[fileName] = 'Uploading to storage...';
+        setUploadStatus({ ...newStatus });
+
+        const xhr = new XMLHttpRequest();
+        
+        // Track upload progress
+        xhr.upload.addEventListener('progress', (e) => {
+          if (e.lengthComputable) {
+            const percentComplete = Math.round((e.loaded / e.total) * 90); // 0-90% for upload
+            newProgress[fileName] = percentComplete;
+            setUploadProgress({ ...newProgress });
+          }
         });
 
-        if (response.ok) {
+        // Upload using XMLHttpRequest for progress tracking
+        await new Promise((resolve, reject) => {
+          xhr.addEventListener('load', () => {
+            if (xhr.status >= 200 && xhr.status < 300) {
+              resolve(xhr.response);
+            } else {
+              reject(new Error(`Upload failed: ${xhr.status} ${xhr.statusText}`));
+            }
+          });
+          xhr.addEventListener('error', () => reject(new Error('Network error during upload')));
+          xhr.addEventListener('abort', () => reject(new Error('Upload cancelled')));
+
+          xhr.open('PUT', uploadUrl);
+          xhr.setRequestHeader('x-ms-blob-type', 'BlockBlob');
+          xhr.setRequestHeader('Content-Type', file.type || 'application/octet-stream');
+          xhr.send(file);
+        });
+
+        console.log(`✅ Upload to storage complete: ${uniqueFileName}`);
+        newProgress[fileName] = 90;
+        setUploadProgress({ ...newProgress });
+
+        // Step 3: Notify API that upload is complete
+        newStatus[fileName] = 'Processing...';
+        setUploadStatus({ ...newStatus });
+
+        const completeResponse = await fetch('/api/upload/upload-complete', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            fileName: uniqueFileName,
+            contentType: file.type || 'application/octet-stream'
+          }),
+        });
+
+        if (completeResponse.ok) {
+          const result = await completeResponse.json();
+          console.log(`✅ Processing complete:`, result);
           newProgress[fileName] = 100;
           newStatus[fileName] = 'success';
           successCount++;
         } else {
-          const error = await response.json();
-          newStatus[fileName] = `error: ${error.error || 'Upload failed'}`;
+          const error = await completeResponse.json();
+          throw new Error(error.error || 'Failed to process uploaded file');
         }
-      } catch (error) {
-        console.error('Upload error:', error);
-        newStatus[fileName] = 'error: Network error';
+
+      } catch (error: any) {
+        console.error(`❌ Upload error for ${fileName}:`, error);
+        
+        let errorMessage = 'Upload failed';
+        if (error.name === 'AbortError') {
+          errorMessage = 'Upload timed out';
+        } else if (error.message) {
+          errorMessage = error.message;
+        }
+        
+        newStatus[fileName] = `error: ${errorMessage}`;
       }
 
       setUploadProgress({ ...newProgress });

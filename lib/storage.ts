@@ -1,4 +1,10 @@
-import { BlobServiceClient, ContainerClient } from '@azure/storage-blob';
+import { 
+  BlobServiceClient, 
+  ContainerClient, 
+  generateBlobSASQueryParameters,
+  BlobSASPermissions,
+  StorageSharedKeyCredential
+} from '@azure/storage-blob';
 
 const accountName = process.env.AZURE_STORAGE_ACCOUNT || '';
 const accountKey = process.env.AZURE_STORAGE_KEY || '';
@@ -75,4 +81,40 @@ export async function blobExists(blobName: string): Promise<boolean> {
   const containerClient = getContainerClient();
   const blockBlobClient = containerClient.getBlockBlobClient(blobName);
   return await blockBlobClient.exists();
+}
+
+/**
+ * Generate a SAS URL for direct upload from browser
+ * @param blobName The name/path of the blob to upload
+ * @param expiresInMinutes How long the SAS token should be valid (default: 60 minutes)
+ * @returns SAS URL that allows uploading to this specific blob
+ */
+export function generateUploadSasUrl(blobName: string, expiresInMinutes: number = 60): string {
+  const containerClient = getContainerClient();
+  const blockBlobClient = containerClient.getBlockBlobClient(blobName);
+  
+  // Create a SAS token that expires in the specified minutes
+  const startsOn = new Date();
+  const expiresOn = new Date(startsOn.getTime() + expiresInMinutes * 60 * 1000);
+  
+  // Create shared key credential
+  const sharedKeyCredential = new StorageSharedKeyCredential(accountName, accountKey);
+  
+  // Define permissions (write only for upload)
+  const permissions = BlobSASPermissions.parse("cw"); // create and write
+  
+  // Generate SAS token
+  const sasToken = generateBlobSASQueryParameters(
+    {
+      containerName: containerName,
+      blobName: blobName,
+      permissions: permissions,
+      startsOn: startsOn,
+      expiresOn: expiresOn,
+    },
+    sharedKeyCredential
+  ).toString();
+  
+  // Return full URL with SAS token
+  return `${blockBlobClient.url}?${sasToken}`;
 }
