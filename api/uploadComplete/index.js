@@ -56,6 +56,9 @@ module.exports = async function (context, req) {
         let width = 0;
         let height = 0;
         let duration = 0;
+        let dateTaken = null;
+        let month = null;
+        let year = null;
 
         // Process based on media type
         if (mediaType === 1) {
@@ -71,10 +74,31 @@ module.exports = async function (context, req) {
                 }
                 const buffer = Buffer.concat(chunks);
 
-                // Get metadata
+                // Get metadata including EXIF
                 const metadata = await sharp(buffer).metadata();
                 width = metadata.width || 0;
                 height = metadata.height || 0;
+
+                // Extract date from EXIF if available
+                if (metadata.exif) {
+                    try {
+                        // EXIF dates are in format: "YYYY:MM:DD HH:MM:SS"
+                        const exifBuffer = metadata.exif;
+                        const exifString = exifBuffer.toString();
+                        
+                        // Look for DateTimeOriginal tag (0x9003)
+                        const dateMatch = exifString.match(/(\d{4}):(\d{2}):(\d{2})\s+(\d{2}):(\d{2}):(\d{2})/);
+                        if (dateMatch) {
+                            const [, yearStr, monthStr, dayStr] = dateMatch;
+                            year = parseInt(yearStr);
+                            month = parseInt(monthStr);
+                            dateTaken = new Date(year, month - 1, parseInt(dayStr));
+                            context.log(`Extracted date from EXIF: ${month}/${year}`);
+                        }
+                    } catch (exifErr) {
+                        context.log('Could not parse EXIF date:', exifErr.message);
+                    }
+                }
 
                 context.log(`Image dimensions: ${width}x${height}`);
 
@@ -104,6 +128,27 @@ module.exports = async function (context, req) {
                                 width = metadata.streams[0].width || 0;
                                 height = metadata.streams[0].height || 0;
                             }
+                            
+                            // Extract creation date from metadata
+                            if (metadata.format && metadata.format.tags) {
+                                const tags = metadata.format.tags;
+                                // Try various date fields (different formats use different tags)
+                                const dateStr = tags.creation_time || tags.date || tags['com.apple.quicktime.creationdate'];
+                                
+                                if (dateStr) {
+                                    try {
+                                        dateTaken = new Date(dateStr);
+                                        if (!isNaN(dateTaken.getTime())) {
+                                            month = dateTaken.getMonth() + 1;
+                                            year = dateTaken.getFullYear();
+                                            context.log(`Extracted date from video metadata: ${month}/${year}`);
+                                        }
+                                    } catch (dateErr) {
+                                        context.log('Could not parse video date:', dateErr.message);
+                                    }
+                                }
+                            }
+                            
                             context.log(`Video: ${width}x${height}, duration: ${duration}s`);
                             resolve();
                         }
