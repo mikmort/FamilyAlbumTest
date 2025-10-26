@@ -47,6 +47,12 @@ export default function ProcessNewFiles() {
   const [year, setYear] = useState<number | ''>('');
   const [selectedEvent, setSelectedEvent] = useState<number | ''>('');
   const [selectedPeople, setSelectedPeople] = useState<number[]>([]);
+  
+  // Search/filter states
+  const [eventSearch, setEventSearch] = useState('');
+  const [eventDropdownOpen, setEventDropdownOpen] = useState(false);
+  const [peopleSearch, setPeopleSearch] = useState('');
+  const [peopleDropdownOpen, setPeopleDropdownOpen] = useState(false);
 
   // Data for dropdowns
   const [people, setPeople] = useState<Person[]>([]);
@@ -58,6 +64,19 @@ export default function ProcessNewFiles() {
   useEffect(() => {
     loadPeople();
     loadEvents();
+  }, []);
+
+  // Close dropdowns when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      if (!target.closest('.autocomplete-wrapper')) {
+        setEventDropdownOpen(false);
+        setPeopleDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
   // Load next file on mount and after processing
@@ -77,7 +96,9 @@ export default function ProcessNewFiles() {
       setMonth(file.uiMonth || '');
       setYear(file.uiYear || '');
       setSelectedEvent('');
+      setEventSearch('');
       setSelectedPeople([]);
+      setPeopleSearch('');
     } else if (allFiles.length === 0) {
       setCurrentFile(null);
     }
@@ -292,6 +313,30 @@ export default function ProcessNewFiles() {
     });
   };
 
+  // Filter events based on search
+  const filteredEvents = events.filter(event =>
+    event.neName.toLowerCase().includes(eventSearch.toLowerCase())
+  ).sort((a, b) => a.neName.localeCompare(b.neName));
+
+  // Filter people based on search
+  const filteredPeople = people.filter(person =>
+    person.neName.toLowerCase().includes(peopleSearch.toLowerCase())
+  ).sort((a, b) => a.neName.localeCompare(b.neName));
+
+  // Get selected event name
+  const getSelectedEventName = () => {
+    const event = events.find(e => e.ID === selectedEvent);
+    return event ? event.neName : '';
+  };
+
+  // Get selected people names
+  const getSelectedPeopleNames = () => {
+    return people
+      .filter(p => selectedPeople.includes(p.ID))
+      .map(p => p.neName)
+      .join(', ');
+  };
+
   if (loading) {
     return (
       <div className="process-container">
@@ -469,40 +514,116 @@ export default function ProcessNewFiles() {
 
           <div className="form-group">
             <label>Event</label>
-            <select
-              value={selectedEvent}
-              onChange={(e) => setSelectedEvent(e.target.value ? parseInt(e.target.value) : '')}
-              disabled={processing || eventsLoading}
-            >
-              <option value="">-- No Event --</option>
-              {events.map(event => (
-                <option key={event.ID} value={event.ID}>
-                  {event.neName} ({event.neCount} photos)
-                </option>
-              ))}
-            </select>
+            <div className="autocomplete-wrapper">
+              <input
+                type="text"
+                value={selectedEvent ? getSelectedEventName() : eventSearch}
+                onChange={(e) => {
+                  setEventSearch(e.target.value);
+                  setSelectedEvent('');
+                  setEventDropdownOpen(true);
+                }}
+                onFocus={() => setEventDropdownOpen(true)}
+                placeholder="Type to search events..."
+                disabled={processing || eventsLoading}
+                className="autocomplete-input"
+              />
+              {eventDropdownOpen && !processing && (
+                <div className="autocomplete-dropdown">
+                  <div 
+                    className="autocomplete-item"
+                    onClick={() => {
+                      setSelectedEvent('');
+                      setEventSearch('');
+                      setEventDropdownOpen(false);
+                    }}
+                  >
+                    <em>-- No Event --</em>
+                  </div>
+                  {filteredEvents.length === 0 ? (
+                    <div className="autocomplete-item disabled">
+                      <em>No matching events</em>
+                    </div>
+                  ) : (
+                    filteredEvents.map(event => (
+                      <div
+                        key={event.ID}
+                        className="autocomplete-item"
+                        onClick={() => {
+                          setSelectedEvent(event.ID);
+                          setEventSearch('');
+                          setEventDropdownOpen(false);
+                        }}
+                      >
+                        {event.neName} <span className="count">({event.neCount} photos)</span>
+                      </div>
+                    ))
+                  )}
+                </div>
+              )}
+            </div>
           </div>
 
           <div className="form-group">
             <label>Tag People</label>
-            <div className="people-checkboxes">
-              {peopleLoading ? (
-                <p className="loading-text">Loading people...</p>
-              ) : people.length === 0 ? (
-                <p className="empty-text">No people in database</p>
-              ) : (
-                people.map(person => (
-                  <label key={person.ID} className="checkbox-label">
-                    <input
-                      type="checkbox"
-                      checked={selectedPeople.includes(person.ID)}
-                      onChange={() => togglePerson(person.ID)}
-                      disabled={processing}
-                    />
-                    <span className="person-name">{person.neName}</span>
-                    <span className="person-relation">({person.neRelation})</span>
-                  </label>
-                ))
+            <div className="autocomplete-wrapper">
+              <input
+                type="text"
+                value={peopleSearch}
+                onChange={(e) => {
+                  setPeopleSearch(e.target.value);
+                  setPeopleDropdownOpen(true);
+                }}
+                onFocus={() => setPeopleDropdownOpen(true)}
+                placeholder="Type to search people..."
+                disabled={processing || peopleLoading}
+                className="autocomplete-input"
+              />
+              {peopleDropdownOpen && !processing && (
+                <div className="autocomplete-dropdown">
+                  {filteredPeople.length === 0 ? (
+                    <div className="autocomplete-item disabled">
+                      <em>No matching people</em>
+                    </div>
+                  ) : (
+                    filteredPeople.map(person => (
+                      <div
+                        key={person.ID}
+                        className={`autocomplete-item ${selectedPeople.includes(person.ID) ? 'selected' : ''}`}
+                        onClick={() => {
+                          togglePerson(person.ID);
+                        }}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={selectedPeople.includes(person.ID)}
+                          onChange={() => {}}
+                          className="person-checkbox"
+                        />
+                        {person.neName} <span className="relation">({person.neRelation})</span>
+                      </div>
+                    ))
+                  )}
+                </div>
+              )}
+              {selectedPeople.length > 0 && (
+                <div className="selected-tags">
+                  {people
+                    .filter(p => selectedPeople.includes(p.ID))
+                    .map(person => (
+                      <span key={person.ID} className="tag">
+                        {person.neName}
+                        <button
+                          type="button"
+                          onClick={() => togglePerson(person.ID)}
+                          className="tag-remove"
+                          disabled={processing}
+                        >
+                          ×
+                        </button>
+                      </span>
+                    ))}
+                </div>
               )}
             </div>
           </div>
