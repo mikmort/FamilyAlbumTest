@@ -348,7 +348,7 @@ export default function MediaDetailModal({
   const handleDelete = async () => {
     const filename = media.PFileName.split(/[\/\\]/).pop() || media.PFileName;
     
-    if (!confirm(`Are you sure you want to permanently delete "${filename}"?\n\nThis will:\n- Remove the file from blob storage\n- Delete all database records\n- Remove all tags and metadata\n\nThis action cannot be undone!`)) {
+    if (!confirm(`Delete cannot be undone. Do you want to delete this image anyway?`)) {
       return;
     }
 
