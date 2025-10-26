@@ -249,6 +249,7 @@ module.exports = async function (context, req) {
             // Try multiple variations to handle inconsistent blob naming
             const pathsToTry = [
                 blobPath, // Try as-is first
+                `media/${blobPath}`, // Try with media/ prefix (for newly uploaded files)
             ];
             
             // If path contains special chars, try with encoded variations

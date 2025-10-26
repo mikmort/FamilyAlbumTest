@@ -47,7 +47,8 @@ module.exports = async function (context, req) {
         const blobUrl = blockBlobClient.url;
         const mediaType = contentType?.startsWith('image/') ? 1 : 2;
 
-        // Generate API URLs instead of direct blob URLs (storage has public access disabled)
+        // Generate API URLs (without 'media/' prefix - it's added by blob storage lookup)
+        // For new uploads without directory structure, just use the filename
         const apiUrl = `/api/media/${fileName}`;
         const apiThumbUrl = `/api/media/${fileName}?thumbnail=true`;
 
