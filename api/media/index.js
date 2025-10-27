@@ -831,7 +831,8 @@ module.exports = async function (context, req) {
                                 if (lookup && lookup.neType === 'N') {
                                     orderedTagged.push({
                                         ID: lookup.ID,
-                                        neName: lookup.neName
+                                        neName: lookup.neName,
+                                        neRelation: lookup.neRelation
                                     });
                                 }
                             }
