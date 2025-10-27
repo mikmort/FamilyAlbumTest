@@ -573,6 +573,18 @@ button {
   font-size: 0.9rem;
 }
 
+.person-name-clickable {
+  cursor: pointer;
+  text-decoration: underline;
+  text-decoration-style: dotted;
+  text-decoration-color: #666;
+}
+
+.person-name-clickable:hover {
+  color: #0d6efd;
+  text-decoration-color: #0d6efd;
+}
+
 .tagged-person-item.event {
   background: #cfe9ff;
   border: 1px solid #0d6efd;

@@ -41,7 +41,7 @@ export default function MediaDetailModal({
   };
 
   const [taggedPeople, setTaggedPeople] = useState<
-    Array<{ ID: number; neName: string }>
+    Array<{ ID: number; neName: string; neRelation?: string }>
   >(() => computeOrderedTaggedPeople(media.TaggedPeople, media.PPeopleList));
 
   // Keep taggedPeople in sync if the media prop updates
@@ -201,7 +201,7 @@ export default function MediaDetailModal({
       const person = allPeople.find(p => p.ID === personId);
       if (person) {
         const newTaggedPeople = [...taggedPeople];
-        newTaggedPeople.splice(positionValue, 0, { ID: person.ID, neName: person.neName });
+        newTaggedPeople.splice(positionValue, 0, { ID: person.ID, neName: person.neName, neRelation: person.neRelation });
         setTaggedPeople(newTaggedPeople);
         
         // Update parent component if callback provided
@@ -867,7 +867,17 @@ export default function MediaDetailModal({
                 <div className="tagged-people-list">
                   {taggedPeople.map((person) => (
                     <div key={person.ID} className="tagged-person-item">
-                      <span>
+                      <span 
+                        className="person-name-clickable"
+                        onClick={() => {
+                          if (person.neRelation) {
+                            alert(`${person.neName}\n${person.neRelation}`);
+                          } else {
+                            alert(`${person.neName}\n(No relation specified)`);
+                          }
+                        }}
+                        title={person.neRelation || "Click to see relation"}
+                      >
                         {person.neName}
                       </span>
                       {editing && (
