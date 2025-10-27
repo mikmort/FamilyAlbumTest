@@ -57,10 +57,6 @@ export default function Home() {
           onSelectPeople={() => setView('select')}
           onProcessFiles={() => setView('process-files')}
           onUploadMedia={() => setView('upload-media')}
-          onBackup={() => {
-            // TODO: Implement backup
-            alert('Backup functionality coming soon');
-          }}
         />
         <UserInfo />
       </div>
@@ -84,7 +80,7 @@ export default function Home() {
 
         {view === 'gallery' && (
           <>
-            <div className="flex flex-between mb-2">
+            <div className="gallery-controls">
               <button className="btn btn-secondary" onClick={handleBack}>
                 ← Back to Selection
               </button>

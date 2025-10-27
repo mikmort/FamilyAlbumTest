@@ -6,7 +6,6 @@ interface NavigationProps {
   onSelectPeople: () => void;
   onProcessFiles: () => void;
   onUploadMedia: () => void;
-  onBackup: () => void;
 }
 
 export default function Navigation({
@@ -15,7 +14,6 @@ export default function Navigation({
   onSelectPeople,
   onProcessFiles,
   onUploadMedia,
-  onBackup,
 }: NavigationProps) {
   return (
     <nav className="nav-menu">
@@ -24,7 +22,6 @@ export default function Navigation({
       <button onClick={onManageEvents}>Manage Events</button>
       <button onClick={onUploadMedia}>Upload Media</button>
       <button onClick={onProcessFiles}>Process New Files</button>
-      <button onClick={onBackup}>Backup Database</button>
     </nav>
   );
 }

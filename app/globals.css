@@ -89,6 +89,20 @@ button {
   margin: 0 auto;
 }
 
+/* Gallery Controls - Sticky */
+.gallery-controls {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  background-color: #f5f5f5;
+  padding: 1rem 0;
+  margin-bottom: 1rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 2px solid #e0e0e0;
+}
+
 /* Cards */
 .card {
   background: white;
