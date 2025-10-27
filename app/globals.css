@@ -89,8 +89,14 @@ button {
   margin: 0 auto;
 }
 
+/* Gallery View */
+.gallery-view {
+  position: relative;
+}
+
 /* Gallery Controls - Sticky */
 .gallery-controls {
+  position: -webkit-sticky;
   position: sticky;
   top: 0;
   z-index: 100;

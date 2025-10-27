@@ -79,7 +79,7 @@ export default function Home() {
         )}
 
         {view === 'gallery' && (
-          <>
+          <div className="gallery-view">
             <div className="gallery-controls">
               <button className="btn btn-secondary" onClick={handleBack}>
                 ← Back to Selection
@@ -103,7 +103,7 @@ export default function Home() {
               onMediaClick={handleMediaClick}
               onMediaFullscreen={handleMediaFullscreen}
             />
-          </>
+          </div>
         )}
 
         {view === 'manage-people' && (
