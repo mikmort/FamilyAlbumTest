@@ -30,7 +30,7 @@ export default function MediaDetailModal({
     return media.Event?.ID || '';
   });
   const computeOrderedTaggedPeople = (
-    tagged: Array<{ ID: number; neName: string }> | undefined,
+    tagged: Array<{ ID: number; neName: string; neRelation?: string }> | undefined,
     peopleList: string | undefined
   ) => {
     const taggedArr = tagged || [];
