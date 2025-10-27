@@ -519,7 +519,7 @@ export default function ProcessNewFiles() {
           </div>
 
           <div className="form-group">
-            <label>Event</label>
+            <label>Event {events.length > 0 && `(${events.length} available)`}</label>
             <div className="autocomplete-wrapper">
               <input
                 type="text"
@@ -534,7 +534,7 @@ export default function ProcessNewFiles() {
                 disabled={processing || eventsLoading}
                 className="autocomplete-input"
               />
-              {eventDropdownOpen && !processing && (
+              {eventDropdownOpen && !processing && !eventsLoading && (
                 <div className="autocomplete-dropdown">
                   <div 
                     className="autocomplete-item"
@@ -546,26 +546,32 @@ export default function ProcessNewFiles() {
                   >
                     <em>-- No Event --</em>
                   </div>
-                  {filteredEvents.map(event => (
-                    <div
-                      key={event.ID}
-                      className="autocomplete-item"
-                      onClick={() => {
-                        setSelectedEvent(event.ID);
-                        setEventSearch('');
-                        setEventDropdownOpen(false);
-                      }}
-                    >
-                      {event.neName} <span className="count">({event.neCount} photos)</span>
+                  {filteredEvents.length === 0 ? (
+                    <div className="autocomplete-item disabled">
+                      <em>No events in database</em>
                     </div>
-                  ))}
+                  ) : (
+                    filteredEvents.map(event => (
+                      <div
+                        key={event.ID}
+                        className="autocomplete-item"
+                        onClick={() => {
+                          setSelectedEvent(event.ID);
+                          setEventSearch('');
+                          setEventDropdownOpen(false);
+                        }}
+                      >
+                        {event.neName} <span className="count">({event.neCount} photos)</span>
+                      </div>
+                    ))
+                  )}
                 </div>
               )}
             </div>
           </div>
 
           <div className="form-group">
-            <label>Tag People</label>
+            <label>Tag People {people.length > 0 && `(${people.length} available)`}</label>
             <div className="autocomplete-wrapper">
               <input
                 type="text"
@@ -579,25 +585,31 @@ export default function ProcessNewFiles() {
                 disabled={processing || peopleLoading}
                 className="autocomplete-input"
               />
-              {peopleDropdownOpen && !processing && (
+              {peopleDropdownOpen && !processing && !peopleLoading && (
                 <div className="autocomplete-dropdown">
-                  {filteredPeople.map(person => (
-                    <div
-                      key={person.ID}
-                      className={`autocomplete-item ${selectedPeople.includes(person.ID) ? 'selected' : ''}`}
-                      onClick={() => {
-                        togglePerson(person.ID);
-                      }}
-                    >
-                      <input
-                        type="checkbox"
-                        checked={selectedPeople.includes(person.ID)}
-                        onChange={() => {}}
-                        className="person-checkbox"
-                      />
-                      {person.neName} <span className="relation">({person.neRelation})</span>
+                  {filteredPeople.length === 0 ? (
+                    <div className="autocomplete-item disabled">
+                      <em>No people in database</em>
                     </div>
-                  ))}
+                  ) : (
+                    filteredPeople.map(person => (
+                      <div
+                        key={person.ID}
+                        className={`autocomplete-item ${selectedPeople.includes(person.ID) ? 'selected' : ''}`}
+                        onClick={() => {
+                          togglePerson(person.ID);
+                        }}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={selectedPeople.includes(person.ID)}
+                          onChange={() => {}}
+                          className="person-checkbox"
+                        />
+                        {person.neName} <span className="relation">({person.neRelation})</span>
+                      </div>
+                    ))
+                  )}
                 </div>
               )}
               {selectedPeople.length > 0 && (
