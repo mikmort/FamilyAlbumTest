@@ -1,6 +1,7 @@
 const { execute } = require('../shared/db');
 const { getContainerClient } = require('../shared/storage');
 const sharp = require('sharp');
+const exifReader = require('exif-reader');
 const ffmpeg = require('fluent-ffmpeg');
 const ffmpegPath = require('@ffmpeg-installer/ffmpeg').path;
 const { Readable } = require('stream');
@@ -82,18 +83,32 @@ module.exports = async function (context, req) {
                 // Extract date from EXIF if available
                 if (metadata.exif) {
                     try {
-                        // EXIF dates are in format: "YYYY:MM:DD HH:MM:SS"
-                        const exifBuffer = metadata.exif;
-                        const exifString = exifBuffer.toString();
+                        // Parse EXIF data using exif-reader
+                        const exifData = exifReader(metadata.exif);
+                        context.log('EXIF data:', JSON.stringify(exifData, null, 2));
                         
-                        // Look for DateTimeOriginal tag (0x9003)
-                        const dateMatch = exifString.match(/(\d{4}):(\d{2}):(\d{2})\s+(\d{2}):(\d{2}):(\d{2})/);
-                        if (dateMatch) {
-                            const [, yearStr, monthStr, dayStr] = dateMatch;
-                            year = parseInt(yearStr);
-                            month = parseInt(monthStr);
-                            dateTaken = new Date(year, month - 1, parseInt(dayStr));
-                            context.log(`Extracted date from EXIF: ${month}/${year}`);
+                        // Try DateTimeOriginal first (most accurate for photos)
+                        let dateStr = exifData?.exif?.DateTimeOriginal || exifData?.exif?.CreateDate || exifData?.image?.DateTime;
+                        
+                        if (dateStr) {
+                            // EXIF dates can be either a Date object or a string in format "YYYY:MM:DD HH:MM:SS"
+                            if (dateStr instanceof Date) {
+                                dateTaken = dateStr;
+                            } else if (typeof dateStr === 'string') {
+                                const dateMatch = dateStr.match(/(\d{4}):(\d{2}):(\d{2})/);
+                                if (dateMatch) {
+                                    const [, yearStr, monthStr, dayStr] = dateMatch;
+                                    dateTaken = new Date(parseInt(yearStr), parseInt(monthStr) - 1, parseInt(dayStr));
+                                }
+                            }
+                            
+                            if (dateTaken && !isNaN(dateTaken.getTime())) {
+                                month = dateTaken.getMonth() + 1;
+                                year = dateTaken.getFullYear();
+                                context.log(`✓ Extracted date from EXIF: ${month}/${year}`);
+                            }
+                        } else {
+                            context.log('No date found in EXIF data');
                         }
                     } catch (exifErr) {
                         context.log('Could not parse EXIF date:', exifErr.message);
