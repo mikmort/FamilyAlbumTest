@@ -89,8 +89,11 @@ export default function PeopleSelector({
       ]);
 
       if (peopleData && eventsData) {
-        setPeople(normalizePeople(peopleData));
-        setEvents(normalizeEvents(eventsData));
+        // Handle both old format (array) and new format ({success, people})
+        const peopleArray = peopleData.success ? peopleData.people : peopleData;
+        const eventsArray = eventsData.success ? eventsData.events : eventsData;
+        setPeople(normalizePeople(peopleArray));
+        setEvents(normalizeEvents(eventsArray));
         setDataLoaded(true);
         setRetryCount(0);
         setIsWarmingUp(false);
