@@ -523,14 +523,13 @@ export default function ProcessNewFiles() {
             <div className="autocomplete-wrapper">
               <input
                 type="text"
-                value={selectedEvent ? getSelectedEventName() : eventSearch}
+                value={eventSearch}
                 onChange={(e) => {
                   setEventSearch(e.target.value);
-                  setSelectedEvent('');
                   setEventDropdownOpen(true);
                 }}
                 onFocus={() => setEventDropdownOpen(true)}
-                placeholder="Type to search events..."
+                placeholder={selectedEvent ? getSelectedEventName() : "Type to search events..."}
                 disabled={processing || eventsLoading}
                 className="autocomplete-input"
               />
@@ -565,6 +564,21 @@ export default function ProcessNewFiles() {
                       </div>
                     ))
                   )}
+                </div>
+              )}
+              {selectedEvent && (
+                <div className="selected-tags">
+                  <span className="tag">
+                    {getSelectedEventName()}
+                    <button
+                      type="button"
+                      onClick={() => setSelectedEvent('')}
+                      className="tag-remove"
+                      disabled={processing}
+                    >
+                      ×
+                    </button>
+                  </span>
                 </div>
               )}
             </div>
