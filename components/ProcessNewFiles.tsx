@@ -313,15 +313,21 @@ export default function ProcessNewFiles() {
     });
   };
 
-  // Filter events based on search
-  const filteredEvents = events.filter(event =>
-    event.neName.toLowerCase().includes(eventSearch.toLowerCase())
-  ).sort((a, b) => a.neName.localeCompare(b.neName));
+  // Filter events based on search - show all but prioritize matches
+  const filteredEvents = eventSearch
+    ? [
+        ...events.filter(event => event.neName.toLowerCase().includes(eventSearch.toLowerCase())).sort((a, b) => a.neName.localeCompare(b.neName)),
+        ...events.filter(event => !event.neName.toLowerCase().includes(eventSearch.toLowerCase())).sort((a, b) => a.neName.localeCompare(b.neName))
+      ]
+    : events.slice().sort((a, b) => a.neName.localeCompare(b.neName));
 
-  // Filter people based on search
-  const filteredPeople = people.filter(person =>
-    person.neName.toLowerCase().includes(peopleSearch.toLowerCase())
-  ).sort((a, b) => a.neName.localeCompare(b.neName));
+  // Filter people based on search - show all but prioritize matches
+  const filteredPeople = peopleSearch
+    ? [
+        ...people.filter(person => person.neName.toLowerCase().includes(peopleSearch.toLowerCase())).sort((a, b) => a.neName.localeCompare(b.neName)),
+        ...people.filter(person => !person.neName.toLowerCase().includes(peopleSearch.toLowerCase())).sort((a, b) => a.neName.localeCompare(b.neName))
+      ]
+    : people.slice().sort((a, b) => a.neName.localeCompare(b.neName));
 
   // Get selected event name
   const getSelectedEventName = () => {
@@ -540,25 +546,19 @@ export default function ProcessNewFiles() {
                   >
                     <em>-- No Event --</em>
                   </div>
-                  {filteredEvents.length === 0 ? (
-                    <div className="autocomplete-item disabled">
-                      <em>No matching events</em>
+                  {filteredEvents.map(event => (
+                    <div
+                      key={event.ID}
+                      className="autocomplete-item"
+                      onClick={() => {
+                        setSelectedEvent(event.ID);
+                        setEventSearch('');
+                        setEventDropdownOpen(false);
+                      }}
+                    >
+                      {event.neName} <span className="count">({event.neCount} photos)</span>
                     </div>
-                  ) : (
-                    filteredEvents.map(event => (
-                      <div
-                        key={event.ID}
-                        className="autocomplete-item"
-                        onClick={() => {
-                          setSelectedEvent(event.ID);
-                          setEventSearch('');
-                          setEventDropdownOpen(false);
-                        }}
-                      >
-                        {event.neName} <span className="count">({event.neCount} photos)</span>
-                      </div>
-                    ))
-                  )}
+                  ))}
                 </div>
               )}
             </div>
@@ -581,29 +581,23 @@ export default function ProcessNewFiles() {
               />
               {peopleDropdownOpen && !processing && (
                 <div className="autocomplete-dropdown">
-                  {filteredPeople.length === 0 ? (
-                    <div className="autocomplete-item disabled">
-                      <em>No matching people</em>
+                  {filteredPeople.map(person => (
+                    <div
+                      key={person.ID}
+                      className={`autocomplete-item ${selectedPeople.includes(person.ID) ? 'selected' : ''}`}
+                      onClick={() => {
+                        togglePerson(person.ID);
+                      }}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={selectedPeople.includes(person.ID)}
+                        onChange={() => {}}
+                        className="person-checkbox"
+                      />
+                      {person.neName} <span className="relation">({person.neRelation})</span>
                     </div>
-                  ) : (
-                    filteredPeople.map(person => (
-                      <div
-                        key={person.ID}
-                        className={`autocomplete-item ${selectedPeople.includes(person.ID) ? 'selected' : ''}`}
-                        onClick={() => {
-                          togglePerson(person.ID);
-                        }}
-                      >
-                        <input
-                          type="checkbox"
-                          checked={selectedPeople.includes(person.ID)}
-                          onChange={() => {}}
-                          className="person-checkbox"
-                        />
-                        {person.neName} <span className="relation">({person.neRelation})</span>
-                      </div>
-                    ))
-                  )}
+                  ))}
                 </div>
               )}
               {selectedPeople.length > 0 && (
