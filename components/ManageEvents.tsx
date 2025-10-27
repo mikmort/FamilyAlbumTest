@@ -35,7 +35,7 @@ export default function ManageEvents() {
             const res = await fetch('/api/events')
             if (!res.ok) throw new Error(`Failed to load events (${res.status})`)
             const data = await res.json()
-            setEvents(Array.isArray(data) ? data : [])
+            setEvents(data.success ? data.events : (Array.isArray(data) ? data : [])) // Handle both formats
         } catch (err: any) {
             setError(err?.message ?? 'Unknown error')
         } finally {

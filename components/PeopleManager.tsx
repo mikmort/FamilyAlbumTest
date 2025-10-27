@@ -26,7 +26,7 @@ export default function PeopleManager() {
       const response = await fetch('/api/people');
       if (!response.ok) throw new Error('Failed to fetch people');
       const data = await response.json();
-      setPeople(data);
+      setPeople(data.success ? data.people : data); // Handle both formats
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred');
     } finally {

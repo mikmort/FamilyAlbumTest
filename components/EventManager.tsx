@@ -26,7 +26,7 @@ export default function EventManager() {
       const response = await fetch('/api/events');
       if (!response.ok) throw new Error('Failed to fetch events');
       const data = await response.json();
-      setEvents(data);
+      setEvents(data.success ? data.events : data); // Handle both formats
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred');
     } finally {
