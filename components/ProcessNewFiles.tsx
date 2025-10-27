@@ -311,6 +311,8 @@ export default function ProcessNewFiles() {
         return [...prev, personID];
       }
     });
+    setPeopleSearch('');
+    setPeopleDropdownOpen(false);
   };
 
   // Filter events based on search - show all but prioritize matches
