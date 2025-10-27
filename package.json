@@ -11,12 +11,13 @@
   },
   "dependencies": {
     "@azure/storage-blob": "^12.17.0",
+    "exif-reader": "^2.0.2",
     "exifreader": "^4.18.0",
     "mssql": "^10.0.1",
     "next": "^14.0.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
-    "sharp": "^0.33.0"
+    "sharp": "^0.33.5"
   },
   "devDependencies": {
     "@types/mssql": "^9.1.0",

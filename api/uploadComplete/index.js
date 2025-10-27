@@ -12,7 +12,7 @@ module.exports = async function (context, req) {
     context.log('Upload complete notification received');
 
     try {
-        const { fileName, contentType } = req.body;
+        const { fileName, contentType, fileModifiedDate } = req.body;
 
         if (!fileName) {
             context.res = {
@@ -27,6 +27,7 @@ module.exports = async function (context, req) {
 
         context.log('Processing uploaded file:', fileName);
         context.log('Content type:', contentType);
+        context.log('File modified date:', fileModifiedDate);
 
         const blobName = `media/${fileName}`;
         const containerClient = getContainerClient();
@@ -114,6 +115,20 @@ module.exports = async function (context, req) {
                         context.log('Could not parse EXIF date:', exifErr.message);
                     }
                 }
+                
+                // Fallback to file modification date if no EXIF date found
+                if ((!month || !year) && fileModifiedDate) {
+                    try {
+                        const modDate = new Date(fileModifiedDate);
+                        if (!isNaN(modDate.getTime())) {
+                            month = modDate.getMonth() + 1;
+                            year = modDate.getFullYear();
+                            context.log(`✓ Using file modification date as fallback: ${month}/${year}`);
+                        }
+                    } catch (err) {
+                        context.log('Could not parse file modification date:', err.message);
+                    }
+                }
 
                 context.log(`Image dimensions: ${width}x${height}`);
 
@@ -169,6 +184,20 @@ module.exports = async function (context, req) {
                         }
                     });
                 });
+                
+                // Fallback to file modification date if no video metadata date found
+                if ((!month || !year) && fileModifiedDate) {
+                    try {
+                        const modDate = new Date(fileModifiedDate);
+                        if (!isNaN(modDate.getTime())) {
+                            month = modDate.getMonth() + 1;
+                            year = modDate.getFullYear();
+                            context.log(`✓ Using file modification date as fallback: ${month}/${year}`);
+                        }
+                    } catch (err) {
+                        context.log('Could not parse file modification date:', err.message);
+                    }
+                }
 
                 // Thumbnail will be generated dynamically via API
                 thumbnailUrl = apiThumbUrl;

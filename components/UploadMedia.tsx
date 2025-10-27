@@ -195,7 +195,8 @@ export default function UploadMedia({ onProcessFiles }: UploadMediaProps) {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             fileName: uniqueFileName,
-            contentType: file.type || 'application/octet-stream'
+            contentType: file.type || 'application/octet-stream',
+            fileModifiedDate: file.lastModified ? new Date(file.lastModified).toISOString() : null
           }),
         });
 
