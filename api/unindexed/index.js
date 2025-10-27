@@ -21,7 +21,9 @@ module.exports = async function (context, req) {
           uiVtime,
           uiStatus,
           uiBlobUrl,
-          uiDateAdded
+          uiDateAdded,
+          uiMonth,
+          uiYear
         FROM UnindexedFiles
         WHERE uiStatus = 'N'
         ORDER BY uiDateAdded ASC
@@ -69,7 +71,9 @@ module.exports = async function (context, req) {
           uiVtime,
           uiStatus,
           uiBlobUrl,
-          uiDateAdded
+          uiDateAdded,
+          uiMonth,
+          uiYear
         FROM UnindexedFiles
         WHERE uiStatus = 'N'
         ORDER BY uiDateAdded ASC

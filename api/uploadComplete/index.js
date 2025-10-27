@@ -166,12 +166,11 @@ module.exports = async function (context, req) {
         }
 
         // Add to UnindexedFiles table for processing
-        // Note: month/year columns may not exist yet - will be added in future migration
         const insertQuery = `
             INSERT INTO dbo.UnindexedFiles 
-                (uiFileName, uiDirectory, uiThumbUrl, uiType, uiWidth, uiHeight, uiVtime, uiStatus, uiBlobUrl)
+                (uiFileName, uiDirectory, uiThumbUrl, uiType, uiWidth, uiHeight, uiVtime, uiStatus, uiBlobUrl, uiMonth, uiYear)
             VALUES 
-                (@fileName, @directory, @thumbUrl, @type, @width, @height, @duration, 'N', @blobUrl)
+                (@fileName, @directory, @thumbUrl, @type, @width, @height, @duration, 'N', @blobUrl, @month, @year)
         `;
 
         await execute(insertQuery, {
@@ -183,6 +182,8 @@ module.exports = async function (context, req) {
             height: height,
             duration: duration,
             blobUrl: apiUrl,  // Store API URL instead of direct blob URL
+            month: month,
+            year: year,
         });
 
         context.log(`File registered in database: ${fileName}`);

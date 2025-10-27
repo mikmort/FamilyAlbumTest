@@ -315,18 +315,20 @@ export default function ProcessNewFiles() {
     setPeopleDropdownOpen(false);
   };
 
-  // Filter events based on search - show all but prioritize matches
+  // Filter events based on search - prioritize starts-with, then contains, then rest
   const filteredEvents = eventSearch
     ? [
-        ...events.filter(event => event.neName.toLowerCase().includes(eventSearch.toLowerCase())).sort((a, b) => a.neName.localeCompare(b.neName)),
+        ...events.filter(event => event.neName.toLowerCase().startsWith(eventSearch.toLowerCase())).sort((a, b) => a.neName.localeCompare(b.neName)),
+        ...events.filter(event => !event.neName.toLowerCase().startsWith(eventSearch.toLowerCase()) && event.neName.toLowerCase().includes(eventSearch.toLowerCase())).sort((a, b) => a.neName.localeCompare(b.neName)),
         ...events.filter(event => !event.neName.toLowerCase().includes(eventSearch.toLowerCase())).sort((a, b) => a.neName.localeCompare(b.neName))
       ]
     : events.slice().sort((a, b) => a.neName.localeCompare(b.neName));
 
-  // Filter people based on search - show all but prioritize matches
+  // Filter people based on search - prioritize starts-with, then contains, then rest
   const filteredPeople = peopleSearch
     ? [
-        ...people.filter(person => person.neName.toLowerCase().includes(peopleSearch.toLowerCase())).sort((a, b) => a.neName.localeCompare(b.neName)),
+        ...people.filter(person => person.neName.toLowerCase().startsWith(peopleSearch.toLowerCase())).sort((a, b) => a.neName.localeCompare(b.neName)),
+        ...people.filter(person => !person.neName.toLowerCase().startsWith(peopleSearch.toLowerCase()) && person.neName.toLowerCase().includes(peopleSearch.toLowerCase())).sort((a, b) => a.neName.localeCompare(b.neName)),
         ...people.filter(person => !person.neName.toLowerCase().includes(peopleSearch.toLowerCase())).sort((a, b) => a.neName.localeCompare(b.neName))
       ]
     : people.slice().sort((a, b) => a.neName.localeCompare(b.neName));
