@@ -32,7 +32,11 @@ module.exports = async function (context, req) {
         context.log.error('Error:', error);
         context.res = {
             status: 500,
-            body: { error: 'Internal server error', message: error.message }
+            body: { 
+                success: false,
+                error: 'Internal server error', 
+                message: error.message 
+            }
         };
     }
 };
