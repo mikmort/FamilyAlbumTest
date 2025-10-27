@@ -1,7 +1,15 @@
 {
   "routes": [
     {
-      "route": "/.auth/login/*",
+      "route": "/.auth/login/aad",
+      "allowedRoles": ["anonymous"]
+    },
+    {
+      "route": "/.auth/login/github",
+      "allowedRoles": ["anonymous"]
+    },
+    {
+      "route": "/.auth/login/google",
       "allowedRoles": ["anonymous"]
     },
     {
@@ -9,38 +17,11 @@
       "allowedRoles": ["anonymous", "authenticated"]
     },
     {
-      "route": "/api/people",
-      "methods": ["POST"],
-      "allowedRoles": ["authenticated"]
-    },
-    {
-      "route": "/api/people/*",
-      "methods": ["PUT", "DELETE"],
-      "allowedRoles": ["authenticated"]
-    },
-    {
-      "route": "/api/events",
-      "methods": ["POST"],
-      "allowedRoles": ["authenticated"]
-    },
-    {
-      "route": "/api/events/*",
-      "methods": ["PUT", "DELETE"],
-      "allowedRoles": ["authenticated"]
-    },
-    {
-      "route": "/api/media/*",
-      "methods": ["PUT", "DELETE"],
-      "allowedRoles": ["authenticated"]
-    },
-    {
-      "route": "/api/upload",
-      "methods": ["POST"],
-      "allowedRoles": ["authenticated"]
+      "route": "/.auth/me",
+      "allowedRoles": ["anonymous", "authenticated"]
     },
     {
       "route": "/api/*",
-      "methods": ["GET"],
       "allowedRoles": ["authenticated"]
     },
     {
