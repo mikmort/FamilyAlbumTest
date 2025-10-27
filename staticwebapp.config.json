@@ -1,6 +1,14 @@
 {
   "routes": [
     {
+      "route": "/.auth/login/*",
+      "allowedRoles": ["anonymous"]
+    },
+    {
+      "route": "/.auth/logout",
+      "allowedRoles": ["anonymous", "authenticated"]
+    },
+    {
       "route": "/api/people",
       "methods": ["POST"],
       "allowedRoles": ["authenticated"]
@@ -33,20 +41,29 @@
     {
       "route": "/api/*",
       "methods": ["GET"],
-      "allowedRoles": ["anonymous", "authenticated"]
+      "allowedRoles": ["authenticated"]
     },
     {
       "route": "/*",
-      "allowedRoles": ["anonymous", "authenticated"]
+      "allowedRoles": ["authenticated"]
     }
   ],
+  "auth": {
+    "identityProviders": {
+      "azureActiveDirectory": {
+        "registration": {
+          "openIdIssuer": "https://login.microsoftonline.com/common/v2.0"
+        }
+      }
+    }
+  },
   "navigationFallback": {
     "rewrite": "/index.html",
     "exclude": ["/images/*.{png,jpg,gif}", "/css/*", "/api/*"]
   },
   "responseOverrides": {
     "401": {
-      "redirect": "/.auth/login/aad?post_login_redirect_uri=.referrer",
+      "redirect": "/.auth/login/aad",
       "statusCode": 302
     }
   },

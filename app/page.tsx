@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import Navigation from '@/components/Navigation';
+import UserInfo from '@/components/UserInfo';
 import PeopleSelector from '@/components/PeopleSelector';
 import ThumbnailGallery from '@/components/ThumbnailGallery';
 import MediaDetailModal from '@/components/MediaDetailModal';
@@ -49,17 +50,20 @@ export default function Home() {
 
   return (
     <>
-      <Navigation
-        onManagePeople={() => setView('manage-people')}
-        onManageEvents={() => setView('manage-events')}
-        onSelectPeople={() => setView('select')}
-        onProcessFiles={() => setView('process-files')}
-        onUploadMedia={() => setView('upload-media')}
-        onBackup={() => {
-          // TODO: Implement backup
-          alert('Backup functionality coming soon');
-        }}
-      />
+      <div className="app-header">
+        <Navigation
+          onManagePeople={() => setView('manage-people')}
+          onManageEvents={() => setView('manage-events')}
+          onSelectPeople={() => setView('select')}
+          onProcessFiles={() => setView('process-files')}
+          onUploadMedia={() => setView('upload-media')}
+          onBackup={() => {
+            // TODO: Implement backup
+            alert('Backup functionality coming soon');
+          }}
+        />
+        <UserInfo />
+      </div>
 
       <main className="container">
         {view === 'select' && (
