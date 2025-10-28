@@ -257,22 +257,22 @@ module.exports = async function (context, req) {
                     .toBuffer();
 
                 // Get metadata from rotated image
-                const rotatedImage = sharp(rotatedBuffer);
-                const metadata = await rotatedImage.metadata();
+                const metadata = await sharp(rotatedBuffer).metadata();
                 width = metadata.width || 0;
                 height = metadata.height || 0;
 
-                context.log(`Rotated image dimensions: ${width}x${height}`);
+                context.log(`Rotated image dimensions: ${width}x${height}, orientation: ${metadata.orientation || 'none'}`);
 
-                // Create thumbnail from rotated image
-                const thumbnailBuffer = await rotatedImage
-                    .clone()
+                // Create thumbnail directly from rotated buffer (don't use clone)
+                const thumbnailBuffer = await sharp(rotatedBuffer)
                     .resize(null, 200, {
                         fit: 'inside',
                         withoutEnlargement: true
                     })
                     .jpeg({ quality: 80 })
                     .toBuffer();
+
+                context.log(`Thumbnail created, size: ${thumbnailBuffer.length} bytes`);
 
                 // Upload thumbnail
                 const fileExt = uniqueFilename.substring(uniqueFilename.lastIndexOf('.'));
