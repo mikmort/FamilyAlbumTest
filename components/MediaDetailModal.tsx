@@ -16,6 +16,9 @@ export default function MediaDetailModal({
   onUpdate,
   startFullscreen = false,
 }: MediaDetailModalProps) {
+  console.log('🔍 MediaDetailModal opened with media:', media);
+  console.log('🔍 TaggedPeople in media:', media.TaggedPeople);
+  
   const [editing, setEditing] = useState(false);
   const [isFullScreen, setIsFullScreen] = useState(startFullscreen);
   const videoRef = useRef<HTMLVideoElement>(null);
