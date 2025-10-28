@@ -249,25 +249,9 @@ module.exports = async function (context, req) {
                 const originalMetadata = await sharp(buffer).metadata();
                 context.log(`Original image EXIF orientation: ${originalMetadata.orientation || 'none'}, dimensions: ${originalMetadata.width}x${originalMetadata.height}`);
 
-                // Create a sharp instance with rotation applied
-                const sharpInstance = sharp(buffer, { failOnError: false }).rotate();
-                
-                // Create thumbnail directly from rotated instance (BEFORE converting to buffer)
-                // This ensures thumbnail gets the same rotation applied
-                const thumbnailBuffer = await sharpInstance
-                    .clone() // Clone so we can use the instance twice
-                    .resize(null, 200, {
-                        fit: 'inside',
-                        withoutEnlargement: true
-                    })
-                    .jpeg({ quality: 80 })
-                    .toBuffer();
-
-                const thumbMetadata = await sharp(thumbnailBuffer).metadata();
-                context.log(`Thumbnail created - size: ${thumbnailBuffer.length} bytes, dimensions: ${thumbMetadata.width}x${thumbMetadata.height}, orientation: ${thumbMetadata.orientation || 'undefined'}`);
-
-                // Now create the full-size rotated image from the same sharp instance
-                const rotatedBuffer = await sharpInstance
+                // Create the full-size rotated image FIRST
+                const rotatedBuffer = await sharp(buffer, { failOnError: false })
+                    .rotate() // Auto-rotate based on EXIF
                     .jpeg({ quality: 95, mozjpeg: true })
                     .toBuffer();
 
@@ -277,6 +261,19 @@ module.exports = async function (context, req) {
                 height = metadata.height || 0;
 
                 context.log(`Full image after rotation - dimensions: ${width}x${height}, orientation: ${metadata.orientation || 'undefined'}`);
+
+                // Now create thumbnail FROM THE ROTATED BUFFER (not from original)
+                // This way the thumbnail is created from an already-rotated image
+                const thumbnailBuffer = await sharp(rotatedBuffer)
+                    .resize(null, 200, {
+                        fit: 'inside',
+                        withoutEnlargement: true
+                    })
+                    .jpeg({ quality: 80 })
+                    .toBuffer();
+
+                const thumbMetadata = await sharp(thumbnailBuffer).metadata();
+                context.log(`Thumbnail created from rotated buffer - dimensions: ${thumbMetadata.width}x${thumbMetadata.height}, orientation: ${thumbMetadata.orientation || 'undefined'}`);
 
                 // Prepare thumbnail filename
                 const fileExt = uniqueFilename.substring(uniqueFilename.lastIndexOf('.'));
