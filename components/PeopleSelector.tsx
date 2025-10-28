@@ -314,10 +314,61 @@ export default function PeopleSelector({
       <h1 className="text-center mb-2" style={{ fontWeight: 'bold', fontSize: '2.5rem', marginBottom: '1.5rem' }}>
         Family Album
       </h1>
-      <h2 className="text-center mb-2" style={{ fontSize: '1.5rem', fontWeight: '500' }}>
+      <h2 className="text-center mb-2" style={{ fontSize: '1.5rem', fontWeight: '500', marginBottom: '1.5rem' }}>
         Select People to Browse
       </h2>
 
+      {/* Filter Options at Top */}
+      <div className="form-group" style={{ 
+        padding: '0.75rem', 
+        backgroundColor: '#f8f9fa', 
+        borderRadius: '4px',
+        border: '1px solid #dee2e6'
+      }}>
+        <label style={{ 
+          display: 'flex', 
+          alignItems: 'center', 
+          cursor: 'pointer',
+          margin: 0,
+          fontSize: '0.95rem'
+        }}>
+          <input
+            type="checkbox"
+            checked={showNoPeople}
+            onChange={(e) => onShowNoPeopleChange(e.target.checked)}
+            disabled={selectedEvent !== null}
+            style={{ marginRight: '0.75rem', cursor: 'pointer' }}
+          />
+          <span>Show photos with no people tagged</span>
+        </label>
+      </div>
+
+      <div className="form-group" style={{ 
+        padding: '0.75rem', 
+        backgroundColor: selectedPeople.length > 1 ? '#fff3cd' : '#f8f9fa', 
+        borderRadius: '4px',
+        border: selectedPeople.length > 1 ? '1px solid #ffc107' : '1px solid #dee2e6',
+        opacity: selectedPeople.length > 1 ? 1 : 0.6
+      }}>
+        <label style={{ 
+          display: 'flex', 
+          alignItems: 'center', 
+          cursor: selectedPeople.length > 1 ? 'pointer' : 'not-allowed',
+          margin: 0,
+          fontSize: '0.95rem'
+        }}>
+          <input
+            type="checkbox"
+            checked={exclusiveFilter}
+            onChange={(e) => onExclusiveFilterChange(e.target.checked)}
+            disabled={selectedPeople.length <= 1}
+            style={{ marginRight: '0.75rem', cursor: selectedPeople.length > 1 ? 'pointer' : 'not-allowed' }}
+          />
+          <span>Only these people (no one else tagged)</span>
+        </label>
+      </div>
+
+      {/* People Selection */}
       <div className="form-group">
         <label>Select People (up to 5) {people.length > 0 && `(${people.length} available)`}</label>
         <div className="autocomplete-wrapper">
@@ -347,9 +398,7 @@ export default function PeopleSelector({
                     onClick={() => {
                       togglePerson(person.ID);
                       setPeopleSearch('');
-                      if (selectedPeople.length >= 4) { // Will be 5 after this selection
-                        setPeopleDropdownOpen(false);
-                      }
+                      setPeopleDropdownOpen(false);
                     }}
                   >
                     <span className="person-name">{person.neName}</span>
@@ -470,56 +519,7 @@ export default function PeopleSelector({
         </div>
       </div>
 
-      {/* Moved these options to be always visible */}
-      <div className="form-group" style={{ 
-        padding: '0.75rem', 
-        backgroundColor: '#f8f9fa', 
-        borderRadius: '4px',
-        border: '1px solid #dee2e6'
-      }}>
-        <label style={{ 
-          display: 'flex', 
-          alignItems: 'center', 
-          cursor: 'pointer',
-          margin: 0,
-          fontSize: '0.95rem'
-        }}>
-          <input
-            type="checkbox"
-            checked={showNoPeople}
-            onChange={(e) => onShowNoPeopleChange(e.target.checked)}
-            disabled={selectedEvent !== null}
-            style={{ marginRight: '0.75rem', cursor: 'pointer' }}
-          />
-          <span>Show photos with no people tagged</span>
-        </label>
-      </div>
-
-      <div className="form-group" style={{ 
-        padding: '0.75rem', 
-        backgroundColor: selectedPeople.length > 1 ? '#fff3cd' : '#f8f9fa', 
-        borderRadius: '4px',
-        border: selectedPeople.length > 1 ? '1px solid #ffc107' : '1px solid #dee2e6',
-        opacity: selectedPeople.length > 1 ? 1 : 0.6
-      }}>
-        <label style={{ 
-          display: 'flex', 
-          alignItems: 'center', 
-          cursor: selectedPeople.length > 1 ? 'pointer' : 'not-allowed',
-          margin: 0,
-          fontSize: '0.95rem'
-        }}>
-          <input
-            type="checkbox"
-            checked={exclusiveFilter}
-            onChange={(e) => onExclusiveFilterChange(e.target.checked)}
-            disabled={selectedPeople.length <= 1}
-            style={{ marginRight: '0.75rem', cursor: selectedPeople.length > 1 ? 'pointer' : 'not-allowed' }}
-          />
-          <span>Only these people (no one else tagged)</span>
-        </label>
-      </div>
-
+      {/* Sort and Action Buttons */}
       <div className="form-group">
         <label>Sort Order:</label>
         <select value={sortOrder} onChange={(e) => onSortOrderChange(e.target.value as 'asc' | 'desc')}>
