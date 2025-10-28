@@ -82,12 +82,17 @@ export default function PeopleSelector({
 
   // Auto-retry logic for cold starts
   useEffect(() => {
-    if (isWarmingUp && autoRetryAttempt < 12) { // Max 12 attempts (60 seconds at 5s intervals)
+    if (isWarmingUp && autoRetryAttempt < 24) { // Max 24 attempts (2 minutes at 5s intervals)
       const retryTimer = setTimeout(() => {
         setAutoRetryAttempt(prev => prev + 1);
         fetchData();
       }, 5000); // Check every 5 seconds
       return () => clearTimeout(retryTimer);
+    } else if (isWarmingUp && autoRetryAttempt >= 24) {
+      // After 2 minutes, give up and show error
+      setIsWarmingUp(false);
+      setLoading(false);
+      setError('Database is taking longer than expected to warm up. Please try again in a moment.');
     }
   }, [isWarmingUp, autoRetryAttempt]);
 
@@ -99,13 +104,33 @@ export default function PeopleSelector({
       }
       setError(null);
 
-  // Try the app API but gracefully fall back to sample data when unavailable.
-  const { fetchWithFallback, samplePeople, sampleEvents } = await import('../lib/api');
+      // Fetch from API with timeout
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
 
-      const [peopleData, eventsData] = await Promise.all([
-        fetchWithFallback('/api/people'),
-        fetchWithFallback('/api/events'),
+      const [peopleResponse, eventsResponse] = await Promise.all([
+        fetch('/api/people', { signal: controller.signal }),
+        fetch('/api/events', { signal: controller.signal }),
       ]);
+
+      clearTimeout(timeoutId);
+
+      // Check if responses are OK
+      if (!peopleResponse.ok || !eventsResponse.ok) {
+        // If 503 or 504, it's likely warming up
+        if (peopleResponse.status === 503 || eventsResponse.status === 503 || 
+            peopleResponse.status === 504 || eventsResponse.status === 504) {
+          if (!isWarmingUp) {
+            setIsWarmingUp(true);
+            setAutoRetryAttempt(0);
+          }
+          return;
+        }
+        throw new Error('Failed to fetch data');
+      }
+
+      const peopleData = await peopleResponse.json();
+      const eventsData = await eventsResponse.json();
 
       if (peopleData && eventsData) {
         // Handle both old format (array) and new format ({success, people})
@@ -120,19 +145,25 @@ export default function PeopleSelector({
         return;
       }
 
-      // If API calls failed (null returned), use sample data so UI remains usable.
-  console.warn('PeopleSelector: API unavailable, falling back to sample data');
-  setPeople(normalizePeople(samplePeople()));
-  setEvents(normalizeEvents(sampleEvents()));
-      setDataLoaded(true);
-      setRetryCount(0);
-      setIsWarmingUp(false);
-      setAutoRetryAttempt(0);
-    } catch (err) {
+      // If we got here, data format was unexpected
+      throw new Error('Unexpected data format from API');
+    } catch (err: any) {
       console.error('❌ PeopleSelector fetch error:', err);
-      setError('An error occurred fetching people/events');
-    } finally {
+      
+      // If it's a timeout or network error during initial load, treat as warm-up needed
+      if ((err.name === 'AbortError' || err.message.includes('fetch')) && !isWarmingUp) {
+        setIsWarmingUp(true);
+        setAutoRetryAttempt(0);
+        return;
+      }
+      
+      // For other errors, show error message (but don't use sample data)
+      setError('Failed to load data from database. Please try refreshing.');
       setLoading(false);
+    } finally {
+      if (!isWarmingUp) {
+        setLoading(false);
+      }
     }
   };
 
@@ -212,14 +243,14 @@ export default function PeopleSelector({
           <h2>Database is Warming Up</h2>
           <p className="loading-message">
             The Azure SQL database is starting up after being idle.
-            This usually takes 10-30 seconds.
+            This usually takes 10-60 seconds.
           </p>
           <div className="progress-bar">
             <div className="progress-fill"></div>
           </div>
           <p className="loading-hint">
-            ☕ Grab a coffee! We're checking every 5 seconds...
-            {autoRetryAttempt > 0 && ` (Attempt ${autoRetryAttempt + 1}/12)`}
+            ☕ Please wait... We're checking every 5 seconds.
+            {autoRetryAttempt > 0 && ` (Attempt ${autoRetryAttempt + 1}/24)`}
           </p>
         </div>
       </div>
