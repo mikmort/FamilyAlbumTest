@@ -304,7 +304,12 @@ export default function PeopleSelector({
 
   return (
     <div className="card">
-      <h1 className="text-center mb-2">Select People to Browse</h1>
+      <h1 className="text-center mb-2" style={{ fontWeight: 'bold', fontSize: '2.5rem', marginBottom: '1.5rem' }}>
+        Family Album
+      </h1>
+      <h2 className="text-center mb-2" style={{ fontSize: '1.5rem', fontWeight: '500' }}>
+        Select People to Browse
+      </h2>
 
       <div className="form-group">
         <label>Select People (up to 5) {people.length > 0 && `(${people.length} available)`}</label>
