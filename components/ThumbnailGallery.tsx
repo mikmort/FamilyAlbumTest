@@ -217,6 +217,15 @@ export default function ThumbnailGallery({
             <img
               src={item.PThumbnailUrl || '/placeholder.svg'}
               alt={item.PDescription || item.PFileName}
+              onLoad={(e) => {
+                const img = e.target as HTMLImageElement;
+                console.log(`✅ Thumbnail loaded: ${item.PFileName}`, {
+                  naturalWidth: img.naturalWidth,
+                  naturalHeight: img.naturalHeight,
+                  ratio: `${img.naturalWidth}x${img.naturalHeight}`,
+                  url: item.PThumbnailUrl
+                });
+              }}
               onError={(e) => {
                 console.error('❌ Thumbnail failed to load:', {
                   fileName: item.PFileName,
