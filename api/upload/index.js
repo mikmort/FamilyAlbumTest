@@ -263,9 +263,10 @@ module.exports = async function (context, req) {
                     .jpeg({ quality: 80 })
                     .toBuffer();
 
-                context.log(`Thumbnail created - size: ${thumbnailBuffer.length} bytes`);
+                const thumbMetadata = await sharp(thumbnailBuffer).metadata();
+                context.log(`Thumbnail created - size: ${thumbnailBuffer.length} bytes, dimensions: ${thumbMetadata.width}x${thumbMetadata.height}, orientation: ${thumbMetadata.orientation || 'undefined'}`);
 
-                // Now create the full-size rotated image
+                // Now create the full-size rotated image from the same sharp instance
                 const rotatedBuffer = await sharpInstance
                     .jpeg({ quality: 95, mozjpeg: true })
                     .toBuffer();
@@ -275,7 +276,7 @@ module.exports = async function (context, req) {
                 width = metadata.width || 0;
                 height = metadata.height || 0;
 
-                context.log(`After rotation - dimensions: ${width}x${height}`);
+                context.log(`Full image after rotation - dimensions: ${width}x${height}, orientation: ${metadata.orientation || 'undefined'}`);
 
                 // Prepare thumbnail filename
                 const fileExt = uniqueFilename.substring(uniqueFilename.lastIndexOf('.'));
@@ -288,7 +289,7 @@ module.exports = async function (context, req) {
                     await deleteBlob(thumbBlobPath);
                     context.log(`✅ Deleted existing thumbnail`);
                 } catch (deleteErr) {
-                    context.log(`No existing thumbnail to delete (this is normal for new files): ${deleteErr.message}`);
+                    context.log(`No existing thumbnail to delete: ${deleteErr.message}`);
                 }
                 
                 // Upload the new thumbnail
