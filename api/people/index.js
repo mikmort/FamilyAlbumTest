@@ -103,7 +103,7 @@ module.exports = async function (context, req) {
 
         // PUT /api/people - Update person
         if (method === 'PUT') {
-            const { id, name } = req.body;
+            const { id, name, relation } = req.body;
 
             if (!id || !name) {
                 context.res = {
@@ -115,14 +115,14 @@ module.exports = async function (context, req) {
 
             const updateQuery = `
                 UPDATE dbo.NameEvent 
-                SET neName = @name
+                SET neName = @name, neRelation = @relation
                 WHERE ID = @id
             `;
 
-            await execute(updateQuery, { id, name });
+            await execute(updateQuery, { id, name, relation: relation || null });
 
             const selectQuery = `
-                SELECT ID as id, neName as name, neCount as photoCount
+                SELECT ID, neName, neRelation, ISNULL(neCount, 0) as neCount
                 FROM dbo.NameEvent
                 WHERE ID = @id
             `;
@@ -139,7 +139,10 @@ module.exports = async function (context, req) {
 
             context.res = {
                 status: 200,
-                body: result[0]
+                body: {
+                    success: true,
+                    person: result[0]
+                }
             };
             return;
         }
