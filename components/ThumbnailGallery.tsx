@@ -94,12 +94,6 @@ export default function ThumbnailGallery({
 
       const data = await res.json();
       
-      // DEBUG: Log what we got from API
-      console.log('🔍 API Response data:', data);
-      if (data.length > 0 && data[0].TaggedPeople) {
-        console.log('🔍 First item TaggedPeople:', data[0].TaggedPeople);
-      }
-      
       // Log video thumbnails for debugging
       const videoItems = data.filter((item: MediaItem) => item.PType === 2);
       if (videoItems.length > 0) {

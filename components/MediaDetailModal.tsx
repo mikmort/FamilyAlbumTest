@@ -16,9 +16,6 @@ export default function MediaDetailModal({
   onUpdate,
   startFullscreen = false,
 }: MediaDetailModalProps) {
-  console.log('🔍 MediaDetailModal opened with media:', media);
-  console.log('🔍 TaggedPeople in media:', media.TaggedPeople);
-  
   const [editing, setEditing] = useState(false);
   const [isFullScreen, setIsFullScreen] = useState(startFullscreen);
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -873,14 +870,11 @@ export default function MediaDetailModal({
                       <span 
                         className="person-name-clickable"
                         onClick={async () => {
-                          console.log('Person clicked:', person);
-                          
                           // Fetch fresh data from the API
                           try {
                             const response = await fetch(`/api/people/${person.ID}`);
                             if (response.ok) {
                               const data = await response.json();
-                              console.log('Fresh person data:', data);
                               
                               if (data.success && data.person && data.person.neRelation) {
                                 alert(`${person.neName}\n${data.person.neRelation}`);
@@ -895,13 +889,9 @@ export default function MediaDetailModal({
                             alert(`${person.neName}\n(Error fetching relation)`);
                           }
                         }}
-                        title={person.neRelation || "Click to see relation"}
+                        title="Click to see relation"
                       >
                         {person.neName}
-                        {/* DEBUG: Show relation directly in UI */}
-                        <small style={{ color: '#666', marginLeft: '0.5rem' }}>
-                          [rel: {person.neRelation ? `"${person.neRelation}"` : 'UNDEFINED'}]
-                        </small>
                       </span>
                       {editing && (
                         <button
