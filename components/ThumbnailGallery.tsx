@@ -215,7 +215,11 @@ export default function ThumbnailGallery({
             }}
           >
             <img
-              src={item.PThumbnailUrl || '/placeholder.svg'}
+              src={
+                item.PThumbnailUrl 
+                  ? `${item.PThumbnailUrl}?v=${new Date(item.PLastModifiedDate).getTime()}` 
+                  : '/placeholder.svg'
+              }
               alt={item.PDescription || item.PFileName}
               onLoad={(e) => {
                 const img = e.target as HTMLImageElement;
