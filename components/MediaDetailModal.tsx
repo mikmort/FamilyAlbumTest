@@ -883,6 +883,10 @@ export default function MediaDetailModal({
                         title={person.neRelation || "Click to see relation"}
                       >
                         {person.neName}
+                        {/* DEBUG: Show relation directly in UI */}
+                        <small style={{ color: '#666', marginLeft: '0.5rem' }}>
+                          [rel: {person.neRelation ? `"${person.neRelation}"` : 'UNDEFINED'}]
+                        </small>
                       </span>
                       {editing && (
                         <button
