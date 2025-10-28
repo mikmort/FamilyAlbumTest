@@ -4,8 +4,49 @@ module.exports = async function (context, req) {
     context.log('People API function processed a request.');
 
     const method = req.method;
+    
+    // Extract ID from URL path if present (e.g., /api/people/123)
+    const personId = context.bindingData?.id || req.params?.id;
 
     try {
+        // GET /api/people/:id - Get single person by ID
+        if (method === 'GET' && personId) {
+            const personQuery = `
+                SELECT 
+                    ID,
+                    neName,
+                    neRelation,
+                    neType,
+                    neDateLastModified,
+                    ISNULL(neCount, 0) as neCount
+                FROM dbo.NameEvent WITH (NOLOCK)
+                WHERE ID = @id AND neType = 'N'
+            `;
+            const people = await query(personQuery, { id: personId });
+
+            if (people.length === 0) {
+                context.res = {
+                    status: 404,
+                    headers: { 'Content-Type': 'application/json' },
+                    body: {
+                        success: false,
+                        error: 'Person not found'
+                    }
+                };
+                return;
+            }
+
+            context.res = {
+                status: 200,
+                headers: { 'Content-Type': 'application/json' },
+                body: {
+                    success: true,
+                    person: people[0]
+                }
+            };
+            return;
+        }
+        
         // GET /api/people - List all people
         if (method === 'GET') {
             const peopleQuery = `

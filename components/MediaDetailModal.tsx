@@ -872,12 +872,27 @@ export default function MediaDetailModal({
                     <div key={person.ID} className="tagged-person-item">
                       <span 
                         className="person-name-clickable"
-                        onClick={() => {
+                        onClick={async () => {
                           console.log('Person clicked:', person);
-                          if (person.neRelation && person.neRelation.trim() !== '') {
-                            alert(`${person.neName}\n${person.neRelation}`);
-                          } else {
-                            alert(`${person.neName}\n(No relation specified)`);
+                          
+                          // Fetch fresh data from the API
+                          try {
+                            const response = await fetch(`/api/people/${person.ID}`);
+                            if (response.ok) {
+                              const data = await response.json();
+                              console.log('Fresh person data:', data);
+                              
+                              if (data.success && data.person && data.person.neRelation) {
+                                alert(`${person.neName}\n${data.person.neRelation}`);
+                              } else {
+                                alert(`${person.neName}\n(No relation specified)`);
+                              }
+                            } else {
+                              alert(`${person.neName}\n(Could not fetch relation data)`);
+                            }
+                          } catch (error) {
+                            console.error('Error fetching person:', error);
+                            alert(`${person.neName}\n(Error fetching relation)`);
                           }
                         }}
                         title={person.neRelation || "Click to see relation"}
