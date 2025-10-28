@@ -250,9 +250,9 @@ module.exports = async function (context, req) {
                 context.log(`Original image EXIF orientation: ${originalMetadata.orientation || 'none'}, dimensions: ${originalMetadata.width}x${originalMetadata.height}`);
 
                 // Auto-rotate based on EXIF orientation
-                // This will rotate the image according to EXIF data and strip the EXIF orientation tag
+                // rotate() with no args uses EXIF and REMOVES the orientation tag
                 const rotatedBuffer = await sharp(buffer, { failOnError: false })
-                    .rotate() // rotate() with no args uses EXIF
+                    .rotate() // rotate() automatically removes EXIF orientation
                     .jpeg({ quality: 95, mozjpeg: true })
                     .toBuffer();
 
@@ -261,32 +261,45 @@ module.exports = async function (context, req) {
                 width = metadata.width || 0;
                 height = metadata.height || 0;
 
-                context.log(`After rotation - dimensions: ${width}x${height}, orientation: ${metadata.orientation || 'none'}`);
+                context.log(`After rotation - dimensions: ${width}x${height}, orientation: ${metadata.orientation || 'none (should be undefined after rotate)'}`);
 
-                // Create thumbnail directly from the ROTATED buffer
-                // Important: using rotatedBuffer, NOT original buffer
+                // Create thumbnail IGNORING any EXIF orientation
+                // Use { orientation: 1 } to force no rotation
                 const thumbnailBuffer = await sharp(rotatedBuffer)
                     .resize(null, 200, {
                         fit: 'inside',
                         withoutEnlargement: true
                     })
+                    .withMetadata({ orientation: 1 }) // Force orientation to 1 (normal/no rotation)
                     .jpeg({ quality: 80 })
                     .toBuffer();
 
                 const thumbMetadata = await sharp(thumbnailBuffer).metadata();
-                context.log(`Thumbnail created from rotated image - size: ${thumbnailBuffer.length} bytes, dimensions: ${thumbMetadata.width}x${thumbMetadata.height}`);
+                context.log(`Thumbnail created from rotated image - size: ${thumbnailBuffer.length} bytes, dimensions: ${thumbMetadata.width}x${thumbMetadata.height}, orientation: ${thumbMetadata.orientation || 'none'}`);
 
-                // Upload thumbnail FIRST
+                // Prepare thumbnail filename
                 const fileExt = uniqueFilename.substring(uniqueFilename.lastIndexOf('.'));
                 const thumbFilename = `thumb_${uniqueFilename.substring(0, uniqueFilename.lastIndexOf('.'))}.jpg`;
+                const thumbBlobPath = `media/${thumbFilename}`;
                 
-                context.log(`Uploading thumbnail as: ${thumbFilename}`);
+                // Delete any existing thumbnail BEFORE uploading new one
+                // This ensures we don't have caching issues
+                try {
+                    context.log(`Attempting to delete any existing thumbnail at: ${thumbBlobPath}`);
+                    await deleteBlob(thumbBlobPath);
+                    context.log(`✅ Deleted existing thumbnail`);
+                } catch (deleteErr) {
+                    context.log(`No existing thumbnail to delete (this is normal for new files): ${deleteErr.message}`);
+                }
+                
+                // Upload the new thumbnail
+                context.log(`Uploading new thumbnail as: ${thumbFilename}`);
                 thumbnailUrl = await uploadBlob(
-                    `media/${thumbFilename}`,
+                    thumbBlobPath,
                     thumbnailBuffer,
                     'image/jpeg'
                 );
-                context.log(`Thumbnail uploaded to: ${thumbnailUrl}`);
+                context.log(`✅ Thumbnail uploaded to: ${thumbnailUrl}`);
 
                 // Use rotated buffer as the main image
                 buffer = rotatedBuffer;
