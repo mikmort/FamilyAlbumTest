@@ -1385,6 +1385,16 @@ module.exports = async function (context, req) {
                 context.log('Extracted blob path:', blobPath);
                 context.log('Extracted thumb path:', thumbBlobPath);
 
+                // Also try to construct thumbnail path from main filename as fallback
+                let constructedThumbPath = null;
+                if (blobPath && blobPath.includes('/')) {
+                    const pathParts = blobPath.split('/');
+                    const filename = pathParts[pathParts.length - 1];
+                    const filenameWithoutExt = filename.substring(0, filename.lastIndexOf('.'));
+                    constructedThumbPath = `media/thumb_${filenameWithoutExt}.jpg`;
+                    context.log('Constructed thumb path:', constructedThumbPath);
+                }
+
                 // Delete from blob storage
                 let blobDeleted = false;
                 let thumbDeleted = false;
@@ -1400,6 +1410,7 @@ module.exports = async function (context, req) {
                     }
                 }
 
+                // Try deleting thumbnail using database path
                 if (thumbBlobPath && thumbBlobPath !== blobPath) {
                     try {
                         await deleteBlob(thumbBlobPath);
@@ -1407,7 +1418,17 @@ module.exports = async function (context, req) {
                         context.log('✅ Deleted thumbnail blob:', thumbBlobPath);
                     } catch (thumbError) {
                         context.log.warn('⚠️ Failed to delete thumbnail blob:', thumbError.message);
-                        // Continue anyway
+                    }
+                }
+
+                // If thumbnail wasn't deleted and we have a constructed path, try that too
+                if (!thumbDeleted && constructedThumbPath && constructedThumbPath !== thumbBlobPath) {
+                    try {
+                        await deleteBlob(constructedThumbPath);
+                        thumbDeleted = true;
+                        context.log('✅ Deleted thumbnail using constructed path:', constructedThumbPath);
+                    } catch (thumbError) {
+                        context.log.warn('⚠️ Failed to delete thumbnail using constructed path:', thumbError.message);
                     }
                 }
 

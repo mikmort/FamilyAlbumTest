@@ -247,7 +247,7 @@ module.exports = async function (context, req) {
             try {
                 // First, check original metadata to log orientation
                 const originalMetadata = await sharp(buffer).metadata();
-                context.log(`Original image EXIF orientation: ${originalMetadata.orientation || 'none'}`);
+                context.log(`Original image EXIF orientation: ${originalMetadata.orientation || 'none'}, dimensions: ${originalMetadata.width}x${originalMetadata.height}`);
 
                 // Auto-rotate based on EXIF orientation
                 // This will rotate the image according to EXIF data and strip the EXIF orientation tag
@@ -256,14 +256,15 @@ module.exports = async function (context, req) {
                     .jpeg({ quality: 95, mozjpeg: true })
                     .toBuffer();
 
-                // Get metadata from rotated image
+                // Get metadata from rotated image to confirm dimensions changed
                 const metadata = await sharp(rotatedBuffer).metadata();
                 width = metadata.width || 0;
                 height = metadata.height || 0;
 
-                context.log(`Rotated image dimensions: ${width}x${height}, orientation: ${metadata.orientation || 'none'}`);
+                context.log(`After rotation - dimensions: ${width}x${height}, orientation: ${metadata.orientation || 'none'}`);
 
-                // Create thumbnail directly from rotated buffer (don't use clone)
+                // Create thumbnail directly from the ROTATED buffer
+                // Important: using rotatedBuffer, NOT original buffer
                 const thumbnailBuffer = await sharp(rotatedBuffer)
                     .resize(null, 200, {
                         fit: 'inside',
@@ -272,21 +273,25 @@ module.exports = async function (context, req) {
                     .jpeg({ quality: 80 })
                     .toBuffer();
 
-                context.log(`Thumbnail created, size: ${thumbnailBuffer.length} bytes`);
+                const thumbMetadata = await sharp(thumbnailBuffer).metadata();
+                context.log(`Thumbnail created from rotated image - size: ${thumbnailBuffer.length} bytes, dimensions: ${thumbMetadata.width}x${thumbMetadata.height}`);
 
-                // Upload thumbnail
+                // Upload thumbnail FIRST
                 const fileExt = uniqueFilename.substring(uniqueFilename.lastIndexOf('.'));
                 const thumbFilename = `thumb_${uniqueFilename.substring(0, uniqueFilename.lastIndexOf('.'))}.jpg`;
+                
+                context.log(`Uploading thumbnail as: ${thumbFilename}`);
                 thumbnailUrl = await uploadBlob(
                     `media/${thumbFilename}`,
                     thumbnailBuffer,
                     'image/jpeg'
                 );
+                context.log(`Thumbnail uploaded to: ${thumbnailUrl}`);
 
                 // Use rotated buffer as the main image
                 buffer = rotatedBuffer;
 
-                context.log(`Image processed and rotated: ${width}x${height}, thumbnail created`);
+                context.log(`Image processed and rotated: ${width}x${height}, thumbnail created and uploaded`);
             } catch (err) {
                 context.log.error('Error processing image:', err);
                 // Continue with original buffer if processing fails
