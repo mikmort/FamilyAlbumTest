@@ -71,6 +71,13 @@ export default function PeopleSelector({
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
+  // Open people dropdown when data is loaded
+  useEffect(() => {
+    if (dataLoaded && people.length > 0 && !selectedEvent) {
+      setPeopleDropdownOpen(true);
+    }
+  }, [dataLoaded, people.length, selectedEvent]);
+
   useEffect(() => {
     // Only fetch if we haven't loaded data yet
     if (!dataLoaded) {
@@ -323,10 +330,10 @@ export default function PeopleSelector({
             }}
             onFocus={() => setPeopleDropdownOpen(true)}
             placeholder="Type to search people..."
-            disabled={selectedPeople.length >= 5}
+            disabled={selectedPeople.length >= 5 || selectedEvent !== null}
             className="autocomplete-input"
           />
-          {peopleDropdownOpen && selectedPeople.length < 5 && (
+          {peopleDropdownOpen && selectedPeople.length < 5 && !selectedEvent && (
             <div className="autocomplete-dropdown">
               {filteredPeople.length === 0 ? (
                 <div className="autocomplete-item disabled">
@@ -380,6 +387,11 @@ export default function PeopleSelector({
               Maximum of 5 people reached. Remove someone to add another.
             </div>
           )}
+          {selectedEvent && (
+            <div style={{ marginTop: '0.5rem', color: '#856404', fontSize: '0.9rem' }}>
+              People selection disabled when an event is selected.
+            </div>
+          )}
         </div>
       </div>
 
@@ -395,9 +407,10 @@ export default function PeopleSelector({
             }}
             onFocus={() => setEventDropdownOpen(true)}
             placeholder={selectedEvent ? getSelectedEventName() : "Type to search events..."}
+            disabled={selectedPeople.length > 0 || showNoPeople}
             className="autocomplete-input"
           />
-          {eventDropdownOpen && (
+          {eventDropdownOpen && selectedPeople.length === 0 && !showNoPeople && (
             <div className="autocomplete-dropdown">
               <div 
                 className="autocomplete-item"
@@ -444,9 +457,20 @@ export default function PeopleSelector({
               </span>
             </div>
           )}
+          {selectedPeople.length > 0 && (
+            <div style={{ marginTop: '0.5rem', color: '#856404', fontSize: '0.9rem' }}>
+              Event selection disabled when people are selected.
+            </div>
+          )}
+          {showNoPeople && (
+            <div style={{ marginTop: '0.5rem', color: '#856404', fontSize: '0.9rem' }}>
+              Event selection disabled when "Show photos with no people" is checked.
+            </div>
+          )}
         </div>
       </div>
 
+      {/* Moved these options to be always visible */}
       <div className="form-group" style={{ 
         padding: '0.75rem', 
         backgroundColor: '#f8f9fa', 
@@ -464,36 +488,37 @@ export default function PeopleSelector({
             type="checkbox"
             checked={showNoPeople}
             onChange={(e) => onShowNoPeopleChange(e.target.checked)}
+            disabled={selectedEvent !== null}
             style={{ marginRight: '0.75rem', cursor: 'pointer' }}
           />
           <span>Show photos with no people tagged</span>
         </label>
       </div>
 
-      {selectedPeople.length > 1 && (
-        <div className="form-group" style={{ 
-          padding: '0.75rem', 
-          backgroundColor: '#fff3cd', 
-          borderRadius: '4px',
-          border: '1px solid #ffc107'
+      <div className="form-group" style={{ 
+        padding: '0.75rem', 
+        backgroundColor: selectedPeople.length > 1 ? '#fff3cd' : '#f8f9fa', 
+        borderRadius: '4px',
+        border: selectedPeople.length > 1 ? '1px solid #ffc107' : '1px solid #dee2e6',
+        opacity: selectedPeople.length > 1 ? 1 : 0.6
+      }}>
+        <label style={{ 
+          display: 'flex', 
+          alignItems: 'center', 
+          cursor: selectedPeople.length > 1 ? 'pointer' : 'not-allowed',
+          margin: 0,
+          fontSize: '0.95rem'
         }}>
-          <label style={{ 
-            display: 'flex', 
-            alignItems: 'center', 
-            cursor: 'pointer',
-            margin: 0,
-            fontSize: '0.95rem'
-          }}>
-            <input
-              type="checkbox"
-              checked={exclusiveFilter}
-              onChange={(e) => onExclusiveFilterChange(e.target.checked)}
-              style={{ marginRight: '0.75rem', cursor: 'pointer' }}
-            />
-            <span>Only these people (no one else tagged)</span>
-          </label>
-        </div>
-      )}
+          <input
+            type="checkbox"
+            checked={exclusiveFilter}
+            onChange={(e) => onExclusiveFilterChange(e.target.checked)}
+            disabled={selectedPeople.length <= 1}
+            style={{ marginRight: '0.75rem', cursor: selectedPeople.length > 1 ? 'pointer' : 'not-allowed' }}
+          />
+          <span>Only these people (no one else tagged)</span>
+        </label>
+      </div>
 
       <div className="form-group">
         <label>Sort Order:</label>
