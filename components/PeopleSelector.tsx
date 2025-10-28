@@ -147,7 +147,7 @@ export default function PeopleSelector({
     if (selectedPeople.includes(personId)) {
       onSelectedPeopleChange(selectedPeople.filter((id) => id !== personId));
     } else if (selectedPeople.length < 5) {
-      onSelectedPeopleChange([...selectedPeople, personId));
+      onSelectedPeopleChange([...selectedPeople, personId]);
     }
   };
 
