@@ -359,20 +359,30 @@ module.exports = async function (context, req) {
                 );
 
                 context.log('Generating video thumbnail...');
-                // Generate thumbnail from video
+                // Generate thumbnail from video using screenshot to buffer
                 const thumbnailBuffer = await new Promise((resolve, reject) => {
                     const chunks = [];
-                    ffmpeg(tempVideoUrl)
-                        .screenshots({
-                            count: 1,
-                            timestamps: ['00:00:01'],
-                            size: '?x200'
+                    const inputStream = Readable.from(buffer);
+                    
+                    ffmpeg(inputStream)
+                        .inputFormat(needsVideoConversion ? 'mp4' : fileName.toLowerCase().endsWith('.mov') ? 'mov' : 'mp4')
+                        .outputFormat('image2')
+                        .outputOptions([
+                            '-vframes 1',      // Extract only 1 frame
+                            '-ss 00:00:01',    // Seek to 1 second
+                            '-vf scale=-1:200' // Scale to height 200, maintain aspect ratio
+                        ])
+                        .on('start', (cmd) => context.log('FFmpeg thumbnail command:', cmd))
+                        .on('error', (err) => {
+                            context.log.error('FFmpeg thumbnail error:', err);
+                            reject(err);
                         })
-                        .on('error', reject)
+                        .on('end', () => {
+                            context.log('Video thumbnail extraction completed');
+                            resolve(Buffer.concat(chunks));
+                        })
                         .pipe()
-                        .on('data', chunk => chunks.push(chunk))
-                        .on('end', () => resolve(Buffer.concat(chunks)))
-                        .on('error', reject);
+                        .on('data', (chunk) => chunks.push(chunk));
                 });
 
                 // Upload thumbnail
@@ -383,7 +393,7 @@ module.exports = async function (context, req) {
                     'image/jpeg'
                 );
 
-                context.log('Video thumbnail created');
+                context.log('Video thumbnail created and uploaded');
             } catch (err) {
                 context.log.error('Error generating video thumbnail:', err);
                 // thumbnailUrl will remain null if thumbnail generation fails
