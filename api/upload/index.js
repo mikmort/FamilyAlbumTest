@@ -219,10 +219,20 @@ module.exports = async function (context, req) {
 
         // Check for duplicate filenames and generate Windows-style numbered name if needed
         // E.g., IMG_5033.jpg -> IMG_5033 (1).jpg -> IMG_5033 (2).jpg
-        const uniqueFilename = await getUniqueFilename(fileName);
+        let uniqueFilename = await getUniqueFilename(fileName);
         
         if (uniqueFilename !== fileName) {
             context.log(`Duplicate detected. Renamed: ${fileName} -> ${uniqueFilename}`);
+        }
+
+        // Convert AVI files to MP4
+        let needsVideoConversion = false;
+        if (fileName.toLowerCase().endsWith('.avi') || actualContentType === 'video/x-msvideo') {
+            needsVideoConversion = true;
+            // Change extension to .mp4
+            uniqueFilename = uniqueFilename.replace(/\.avi$/i, '.mp4');
+            actualContentType = 'video/mp4';
+            context.log(`AVI file detected. Will convert to MP4: ${uniqueFilename}`);
         }
         
         const mediaType = actualContentType.startsWith('image/') ? 1 : 2; // 1=image, 2=video
@@ -235,14 +245,28 @@ module.exports = async function (context, req) {
         // Process images: fix orientation and create thumbnail
         if (mediaType === 1) {
             try {
-                // Auto-rotate based on EXIF orientation and get metadata
-                const image = sharp(buffer).rotate(); // rotate() with no args uses EXIF
-                const metadata = await image.metadata();
+                // First, check original metadata to log orientation
+                const originalMetadata = await sharp(buffer).metadata();
+                context.log(`Original image EXIF orientation: ${originalMetadata.orientation || 'none'}`);
+
+                // Auto-rotate based on EXIF orientation
+                // This will rotate the image according to EXIF data and strip the EXIF orientation tag
+                const rotatedBuffer = await sharp(buffer, { failOnError: false })
+                    .rotate() // rotate() with no args uses EXIF
+                    .jpeg({ quality: 95, mozjpeg: true })
+                    .toBuffer();
+
+                // Get metadata from rotated image
+                const rotatedImage = sharp(rotatedBuffer);
+                const metadata = await rotatedImage.metadata();
                 width = metadata.width || 0;
                 height = metadata.height || 0;
 
-                // Create thumbnail (200px height, maintain aspect ratio)
-                const thumbnailBuffer = await image
+                context.log(`Rotated image dimensions: ${width}x${height}`);
+
+                // Create thumbnail from rotated image
+                const thumbnailBuffer = await rotatedImage
+                    .clone()
                     .resize(null, 200, {
                         fit: 'inside',
                         withoutEnlargement: true
@@ -259,20 +283,59 @@ module.exports = async function (context, req) {
                     'image/jpeg'
                 );
 
-                // Re-encode the main image with orientation fix
-                buffer = await image
-                    .jpeg({ quality: 95 })
-                    .toBuffer();
+                // Use rotated buffer as the main image
+                buffer = rotatedBuffer;
 
-                context.log(`Image processed: ${width}x${height}, thumbnail created`);
+                context.log(`Image processed and rotated: ${width}x${height}, thumbnail created`);
             } catch (err) {
                 context.log.error('Error processing image:', err);
                 // Continue with original buffer if processing fails
             }
         } 
-        // Process videos: extract thumbnail
+        // Process videos: convert AVI to MP4 if needed, extract thumbnail
         else if (mediaType === 2) {
             try {
+                let videoBuffer = buffer;
+                
+                // Convert AVI to MP4 if needed
+                if (needsVideoConversion) {
+                    context.log('Converting AVI to MP4...');
+                    videoBuffer = await new Promise((resolve, reject) => {
+                        const chunks = [];
+                        const inputStream = Readable.from(buffer);
+                        
+                        ffmpeg(inputStream)
+                            .inputFormat('avi')
+                            .videoCodec('libx264')
+                            .audioCodec('aac')
+                            .outputFormat('mp4')
+                            .outputOptions([
+                                '-preset fast',
+                                '-crf 23',
+                                '-movflags +faststart'
+                            ])
+                            .on('start', (cmd) => context.log('FFmpeg command:', cmd))
+                            .on('progress', (progress) => {
+                                if (progress.percent) {
+                                    context.log(`Conversion progress: ${progress.percent.toFixed(1)}%`);
+                                }
+                            })
+                            .on('error', (err) => {
+                                context.log.error('FFmpeg conversion error:', err);
+                                reject(err);
+                            })
+                            .on('end', () => {
+                                context.log('AVI to MP4 conversion completed');
+                                resolve(Buffer.concat(chunks));
+                            })
+                            .pipe()
+                            .on('data', (chunk) => chunks.push(chunk));
+                    });
+                    
+                    buffer = videoBuffer; // Use converted video
+                    context.log(`Converted AVI to MP4, new size: ${videoBuffer.length} bytes`);
+                }
+                
                 // Upload video first so we can generate thumbnail from it
                 const tempVideoUrl = await uploadBlob(
                     `media/${uniqueFilename}`,
@@ -280,6 +343,7 @@ module.exports = async function (context, req) {
                     actualContentType
                 );
 
+                context.log('Generating video thumbnail...');
                 // Generate thumbnail from video
                 const thumbnailBuffer = await new Promise((resolve, reject) => {
                     const chunks = [];
