@@ -38,6 +38,12 @@ export default function PeopleSelector({
   const [retryCount, setRetryCount] = useState(0);
   const [isWarmingUp, setIsWarmingUp] = useState(false);
   const [autoRetryAttempt, setAutoRetryAttempt] = useState(0);
+  
+  // Search/filter states for autocomplete
+  const [peopleSearch, setPeopleSearch] = useState('');
+  const [peopleDropdownOpen, setPeopleDropdownOpen] = useState(false);
+  const [eventSearch, setEventSearch] = useState('');
+  const [eventDropdownOpen, setEventDropdownOpen] = useState(false);
 
   // Helpers to normalize API/sample data into expected types
   const normalizePeople = (arr: any[]): Person[] =>
@@ -51,6 +57,19 @@ export default function PeopleSelector({
       ...e,
       neDateLastModified: e.neDateLastModified ? new Date(e.neDateLastModified) : new Date(),
     } as Event));
+
+  // Close dropdowns when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      if (!target.closest('.autocomplete-wrapper')) {
+        setPeopleDropdownOpen(false);
+        setEventDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   useEffect(() => {
     // Only fetch if we haven't loaded data yet
@@ -128,8 +147,61 @@ export default function PeopleSelector({
     if (selectedPeople.includes(personId)) {
       onSelectedPeopleChange(selectedPeople.filter((id) => id !== personId));
     } else if (selectedPeople.length < 5) {
-      onSelectedPeopleChange([...selectedPeople, personId]);
+      onSelectedPeopleChange([...selectedPeople, personId));
     }
+  };
+
+  // Filter people based on search, prioritizing starts-with matches
+  const filteredPeople = people
+    .filter(p => !selectedPeople.includes(p.ID)) // Exclude already selected
+    .filter(p => {
+      const search = peopleSearch.toLowerCase();
+      if (!search) return true;
+      const name = p.neName.toLowerCase();
+      return name.includes(search);
+    })
+    .sort((a, b) => {
+      const search = peopleSearch.toLowerCase();
+      if (!search) return a.neName.localeCompare(b.neName);
+      
+      const aName = a.neName.toLowerCase();
+      const bName = b.neName.toLowerCase();
+      const aStarts = aName.startsWith(search);
+      const bStarts = bName.startsWith(search);
+      
+      if (aStarts && !bStarts) return -1;
+      if (!aStarts && bStarts) return 1;
+      return aName.localeCompare(bName);
+    });
+
+  // Filter events based on search
+  const filteredEvents = events
+    .filter(e => {
+      const search = eventSearch.toLowerCase();
+      if (!search) return true;
+      const name = e.neName.toLowerCase();
+      return name.includes(search);
+    })
+    .sort((a, b) => {
+      const search = eventSearch.toLowerCase();
+      if (!search) return a.neName.localeCompare(b.neName);
+      
+      const aName = a.neName.toLowerCase();
+      const bName = b.neName.toLowerCase();
+      const aStarts = aName.startsWith(search);
+      const bStarts = bName.startsWith(search);
+      
+      if (aStarts && !bStarts) return -1;
+      if (!aStarts && bStarts) return 1;
+      return aName.localeCompare(bName);
+    });
+
+  const getSelectedPeopleNames = () => {
+    return selectedPeople.map(id => people.find(p => p.ID === id)?.neName).filter(Boolean);
+  };
+
+  const getSelectedEventName = () => {
+    return events.find(e => e.ID === selectedEvent)?.neName || '';
   };
 
   if (loading && isWarmingUp) {
@@ -204,95 +276,139 @@ export default function PeopleSelector({
       <h1 className="text-center mb-2">Select People to Browse</h1>
 
       <div className="form-group">
-        <label style={{ marginBottom: '0.5rem', display: 'block' }}>Select People (up to 5):</label>
-        <div style={{ 
-          maxHeight: '350px', 
-          overflowY: 'auto', 
-          border: '1px solid #ddd', 
-          borderRadius: '4px',
-          backgroundColor: '#fff'
-        }}>
-          <table style={{ 
-            width: '100%', 
-            borderCollapse: 'collapse',
-            fontSize: '0.95rem'
-          }}>
-            <thead style={{ 
-              position: 'sticky', 
-              top: 0, 
-              backgroundColor: '#f8f9fa',
-              borderBottom: '2px solid #dee2e6'
-            }}>
-              <tr>
-                <th style={{ padding: '0.75rem 0.5rem', textAlign: 'center', width: '40px' }}></th>
-                <th style={{ padding: '0.75rem 0.5rem', textAlign: 'left', fontWeight: '600' }}>Name</th>
-                <th style={{ padding: '0.75rem 0.5rem', textAlign: 'left', fontWeight: '600' }}>Description</th>
-                <th style={{ padding: '0.75rem 0.5rem', textAlign: 'center', fontWeight: '600', width: '100px' }}>Photos</th>
-              </tr>
-            </thead>
-            <tbody>
-              {people.map((person) => (
-                <tr 
-                  key={person.ID} 
-                  style={{ 
-                    borderBottom: '1px solid #eee',
-                    backgroundColor: selectedPeople.includes(person.ID) ? '#e3f2fd' : 'transparent',
-                    cursor: 'pointer'
-                  }}
-                  onClick={() => togglePerson(person.ID)}
-                >
-                  <td style={{ padding: '0.75rem 0.5rem', textAlign: 'center' }}>
-                    <input
-                      type="checkbox"
-                      checked={selectedPeople.includes(person.ID)}
-                      onChange={() => togglePerson(person.ID)}
-                      disabled={!selectedPeople.includes(person.ID) && selectedPeople.length >= 5}
-                      style={{ cursor: 'pointer' }}
-                      onClick={(e) => e.stopPropagation()}
-                    />
-                  </td>
-                  <td style={{ 
-                    padding: '0.75rem 0.5rem', 
-                    fontWeight: '500',
-                    color: '#212529'
-                  }}>
+        <label>Select People (up to 5) {people.length > 0 && `(${people.length} available)`}</label>
+        <div className="autocomplete-wrapper">
+          <input
+            type="text"
+            value={peopleSearch}
+            onChange={(e) => {
+              setPeopleSearch(e.target.value);
+              setPeopleDropdownOpen(true);
+            }}
+            onFocus={() => setPeopleDropdownOpen(true)}
+            placeholder="Type to search people..."
+            disabled={selectedPeople.length >= 5}
+            className="autocomplete-input"
+          />
+          {peopleDropdownOpen && selectedPeople.length < 5 && (
+            <div className="autocomplete-dropdown">
+              {filteredPeople.length === 0 ? (
+                <div className="autocomplete-item disabled">
+                  <em>{peopleSearch ? 'No matching people found' : 'All people selected'}</em>
+                </div>
+              ) : (
+                filteredPeople.slice(0, 20).map(person => (
+                  <div
+                    key={person.ID}
+                    className="autocomplete-item"
+                    onClick={() => {
+                      togglePerson(person.ID);
+                      setPeopleSearch('');
+                      if (selectedPeople.length >= 4) { // Will be 5 after this selection
+                        setPeopleDropdownOpen(false);
+                      }
+                    }}
+                  >
+                    <span className="person-name">{person.neName}</span>
+                    {person.neRelation && (
+                      <span className="person-relation"> — {person.neRelation}</span>
+                    )}
+                    <span className="count"> ({person.neCount} photos)</span>
+                  </div>
+                ))
+              )}
+            </div>
+          )}
+          {selectedPeople.length > 0 && (
+            <div className="selected-tags">
+              {selectedPeople.map(personId => {
+                const person = people.find(p => p.ID === personId);
+                if (!person) return null;
+                return (
+                  <span key={personId} className="tag">
                     {person.neName}
-                  </td>
-                  <td style={{ 
-                    padding: '0.75rem 0.5rem',
-                    color: '#6c757d',
-                    fontSize: '0.9rem'
-                  }}>
-                    {person.neRelation || '—'}
-                  </td>
-                  <td style={{ 
-                    padding: '0.75rem 0.5rem', 
-                    textAlign: 'center',
-                    fontWeight: '500',
-                    color: '#495057'
-                  }}>
-                    {person.neCount}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+                    <button
+                      type="button"
+                      onClick={() => togglePerson(personId)}
+                      className="tag-remove"
+                    >
+                      ×
+                    </button>
+                  </span>
+                );
+              })}
+            </div>
+          )}
+          {selectedPeople.length >= 5 && (
+            <div style={{ marginTop: '0.5rem', color: '#856404', fontSize: '0.9rem' }}>
+              Maximum of 5 people reached. Remove someone to add another.
+            </div>
+          )}
         </div>
       </div>
 
       <div className="form-group">
-        <label>Or Select an Event:</label>
-        <select
-          value={selectedEvent || ''}
-          onChange={(e) => onSelectedEventChange(e.target.value ? parseInt(e.target.value) : null)}
-        >
-          <option value="">-- Select Event --</option>
-          {events.map((event) => (
-            <option key={event.ID} value={event.ID}>
-              {event.neName} ({event.neCount} photos)
-            </option>
-          ))}
-        </select>
+        <label>Or Select an Event {events.length > 0 && `(${events.length} available)`}</label>
+        <div className="autocomplete-wrapper">
+          <input
+            type="text"
+            value={eventSearch}
+            onChange={(e) => {
+              setEventSearch(e.target.value);
+              setEventDropdownOpen(true);
+            }}
+            onFocus={() => setEventDropdownOpen(true)}
+            placeholder={selectedEvent ? getSelectedEventName() : "Type to search events..."}
+            className="autocomplete-input"
+          />
+          {eventDropdownOpen && (
+            <div className="autocomplete-dropdown">
+              <div 
+                className="autocomplete-item"
+                onClick={() => {
+                  onSelectedEventChange(null);
+                  setEventSearch('');
+                  setEventDropdownOpen(false);
+                }}
+              >
+                <em>-- No Event --</em>
+              </div>
+              {filteredEvents.length === 0 ? (
+                <div className="autocomplete-item disabled">
+                  <em>{eventSearch ? 'No matching events found' : 'No events in database'}</em>
+                </div>
+              ) : (
+                filteredEvents.map(event => (
+                  <div
+                    key={event.ID}
+                    className="autocomplete-item"
+                    onClick={() => {
+                      onSelectedEventChange(event.ID);
+                      setEventSearch('');
+                      setEventDropdownOpen(false);
+                    }}
+                  >
+                    {event.neName} <span className="count">({event.neCount} photos)</span>
+                  </div>
+                ))
+              )}
+            </div>
+          )}
+          {selectedEvent && (
+            <div className="selected-tags">
+              <span className="tag">
+                {getSelectedEventName()}
+                <button
+                  type="button"
+                  onClick={() => onSelectedEventChange(null)}
+                  className="tag-remove"
+                >
+                  ×
+                </button>
+              </span>
+            </div>
+          )}
+        </div>
       </div>
 
       <div className="form-group" style={{ 
