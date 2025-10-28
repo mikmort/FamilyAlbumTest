@@ -667,7 +667,7 @@ module.exports = async function (context, req) {
                 if (candidateIds.size > 0) {
                     const ids = Array.from(candidateIds);
                     const idPlaceholders = ids.map((_, i) => `@id${i}`).join(',');
-                    const eventQuery = `SELECT ID, neName, neType FROM dbo.NameEvent WHERE ID IN (${idPlaceholders})`;
+                    const eventQuery = `SELECT ID, neName, neRelation, neType FROM dbo.NameEvent WHERE ID IN (${idPlaceholders})`;
                     const eventParams = {};
                     ids.forEach((id, i) => { eventParams[`id${i}`] = id; });
                     
@@ -738,7 +738,7 @@ module.exports = async function (context, req) {
                             const missingEventIds = Array.from(npEventIds).filter(id => !eventLookup[id]);
                             if (missingEventIds.length > 0) {
                                 const eventIdPlaceholders = missingEventIds.map((_, i) => `@eid${i}`).join(',');
-                                const eventQuery = `SELECT ID, neName, neType FROM dbo.NameEvent WHERE ID IN (${eventIdPlaceholders})`;
+                                const eventQuery = `SELECT ID, neName, neRelation, neType FROM dbo.NameEvent WHERE ID IN (${eventIdPlaceholders})`;
                                 const eventParams = {};
                                 missingEventIds.forEach((id, i) => { eventParams[`eid${i}`] = id; });
                                 
