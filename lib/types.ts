@@ -34,7 +34,7 @@ export interface MediaItem {
   PReviewed: boolean;
   PSoundFile?: string;
   PBlobUrl: string;
-  TaggedPeople?: Array<{ ID: number; neName: string }>;
+  TaggedPeople?: Array<{ ID: number; neName: string; neRelation?: string }>;
   // Optional Event information attached by the media API
   Event?: { ID: number; neName: string } | null;
 }
