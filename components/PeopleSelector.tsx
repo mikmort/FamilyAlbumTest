@@ -319,7 +319,7 @@ export default function PeopleSelector({
       </h2>
 
       {/* People Selection - TOP */}
-      <div className="form-group">
+      <div className="form-group" style={{ marginBottom: '18rem' }}>
         <label>Select People (up to 5) {people.length > 0 && `(${people.length} available)`}</label>
         <div className="autocomplete-wrapper">
           <input
