@@ -870,7 +870,8 @@ export default function MediaDetailModal({
                       <span 
                         className="person-name-clickable"
                         onClick={() => {
-                          if (person.neRelation) {
+                          console.log('Person clicked:', person);
+                          if (person.neRelation && person.neRelation.trim() !== '') {
                             alert(`${person.neName}\n${person.neRelation}`);
                           } else {
                             alert(`${person.neName}\n(No relation specified)`);
