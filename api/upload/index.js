@@ -453,6 +453,11 @@ module.exports = async function (context, req) {
 
         context.res = {
             status: 201,
+            headers: {
+                'X-Upload-Version': '2.0-AVI-FIX',
+                'X-Original-Filename': fileName,
+                'X-Final-Filename': uniqueFilename
+            },
             body: {
                 success: true,
                 fileName: uniqueFilename,
