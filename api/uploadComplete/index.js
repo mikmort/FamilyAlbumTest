@@ -47,7 +47,80 @@ module.exports = async function (context, req) {
         }
 
         const blobUrl = blockBlobClient.url;
-        const mediaType = contentType?.startsWith('image/') ? 1 : 2;
+        let mediaType = contentType?.startsWith('image/') ? 1 : 2;
+
+        // Check if this is an AVI file that needs conversion to MP4
+        // This happens when user uploads .AVI but we changed extension to .mp4 in getUploadUrl
+        const isAviConversion = fileName.toLowerCase().endsWith('.mp4') && 
+                                (contentType === 'video/x-msvideo' || 
+                                 contentType === 'video/avi' || 
+                                 contentType === 'video/msvideo');
+
+        if (isAviConversion) {
+            context.log(`⚠️ Detected AVI file uploaded as MP4: ${fileName}. Converting...`);
+            
+            try {
+                // Download the AVI blob
+                const downloadResponse = await blockBlobClient.download();
+                const chunks = [];
+                for await (const chunk of downloadResponse.readableStreamBody) {
+                    chunks.push(chunk);
+                }
+                const aviBuffer = Buffer.concat(chunks);
+                context.log(`Downloaded AVI file (${aviBuffer.length} bytes)`);
+
+                // Convert AVI to MP4 using FFmpeg
+                const mp4Buffer = await new Promise((resolve, reject) => {
+                    const inputStream = Readable.from(aviBuffer);
+                    const chunks = [];
+
+                    ffmpeg(inputStream)
+                        .inputFormat('avi')
+                        .videoCodec('libx264')
+                        .audioCodec('aac')
+                        .outputFormat('mp4')
+                        .outputOptions([
+                            '-preset fast',
+                            '-crf 23',
+                            '-movflags +faststart'
+                        ])
+                        .on('start', (cmd) => {
+                            context.log('FFmpeg command:', cmd);
+                        })
+                        .on('progress', (progress) => {
+                            if (progress.percent) {
+                                context.log(`Conversion progress: ${Math.round(progress.percent)}%`);
+                            }
+                        })
+                        .on('error', (err) => {
+                            context.log.error('FFmpeg error:', err);
+                            reject(err);
+                        })
+                        .on('end', () => {
+                            context.log('✓ AVI to MP4 conversion complete');
+                            resolve(Buffer.concat(chunks));
+                        })
+                        .pipe()
+                        .on('data', (chunk) => {
+                            chunks.push(chunk);
+                        });
+                });
+
+                // Upload the converted MP4 back to blob storage (overwrite)
+                await blockBlobClient.uploadData(mp4Buffer, {
+                    blobHTTPHeaders: {
+                        blobContentType: 'video/mp4'
+                    }
+                });
+                
+                context.log(`✓ Uploaded converted MP4: ${fileName} (${mp4Buffer.length} bytes)`);
+                mediaType = 2; // Video
+                
+            } catch (conversionErr) {
+                context.log.error('AVI conversion failed:', conversionErr);
+                // Continue with original file - it might still play
+            }
+        }
 
         // Generate API URLs (without 'media/' prefix - it's added by blob storage lookup)
         // For new uploads without directory structure, just use the filename

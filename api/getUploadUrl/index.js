@@ -59,7 +59,7 @@ module.exports = async function (context, req) {
     context.log('Get upload URL API called');
 
     try {
-        const { fileName } = req.query;
+        let { fileName } = req.query;
 
         if (!fileName) {
             context.res = {
@@ -73,6 +73,16 @@ module.exports = async function (context, req) {
         }
 
         context.log('Requested filename:', fileName);
+
+        // Convert AVI files to MP4 (change extension before generating SAS URL)
+        const lowerFileName = fileName.toLowerCase();
+        if (lowerFileName.endsWith('.avi')) {
+            const lastDotIndex = fileName.lastIndexOf('.');
+            if (lastDotIndex !== -1) {
+                fileName = fileName.substring(0, lastDotIndex) + '.mp4';
+                context.log(`AVI file detected. Changed extension: ${req.query.fileName} -> ${fileName}`);
+            }
+        }
 
         // Check for duplicates and get unique filename
         const uniqueFilename = await getUniqueFilename(fileName);
