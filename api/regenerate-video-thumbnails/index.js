@@ -9,7 +9,7 @@ module.exports = async function (context, req) {
     try {
         // Get all videos that don't have thumbnails or have thumbnails pointing to the video itself
         const videos = await query(`
-            SELECT ID, PFileName, PBlobUrl, PThumbnailUrl, PType
+            SELECT PFileName, PBlobUrl, PThumbnailUrl, PType
             FROM Pictures
             WHERE PType = 2
             AND (PThumbnailUrl IS NULL OR PThumbnailUrl = '' OR PThumbnailUrl = PBlobUrl)
@@ -84,10 +84,10 @@ module.exports = async function (context, req) {
                     UPDATE Pictures
                     SET PThumbnailUrl = @thumbnailUrl,
                         PLastModifiedDate = GETDATE()
-                    WHERE ID = @id
+                    WHERE PFileName = @fileName
                 `, {
                     thumbnailUrl,
-                    id: video.ID
+                    fileName: video.PFileName
                 });
 
                 context.log(`✅ Updated database for ${video.PFileName}`);
