@@ -217,22 +217,23 @@ module.exports = async function (context, req) {
             }
         }
 
-        // Check for duplicate filenames and generate Windows-style numbered name if needed
-        // E.g., IMG_5033.jpg -> IMG_5033 (1).jpg -> IMG_5033 (2).jpg
-        let uniqueFilename = await getUniqueFilename(fileName);
-        
-        if (uniqueFilename !== fileName) {
-            context.log(`Duplicate detected. Renamed: ${fileName} -> ${uniqueFilename}`);
-        }
-
-        // Convert AVI files to MP4
+        // Convert AVI files to MP4 - do this BEFORE checking for duplicates
         let needsVideoConversion = false;
+        let fileNameToCheck = fileName;
         if (fileName.toLowerCase().endsWith('.avi') || actualContentType === 'video/x-msvideo') {
             needsVideoConversion = true;
-            // Change extension to .mp4
-            uniqueFilename = uniqueFilename.replace(/\.avi$/i, '.mp4');
+            // Change extension to .mp4 for duplicate check and storage
+            fileNameToCheck = fileName.replace(/\.avi$/i, '.mp4');
             actualContentType = 'video/mp4';
-            context.log(`AVI file detected. Will convert to MP4: ${uniqueFilename}`);
+            context.log(`AVI file detected. Will convert to MP4: ${fileNameToCheck}`);
+        }
+
+        // Check for duplicate filenames and generate Windows-style numbered name if needed
+        // E.g., IMG_5033.jpg -> IMG_5033 (1).jpg -> IMG_5033 (2).jpg
+        let uniqueFilename = await getUniqueFilename(fileNameToCheck);
+        
+        if (uniqueFilename !== fileNameToCheck) {
+            context.log(`Duplicate detected. Renamed: ${fileNameToCheck} -> ${uniqueFilename}`);
         }
         
         const mediaType = actualContentType.startsWith('image/') ? 1 : 2; // 1=image, 2=video
