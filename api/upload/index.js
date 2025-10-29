@@ -7,6 +7,7 @@ const { Readable } = require('stream');
 
 ffmpeg.setFfmpegPath(ffmpegPath);
 
+// Version: 2.0 - AVI to MP4 conversion with uppercase extension fix
 /**
  * Check if filename exists and generate Windows-style duplicate name if needed
  * E.g., IMG_5033.jpg -> IMG_5033 (1).jpg -> IMG_5033 (2).jpg
