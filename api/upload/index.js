@@ -238,6 +238,7 @@ module.exports = async function (context, req) {
         const mediaType = actualContentType.startsWith('image/') ? 1 : 2; // 1=image, 2=video
 
         let thumbnailUrl = null;
+        let blobUrl = null;
         let width = 0;
         let height = 0;
         let duration = 0;
@@ -351,12 +352,13 @@ module.exports = async function (context, req) {
                     context.log(`Converted AVI to MP4, new size: ${videoBuffer.length} bytes`);
                 }
                 
-                // Upload video first so we can generate thumbnail from it
-                const tempVideoUrl = await uploadBlob(
+                // Upload video to blob storage
+                blobUrl = await uploadBlob(
                     `media/${uniqueFilename}`,
                     buffer,
                     actualContentType
                 );
+                context.log('Video uploaded to blob storage');
 
                 context.log('Generating video thumbnail...');
                 // Generate thumbnail from video using screenshot to buffer
@@ -400,12 +402,14 @@ module.exports = async function (context, req) {
             }
         }
 
-        // Upload to blob storage in the media container
-        const blobUrl = await uploadBlob(
-            `media/${uniqueFilename}`,
-            buffer,
-            actualContentType
-        );
+        // Upload images to blob storage (videos already uploaded above)
+        if (mediaType === 1) {
+            blobUrl = await uploadBlob(
+                `media/${uniqueFilename}`,
+                buffer,
+                actualContentType
+            );
+        }
 
         // Use the generated thumbnail URL or fallback to main blob URL
         if (!thumbnailUrl) {
