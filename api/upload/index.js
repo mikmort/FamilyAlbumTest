@@ -228,10 +228,14 @@ module.exports = async function (context, req) {
             actualContentType === 'video/avi' ||
             actualContentType === 'video/msvideo') {
             needsVideoConversion = true;
-            // Change extension to .mp4 for duplicate check and storage
-            fileNameToCheck = fileName.replace(/\.avi$/i, '.mp4');
+            // Change extension to .mp4 (handle both uppercase and lowercase)
+            // Find the last occurrence of .avi (case insensitive) and replace with .mp4
+            const lastDotIndex = fileName.lastIndexOf('.');
+            if (lastDotIndex !== -1) {
+                fileNameToCheck = fileName.substring(0, lastDotIndex) + '.mp4';
+            }
             actualContentType = 'video/mp4';
-            context.log(`✅ AVI file detected. Will convert to MP4: ${fileNameToCheck}`);
+            context.log(`✅ AVI file detected. Will convert to MP4: ${fileName} -> ${fileNameToCheck}`);
         } else {
             context.log(`ℹ️ Not an AVI file. Extension check: ${lowerFileName.endsWith('.avi')}, ContentType: ${actualContentType}`);
         }
