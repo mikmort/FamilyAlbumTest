@@ -217,15 +217,23 @@ module.exports = async function (context, req) {
             }
         }
 
+        context.log(`File: ${fileName}, ContentType: ${contentType}, ActualContentType: ${actualContentType}`);
+
         // Convert AVI files to MP4 - do this BEFORE checking for duplicates
         let needsVideoConversion = false;
         let fileNameToCheck = fileName;
-        if (fileName.toLowerCase().endsWith('.avi') || actualContentType === 'video/x-msvideo') {
+        const lowerFileName = fileName.toLowerCase();
+        if (lowerFileName.endsWith('.avi') || 
+            actualContentType === 'video/x-msvideo' || 
+            actualContentType === 'video/avi' ||
+            actualContentType === 'video/msvideo') {
             needsVideoConversion = true;
             // Change extension to .mp4 for duplicate check and storage
             fileNameToCheck = fileName.replace(/\.avi$/i, '.mp4');
             actualContentType = 'video/mp4';
-            context.log(`AVI file detected. Will convert to MP4: ${fileNameToCheck}`);
+            context.log(`✅ AVI file detected. Will convert to MP4: ${fileNameToCheck}`);
+        } else {
+            context.log(`ℹ️ Not an AVI file. Extension check: ${lowerFileName.endsWith('.avi')}, ContentType: ${actualContentType}`);
         }
 
         // Check for duplicate filenames and generate Windows-style numbered name if needed
