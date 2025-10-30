@@ -117,7 +117,9 @@ module.exports = async function (context, req) {
             context.log('AFTER REMOVING /tags SUFFIX:', tempPath);
             
             filename = decodeURIComponent(tempPath);
-            context.log('DECODED FILENAME:', filename);
+            // Normalize all backslashes to forward slashes
+            filename = filename.replace(/\\/g, '/');
+            context.log('DECODED AND NORMALIZED FILENAME:', filename);
         }
     }
     
@@ -135,7 +137,10 @@ module.exports = async function (context, req) {
 
     // Normalize path: convert backslashes to forward slashes for blob storage
     if (filename) {
+        // Normalize all backslashes to forward slashes
         filename = filename.replace(/\\/g, '/');
+        // Also normalize any accidental double slashes
+        filename = filename.replace(/\/\//g, '/');
         context.log('NORMALIZED FILENAME:', filename);
     }
 
@@ -487,15 +492,24 @@ module.exports = async function (context, req) {
                 // Determine content type
                 const contentType = downloadResponse.contentType || getContentType(blobPath);
                 
+                // For video files, add Accept-Ranges header to support seeking
+                const isVideo = contentType && contentType.startsWith('video/');
+                const headers = {
+                    'Content-Type': contentType,
+                    'Content-Disposition': `inline; filename="${blobPath.split('/').pop()}"`,
+                    'Cache-Control': 'public, max-age=31536000', // Cache for 1 year
+                    'Content-Length': buffer.length.toString()
+                };
+                
+                if (isVideo) {
+                    headers['Accept-Ranges'] = 'bytes';
+                    headers['Content-Range'] = `bytes 0-${buffer.length - 1}/${buffer.length}`;
+                }
+                
                 // Return the buffer
                 context.res = {
                     status: 200,
-                    headers: {
-                        'Content-Type': contentType,
-                        'Content-Disposition': `inline; filename="${blobPath.split('/').pop()}"`,
-                        'Cache-Control': 'public, max-age=31536000', // Cache for 1 year
-                        'Content-Length': buffer.length.toString()
-                    },
+                    headers: headers,
                     body: buffer,
                     isRaw: true
                 };
