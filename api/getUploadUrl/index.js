@@ -119,3 +119,6 @@ module.exports = async function (context, req) {
         };
     }
 };
+
+// Trigger redeploy: trivial comment
+// Redeploy requested on October 30, 2025
