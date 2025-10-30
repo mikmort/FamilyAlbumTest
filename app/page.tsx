@@ -55,8 +55,13 @@ export default function Home() {
     try {
       const res = await fetch('/api/admin-rename-blobs', { method: 'POST' });
       const text = await res.text();
+      let displayText = text;
+      try {
+        const json = JSON.parse(text);
+        displayText = JSON.stringify(json, null, 2);
+      } catch {}
       setShowBlobFixButton(false);
-      setTimeout(() => setBlobFixStatus('Done: ' + text), 100); // Delay status update to ensure it persists
+      setTimeout(() => setBlobFixStatus(displayText), 100);
     } catch (err) {
       setBlobFixStatus('Error: ' + (err instanceof Error ? err.message : String(err)));
     }
