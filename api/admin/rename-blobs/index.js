@@ -1,7 +1,18 @@
 const { BlobServiceClient } = require('@azure/storage-blob');
 
+
+
+
+
 module.exports = async function (context, req) {
-  // Optional: check for admin authentication here
+  if (req.method === 'GET') {
+    context.res = {
+      status: 200,
+      body: 'Rename blobs endpoint is available.'
+    };
+    return;
+  }
+  // ...existing code...
   const AZURE_STORAGE_CONNECTION_STRING = process.env.AZURE_STORAGE_CONNECTION_STRING;
   const CONTAINER_NAME = 'family-album-media'; // Replace with your actual container name
 
