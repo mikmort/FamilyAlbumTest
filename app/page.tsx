@@ -53,7 +53,7 @@ export default function Home() {
   const runBlobFix = async () => {
     setBlobFixStatus('Running...');
     try {
-      const res = await fetch('/api/admin-rename-blobs', { method: 'POST' });
+      const res = await fetch('/api/rename-blobs', { method: 'POST' });
       const text = await res.text();
       let displayText = text;
       try {
