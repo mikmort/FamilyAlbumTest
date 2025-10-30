@@ -55,8 +55,8 @@ export default function Home() {
     try {
       const res = await fetch('/api/admin-rename-blobs', { method: 'POST' });
       const text = await res.text();
-      setBlobFixStatus('Done: ' + text);
       setShowBlobFixButton(false);
+      setTimeout(() => setBlobFixStatus('Done: ' + text), 100); // Delay status update to ensure it persists
     } catch (err) {
       setBlobFixStatus('Error: ' + (err instanceof Error ? err.message : String(err)));
     }
@@ -64,6 +64,20 @@ export default function Home() {
 
   return (
     <>
+      {/* Blob fix button and status at the very top */}
+      <div style={{ margin: '16px 0', textAlign: 'center' }}>
+        {showBlobFixButton && (
+          <button className="btn btn-danger" onClick={runBlobFix}>
+            Run Blob Storage Fix
+          </button>
+        )}
+        {blobFixStatus && (
+          <div style={{ marginTop: 8, color: 'darkgreen', fontWeight: 'bold' }}>
+            {blobFixStatus}
+          </div>
+        )}
+      </div>
+
       <div className="app-header">
         <Navigation
           onManagePeople={() => setView('manage-people')}
@@ -76,16 +90,6 @@ export default function Home() {
       </div>
 
       <main className="container">
-        {/* Temporary blob fix button */}
-        {showBlobFixButton && (
-          <div style={{ margin: '16px 0' }}>
-            <button className="btn btn-danger" onClick={runBlobFix}>
-              Run Blob Storage Fix
-            </button>
-            {blobFixStatus && <div style={{ marginTop: 8 }}>{blobFixStatus}</div>}
-          </div>
-        )}
-
         {view === 'select' && (
           <PeopleSelector
             selectedPeople={selectedPeople}
