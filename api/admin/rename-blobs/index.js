@@ -5,40 +5,10 @@ const { BlobServiceClient } = require('@azure/storage-blob');
 
 
 module.exports = async function (context, req) {
-  if (req.method === 'GET') {
-    context.res = {
-      status: 200,
-      body: 'Rename blobs endpoint is available.'
-    };
-    return;
-  }
-  // ...existing code...
-  const AZURE_STORAGE_CONNECTION_STRING = process.env.AZURE_STORAGE_CONNECTION_STRING;
-  const CONTAINER_NAME = 'family-album-media'; // Replace with your actual container name
-
-  const blobServiceClient = BlobServiceClient.fromConnectionString(AZURE_STORAGE_CONNECTION_STRING);
-  const containerClient = blobServiceClient.getContainerClient(CONTAINER_NAME);
-
-  let renamed = 0;
-  for await (const blob of containerClient.listBlobsFlat()) {
-    if (blob.name.includes('\\')) {
-      const newName = blob.name.replace(/\\/g, '/');
-      const blockBlobClient = containerClient.getBlockBlobClient(blob.name);
-      const downloadResponse = await blockBlobClient.download();
-      const buffer = await streamToBuffer(downloadResponse.readableStreamBody);
-
-      const newBlobClient = containerClient.getBlockBlobClient(newName);
-      await newBlobClient.uploadData(buffer, {
-        blobHTTPHeaders: { blobContentType: blob.properties.contentType }
-      });
-      await blockBlobClient.delete();
-      renamed++;
-    }
-  }
-
+  try {
   context.res = {
     status: 200,
-    body: { success: true, renamed }
+    body: `Minimal test: rename-blobs endpoint is working for ${req.method} request.`
   };
 };
 
