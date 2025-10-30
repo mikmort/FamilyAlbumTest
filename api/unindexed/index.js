@@ -103,7 +103,7 @@ module.exports = async function (context, req) {
 
     // POST /api/unindexed/process - Process an unindexed file
     if (method === 'POST' && action === 'process') {
-      const {
+      let {
         uiID,
         fileName,
         directory,
@@ -119,6 +119,12 @@ module.exports = async function (context, req) {
         height,
         vtime
       } = req.body;
+
+      // Normalize all file paths to use forward slashes
+      if (fileName) fileName = fileName.replace(/\\/g, '/');
+      if (directory) directory = directory.replace(/\\/g, '/');
+      if (blobUrl) blobUrl = blobUrl.replace(/\\/g, '/');
+      if (thumbUrl) thumbUrl = thumbUrl.replace(/\\/g, '/');
 
       if (!uiID || !fileName) {
         context.res = {
