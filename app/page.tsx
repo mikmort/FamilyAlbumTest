@@ -21,6 +21,8 @@ export default function Home() {
   const [exclusiveFilter, setExclusiveFilter] = useState(false);
   const [selectedMedia, setSelectedMedia] = useState<MediaItem | null>(null);
   const [startFullscreen, setStartFullscreen] = useState(false);
+  const [showBlobFixButton, setShowBlobFixButton] = useState(true);
+  const [blobFixStatus, setBlobFixStatus] = useState<string | null>(null);
 
   const handleContinue = () => {
     setView('gallery');
@@ -48,6 +50,18 @@ export default function Home() {
     setStartFullscreen(true);
   };
 
+  const runBlobFix = async () => {
+    setBlobFixStatus('Running...');
+    try {
+      const res = await fetch('/api/admin-rename-blobs', { method: 'POST' });
+      const text = await res.text();
+      setBlobFixStatus('Done: ' + text);
+      setShowBlobFixButton(false);
+    } catch (err) {
+      setBlobFixStatus('Error: ' + (err instanceof Error ? err.message : String(err)));
+    }
+  };
+
   return (
     <>
       <div className="app-header">
@@ -62,6 +76,16 @@ export default function Home() {
       </div>
 
       <main className="container">
+        {/* Temporary blob fix button */}
+        {showBlobFixButton && (
+          <div style={{ margin: '16px 0' }}>
+            <button className="btn btn-danger" onClick={runBlobFix}>
+              Run Blob Storage Fix
+            </button>
+            {blobFixStatus && <div style={{ marginTop: 8 }}>{blobFixStatus}</div>}
+          </div>
+        )}
+
         {view === 'select' && (
           <PeopleSelector
             selectedPeople={selectedPeople}
