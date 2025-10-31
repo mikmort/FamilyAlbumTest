@@ -141,6 +141,16 @@ module.exports = async function (context, req) {
         filename = filename.replace(/\\/g, '/');
         // Also normalize any accidental double slashes
         filename = filename.replace(/\/\//g, '/');
+        // Remove duplicated folder segments (e.g., Events/ES BnotMitzvah/Events/ES BnotMitzvah/IMG_2660.JPG)
+        const parts = filename.split('/');
+        for (let i = 1; i < parts.length; i++) {
+            if (parts[i] === parts[i - 1]) {
+                parts.splice(i, 1);
+                i--;
+            }
+        }
+        filename = parts.join('/');
+        context.log('DEDUPED FILENAME:', filename);
         context.log('NORMALIZED FILENAME:', filename);
     }
 
