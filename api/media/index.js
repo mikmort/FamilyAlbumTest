@@ -135,25 +135,14 @@ module.exports = async function (context, req) {
         }
     }
 
-    // Normalize path: convert backslashes to forward slashes for blob storage
+    // Use only PFileName for blob path lookup and API URL construction
     if (filename) {
-        // Normalize all backslashes to forward slashes
-        filename = filename.replace(/\\/g, '/');
-        // Also normalize any accidental double slashes
-        filename = filename.replace(/\/\//g, '/');
-        // Remove duplicated folder segments (e.g., Events/ES BnotMitzvah/Events/ES BnotMitzvah/IMG_2660.JPG)
-        let parts = filename.split('/');
-        for (let i = 1; i < parts.length; i++) {
-            if (parts[i] === parts[i - 1]) {
-                parts.splice(i, 1);
-                i--;
-            }
-        }
-        // Trim whitespace from each segment
-        parts = parts.map(s => s.trim());
-        filename = parts.join('/');
-        context.log('DEDUPED & TRIMMED FILENAME:', filename);
-        context.log('NORMALIZED FILENAME:', filename);
+    // Normalize any accidental double slashes
+    filename = filename.replace(/\/\//g, '/');
+    // Trim whitespace from each segment
+    let parts = filename.split('/').map(s => s.trim());
+    filename = parts.join('/');
+    context.log('FINAL FILENAME FOR LOOKUP:', filename);
     }
 
     // Check if thumbnail is requested
