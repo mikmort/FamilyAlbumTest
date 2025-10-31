@@ -53,6 +53,28 @@ function releaseThumbnailLock(filepath) {
 }
 
 module.exports = async function (context, req) {
+    // Temporary debug endpoint: /api/media/debug/list
+    if (req.url && req.url.startsWith('/api/media/debug/list')) {
+        // Query all media items (limit to 100 for safety)
+        const rows = await query('SELECT TOP 100 * FROM dbo.Pictures ORDER BY PFileName');
+        // Transform as in main API
+        const debugMedia = rows.map(item => {
+            let blobPath = (item.PFileName || '').replace(/\\/g, '/').replace(/\/\//g, '/');
+            blobPath = blobPath.split('/').map(s => s.trim()).join('/');
+            const encodedBlobPath = blobPath.split('/').map(encodeURIComponent).join('/');
+            return {
+                PFileName: item.PFileName,
+                PBlobUrl: `/api/media/${encodedBlobPath}`,
+                PThumbnailUrl: item.PThumbnailUrl ? item.PThumbnailUrl : `/api/media/${encodedBlobPath}?thumbnail=true`
+            };
+        });
+        context.res = {
+            status: 200,
+            headers: { 'Content-Type': 'application/json' },
+            body: debugMedia
+        };
+        return;
+    }
     // Log everything for debugging
     context.log('=== MEDIA API DEBUG ===');
     context.log('req.url:', req.url);
@@ -778,26 +800,10 @@ module.exports = async function (context, req) {
             let transformedMedia;
             try {
                 transformedMedia = media.map(item => {
-                    const directory = item.PFileDirectory || '';
-                    const fileName = item.PFileName || '';
-                    
-                    // Construct the blob path: directory/filename
-                    // But check if fileName already contains the directory to avoid duplication
-                    let blobPath;
-                    if (directory && fileName.startsWith(directory)) {
-                        // Filename already contains the full path
-                        blobPath = fileName;
-                    } else if (directory) {
-                        // Need to combine directory and filename
-                        blobPath = `${directory}/${fileName}`;
-                    } else {
-                        // No directory, just use filename
-                        blobPath = fileName;
-                    }
-                    
-                    // Normalize slashes (convert backslash to forward slash)
-                    blobPath = blobPath.replace(/\\/g, '/');
-                    
+                    // Always use only PFileName for blob path and API URL construction
+                    let blobPath = (item.PFileName || '').replace(/\\/g, '/').replace(/\/\//g, '/');
+                    // Trim whitespace from each segment
+                    blobPath = blobPath.split('/').map(s => s.trim()).join('/');
                     // The database stores filenames that match blob storage exactly
                     // Some blob names have URL-encoded characters (%27, %20) as part of the blob name
                     // Don't encode again - use the blob path as-is
@@ -878,6 +884,12 @@ module.exports = async function (context, req) {
             }
 
             context.res = {
+                // Log each media item for debugging
+                transformedMedia.forEach(item => {
+                    context.log(`[MEDIA DEBUG] PFileName: ${item.PFileName}`);
+                    context.log(`[MEDIA DEBUG] PBlobUrl: ${item.PBlobUrl}`);
+                    context.log(`[MEDIA DEBUG] PThumbnailUrl: ${item.PThumbnailUrl}`);
+                });
                 status: 200,
                 headers: { 'Content-Type': 'application/json' },
                 body: transformedMedia

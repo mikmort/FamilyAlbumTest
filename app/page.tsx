@@ -21,8 +21,6 @@ export default function Home() {
   const [exclusiveFilter, setExclusiveFilter] = useState(false);
   const [selectedMedia, setSelectedMedia] = useState<MediaItem | null>(null);
   const [startFullscreen, setStartFullscreen] = useState(false);
-  const [showBlobFixButton, setShowBlobFixButton] = useState(true);
-  const [blobFixStatus, setBlobFixStatus] = useState<string | null>(null);
 
   const handleContinue = () => {
     setView('gallery');
@@ -50,38 +48,9 @@ export default function Home() {
     setStartFullscreen(true);
   };
 
-  const runBlobFix = async () => {
-    setBlobFixStatus('Running...');
-    try {
-      const res = await fetch('/api/blobfix', { method: 'POST' }); // <-- updated endpoint
-      const text = await res.text();
-      let displayText = text;
-      try {
-        const json = JSON.parse(text);
-        displayText = JSON.stringify(json, null, 2);
-      } catch {}
-      setShowBlobFixButton(false);
-      setTimeout(() => setBlobFixStatus(displayText), 100);
-    } catch (err) {
-      setBlobFixStatus('Error: ' + (err instanceof Error ? err.message : String(err)));
-    }
-  };
 
   return (
     <>
-      {/* Blob fix button and status at the very top */}
-      <div style={{ margin: '16px 0', textAlign: 'center' }}>
-        {showBlobFixButton && (
-          <button className="btn btn-danger" onClick={runBlobFix}>
-            Run Blob Storage Fix
-          </button>
-        )}
-        {blobFixStatus && (
-          <div style={{ marginTop: 8, color: 'darkgreen', fontWeight: 'bold' }}>
-            {blobFixStatus}
-          </div>
-        )}
-      </div>
 
       <div className="app-header">
         <Navigation
