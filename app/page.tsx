@@ -1,3 +1,4 @@
+// trigger redeploy: trivial change
 'use client';
 
 import { useState, useEffect } from 'react';
