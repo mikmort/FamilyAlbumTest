@@ -217,7 +217,7 @@ export default function ThumbnailGallery({
             <img
               src={
                 item.PThumbnailUrl 
-                  ? `${item.PThumbnailUrl}?v=${new Date(item.PLastModifiedDate).getTime()}` 
+                  ? `${item.PThumbnailUrl}${item.PThumbnailUrl.includes('?') ? '&' : '?'}v=${new Date(item.PLastModifiedDate).getTime()}` 
                   : '/placeholder.svg'
               }
               alt={item.PDescription || item.PFileName}
