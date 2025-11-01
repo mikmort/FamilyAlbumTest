@@ -65,6 +65,34 @@ Quick upload script specifically for the Albums directory.
 - Calls `bulk-upload-photos.ps1` with pre-configured settings
 - **Usage**: `.\scripts\upload-albums.ps1`
 
+### `convert-videos-to-mp4.ps1`
+Converts old MOV files to modern MP4 format with H.264 codec.
+- Downloads MOV files from Azure Blob Storage
+- Converts to web-compatible MP4 format
+- Uploads converted files back to storage
+- Shows file size savings
+- **Usage**: `.\scripts\convert-videos-to-mp4.ps1`
+- **Options**:
+  - `-DryRun` - Preview files without converting
+  - `-Filter` - Filter specific files (default: `*.MOV`)
+  - `-MaxConcurrent` - Concurrent conversions (default: 3)
+- **Prerequisites**: FFmpeg must be installed (`winget install Gyan.FFmpeg`)
+- **See**: [VIDEO_CONVERSION.md](../docs/VIDEO_CONVERSION.md) for full guide
+
+### `update-database-after-conversion.js`
+Updates database after video conversion from MOV to MP4.
+- Finds converted MP4 files in blob storage
+- Generates SQL script to update Pictures table
+- **Usage**: `cd api && node ..\scripts\update-database-after-conversion.js`
+- **Output**: `scripts/update-mov-to-mp4.sql`
+
+### `cleanup-placeholder-thumbnails.js`
+Deletes tiny placeholder thumbnails to force regeneration.
+- Finds thumbnails < 100 bytes (placeholders)
+- Deletes them from blob storage
+- New thumbnails regenerate on next view
+- **Usage**: `cd api && node ..\scripts\cleanup-placeholder-thumbnails.js`
+
 ## Legacy Scripts
 
 The following scripts are older versions kept for reference:
