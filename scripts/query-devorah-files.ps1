@@ -19,7 +19,7 @@ try {
 SELECT TOP 10
     PFileDirectory,
     PFileName,
-    CONCAT(PFileDirectory, '/', PFileName) as ConstructedPath
+    PFileName as ConstructedPath
 FROM dbo.Pictures
 WHERE PFileDirectory LIKE '%Devorah%'
 ORDER BY PFileName

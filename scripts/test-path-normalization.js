@@ -28,11 +28,7 @@ const test2 = {
 };
 
 let blobPath2;
-if (test2.PFileDirectory) {
-    blobPath2 = `${test2.PFileDirectory}/${test2.PFileName}`;
-} else {
-    blobPath2 = test2.PFileName;
-}
+blobPath2 = test2.PFileName;
 blobPath2 = blobPath2.replace(/\\/g, '/').replace(/\/+/g, '/');
 const url2 = `/api/media/${encodeURIComponent(blobPath2)}`;
 
@@ -52,11 +48,7 @@ const test3 = {
 };
 
 let blobPath3;
-if (test3.PFileDirectory) {
-    blobPath3 = `${test3.PFileDirectory}/${test3.PFileName}`;
-} else {
-    blobPath3 = test3.PFileName;
-}
+blobPath3 = test3.PFileName;
 blobPath3 = blobPath3.replace(/\\/g, '/').replace(/\/+/g, '/');
 const url3 = `/api/media/${encodeURIComponent(blobPath3)}`;
 
@@ -76,13 +68,7 @@ const test4 = {
 };
 
 let blobPath4;
-if (test4.PFileDirectory && test4.PFileName.startsWith(test4.PFileDirectory)) {
-    blobPath4 = test4.PFileName;
-} else if (test4.PFileDirectory) {
-    blobPath4 = `${test4.PFileDirectory}/${test4.PFileName}`;
-} else {
-    blobPath4 = test4.PFileName;
-}
+blobPath4 = test4.PFileName;
 blobPath4 = blobPath4.replace(/\\/g, '/').replace(/\/+/g, '/');
 const url4 = `/api/media/${encodeURIComponent(blobPath4)}`;
 

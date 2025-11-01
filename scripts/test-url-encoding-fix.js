@@ -6,14 +6,7 @@ console.log('=== Testing URL Encoding Fix ===\n');
 // Helper function that mimics the API logic
 function constructBlobUrl(directory, fileName) {
     // Same logic as in api/media/index.js
-    let blobPath;
-    if (directory && fileName.startsWith(directory)) {
-        blobPath = fileName;
-    } else if (directory) {
-        blobPath = `${directory}/${fileName}`;
-    } else {
-        blobPath = fileName;
-    }
+    let blobPath = fileName;
     
     // Decode the blob path in case it contains URL-encoded characters from the database
     try {

@@ -9,16 +9,16 @@ async function checkDuplicatePaths() {
         const duplicateResults = await query(`
             SELECT 
                 PFileName,
-                PFileDirectory,
+                -- PFileDirectory (ignored)
                 CASE 
-                    WHEN PFileName LIKE '%' || PFileDirectory || '%' THEN 'DUPLICATE'
+                    -- WHEN PFileName LIKE '%' || PFileDirectory || '%' THEN 'DUPLICATE'
                     WHEN PFileName LIKE 'B:%' OR PFileName LIKE 'C:%' OR PFileName LIKE 'D:%' THEN 'HAS DRIVE LETTER'
                     WHEN PFileDirectory LIKE 'B:%' OR PFileDirectory LIKE 'C:%' OR PFileDirectory LIKE 'D:%' THEN 'DIR HAS DRIVE LETTER'
                     ELSE 'OK'
                 END as Issue
             FROM Media
             WHERE 
-                (PFileName LIKE '%' || PFileDirectory || '%' AND PFileDirectory IS NOT NULL AND PFileDirectory != '')
+                -- (PFileName LIKE '%' || PFileDirectory || '%' AND PFileDirectory IS NOT NULL AND PFileDirectory != '')
                 OR PFileName LIKE 'B:%'
                 OR PFileName LIKE 'C:%'
                 OR PFileName LIKE 'D:%'
@@ -32,7 +32,7 @@ async function checkDuplicatePaths() {
         
         duplicateResults.forEach(row => {
             console.log(`Issue: ${row.Issue}`);
-            console.log(`  PFileDirectory: "${row.PFileDirectory}"`);
+            // console.log(`  PFileDirectory: "${row.PFileDirectory}"`);
             console.log(`  PFileName: "${row.PFileName}"`);
             console.log('');
         });
