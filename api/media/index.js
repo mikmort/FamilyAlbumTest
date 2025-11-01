@@ -425,25 +425,37 @@ module.exports = async function (context, req) {
                             context.log.error(`FFmpeg error stack: ${ffmpegError.stack}`);
                             context.log.error(`FFmpeg error details:`, ffmpegError);
                             
-                            // Fall back to placeholder
-                            context.log.warn(`Falling back to placeholder thumbnail for video`);
-                            const placeholderBuffer = Buffer.from(
-                                'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==',
-                                'base64'
-                            );
-                            await uploadBlob(thumbnailPath, placeholderBuffer, 'image/png');
-                            context.log(`⚠️ Using placeholder for video thumbnail: ${thumbnailPath}`);
+                            // Fall back to a better video placeholder image (300x200 with play icon)
+                            context.log.warn(`Falling back to video placeholder thumbnail`);
+                            
+                            // Create a simple SVG placeholder that will be recognizable
+                            const placeholderSvg = `<svg width="300" height="200" xmlns="http://www.w3.org/2000/svg">
+                                <rect width="300" height="200" fill="#1a1a1a"/>
+                                <circle cx="150" cy="100" r="40" fill="rgba(255,255,255,0.8)"/>
+                                <polygon points="140,85 140,115 165,100" fill="#1a1a1a"/>
+                                <text x="150" y="160" font-family="Arial" font-size="14" fill="white" text-anchor="middle">Video Preview Unavailable</text>
+                            </svg>`;
+                            
+                            const placeholderBuffer = Buffer.from(placeholderSvg);
+                            await uploadBlob(thumbnailPath, placeholderBuffer, 'image/svg+xml');
+                            context.log(`⚠️ Using placeholder SVG for video thumbnail: ${thumbnailPath}`);
                             blobPath = thumbnailPath;
                         }
                     } else if (isVideo && !ffmpeg) {
                         // FFmpeg not available, use placeholder
                         context.log(`Video file detected but ffmpeg not available, using placeholder`);
-                        const placeholderBuffer = Buffer.from(
-                            'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==',
-                            'base64'
-                        );
-                        await uploadBlob(thumbnailPath, placeholderBuffer, 'image/png');
-                        context.log(`Placeholder thumbnail saved for video: ${thumbnailPath}`);
+                        
+                        // Create a simple SVG placeholder that will be recognizable
+                        const placeholderSvg = `<svg width="300" height="200" xmlns="http://www.w3.org/2000/svg">
+                            <rect width="300" height="200" fill="#1a1a1a"/>
+                            <circle cx="150" cy="100" r="40" fill="rgba(255,255,255,0.8)"/>
+                            <polygon points="140,85 140,115 165,100" fill="#1a1a1a"/>
+                            <text x="150" y="160" font-family="Arial" font-size="14" fill="white" text-anchor="middle">Video Preview Unavailable</text>
+                        </svg>`;
+                        
+                        const placeholderBuffer = Buffer.from(placeholderSvg);
+                        await uploadBlob(thumbnailPath, placeholderBuffer, 'image/svg+xml');
+                        context.log(`Placeholder SVG saved for video: ${thumbnailPath}`);
                         blobPath = thumbnailPath;
                     } else {
                         // Generate thumbnail using sharp for images (300px width, maintain aspect ratio)
