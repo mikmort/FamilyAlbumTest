@@ -1,4 +1,5 @@
 # Family Album Web Application
+<!-- Trigger redeployment: trivial change -->
 
 A comprehensive family photo and video management web application built with Next.js, TypeScript, Azure SQL Database, and Azure Blob Storage.
 
