@@ -883,13 +883,14 @@ module.exports = async function (context, req) {
                 throw transformError;
             }
 
+            // Log each media item for debugging
+            transformedMedia.forEach(item => {
+                context.log(`[MEDIA DEBUG] PFileName: ${item.PFileName}`);
+                context.log(`[MEDIA DEBUG] PBlobUrl: ${item.PBlobUrl}`);
+                context.log(`[MEDIA DEBUG] PThumbnailUrl: ${item.PThumbnailUrl}`);
+            });
+
             context.res = {
-                // Log each media item for debugging
-                transformedMedia.forEach(item => {
-                    context.log(`[MEDIA DEBUG] PFileName: ${item.PFileName}`);
-                    context.log(`[MEDIA DEBUG] PBlobUrl: ${item.PBlobUrl}`);
-                    context.log(`[MEDIA DEBUG] PThumbnailUrl: ${item.PThumbnailUrl}`);
-                });
                 status: 200,
                 headers: { 'Content-Type': 'application/json' },
                 body: transformedMedia
