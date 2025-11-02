@@ -25,6 +25,10 @@ module.exports = async function (context, req) {
 
     try {
         const { fileName, contentType, fileModifiedDate } = req.body;
+        
+        context.log('📦 Request body received:', JSON.stringify(req.body, null, 2));
+        context.log('📅 fileModifiedDate value:', fileModifiedDate);
+        context.log('📅 fileModifiedDate type:', typeof fileModifiedDate);
 
         if (!fileName) {
             context.res = {
@@ -229,13 +233,17 @@ module.exports = async function (context, req) {
             // Video processing
             try {
                 context.log('Processing video...');
+                context.log('Video blob URL:', blobUrl);
                 
                 // Get video metadata using ffprobe
                 await new Promise((resolve, reject) => {
                     ffmpeg.ffprobe(blobUrl, (err, metadata) => {
                         if (err) {
+                            context.log.error('FFprobe error:', err);
                             reject(err);
                         } else {
+                            context.log('Video metadata:', JSON.stringify(metadata, null, 2));
+                            
                             if (metadata.format && metadata.format.duration) {
                                 duration = Math.round(metadata.format.duration);
                             }
@@ -247,6 +255,7 @@ module.exports = async function (context, req) {
                             // Extract creation date from metadata
                             if (metadata.format && metadata.format.tags) {
                                 const tags = metadata.format.tags;
+                                context.log('Video tags:', JSON.stringify(tags, null, 2));
                                 // Try various date fields (different formats use different tags)
                                 const dateStr = tags.creation_time || tags.date || tags['com.apple.quicktime.creationdate'];
                                 
@@ -272,16 +281,22 @@ module.exports = async function (context, req) {
                 
                 // Fallback to file modification date if no video metadata date found
                 if ((!month || !year) && fileModifiedDate) {
+                    context.log(`📅 Attempting to use file modification date: ${fileModifiedDate}`);
                     try {
                         const modDate = new Date(fileModifiedDate);
+                        context.log(`Parsed mod date:`, modDate);
                         if (!isNaN(modDate.getTime())) {
                             month = modDate.getMonth() + 1;
                             year = modDate.getFullYear();
                             context.log(`✓ Using file modification date as fallback: ${month}/${year}`);
+                        } else {
+                            context.log(`❌ Invalid date parsed from: ${fileModifiedDate}`);
                         }
                     } catch (err) {
                         context.log('Could not parse file modification date:', err.message);
                     }
+                } else {
+                    context.log(`Date extraction status: month=${month}, year=${year}, fileModifiedDate=${fileModifiedDate}`);
                 }
 
                 // Thumbnail will be generated dynamically via API
@@ -302,7 +317,7 @@ module.exports = async function (context, req) {
                 (@fileName, @directory, @thumbUrl, @type, @width, @height, @duration, 'N', @blobUrl, @month, @year)
         `;
 
-        await execute(insertQuery, {
+        const insertParams = {
             fileName: fileName,
             directory: '',
             thumbUrl: thumbnailUrl,
@@ -313,7 +328,11 @@ module.exports = async function (context, req) {
             blobUrl: apiUrl,  // Store API URL instead of direct blob URL
             month: month,
             year: year,
-        });
+        };
+        
+        context.log('📝 Inserting into UnindexedFiles with params:', JSON.stringify(insertParams, null, 2));
+
+        await execute(insertQuery, insertParams);
 
         context.log(`File registered in database: ${fileName}`);
 
