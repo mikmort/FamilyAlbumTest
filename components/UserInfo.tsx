@@ -28,10 +28,25 @@ export default function UserInfo() {
   if (loading) return null;
   if (!user) return null;
 
+  const getProviderIcon = () => {
+    switch (user.identityProvider) {
+      case 'aad':
+        return '🔷'; // Microsoft
+      case 'google':
+        return '🔴'; // Google
+      case 'github':
+        return '⚫'; // GitHub
+      default:
+        return '👤';
+    }
+  };
+
   return (
     <div className="user-info">
-      <span className="user-name">👤 {user.userDetails}</span>
-      <a href="/.auth/logout" className="logout-link">Logout</a>
+      <span className="user-name">{getProviderIcon()} {user.userDetails}</span>
+      <a href="/.auth/logout?post_logout_redirect_uri=/login.html" className="logout-link">
+        Sign Out
+      </a>
     </div>
   );
 }
