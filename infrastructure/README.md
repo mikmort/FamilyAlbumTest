@@ -232,7 +232,7 @@ az staticwebapp appsettings set `
 
 ### 4. Configure Route Authorization
 
-Create `staticwebapp.config.json` in your project root:
+Create `staticwebapp.config.json` in your `public/` folder (so it gets deployed with the built app):
 
 ```json
 {

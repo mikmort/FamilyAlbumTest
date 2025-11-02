@@ -124,7 +124,7 @@ You should add a sign-out button in your UI that links to this URL.
 
 1. Commit the changes:
    ```bash
-   git add staticwebapp.config.json public/login.html
+   git add public/staticwebapp.config.json public/login.html
    git commit -m "Enable Microsoft and Google authentication"
    git push
    ```
