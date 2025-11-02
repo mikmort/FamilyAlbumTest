@@ -255,28 +255,31 @@ module.exports = async function (context, req) {
             }
         } else if (mediaType === 2) {
             // Video processing
+            context.log('🎬 Starting video processing...');
+            
             try {
-                context.log('Processing video...');
-                
                 // Generate a read SAS URL for ffprobe to access the blob
                 const blobSasUrl = generateReadSasUrl(blockBlobClient, 10); // 10 minute expiry
-                context.log('Generated SAS URL for video processing');
+                context.log('✓ Generated SAS URL for video processing');
                 
                 // Get video metadata using ffprobe with SAS URL
                 await new Promise((resolve, reject) => {
                     ffmpeg.ffprobe(blobSasUrl, (err, metadata) => {
                         if (err) {
-                            context.log.error('FFprobe error:', err);
+                            context.log.error('❌ FFprobe error:', err);
                             reject(err);
                         } else {
+                            context.log('✓ Video metadata retrieved successfully');
                             context.log('Video metadata:', JSON.stringify(metadata, null, 2));
                             
                             if (metadata.format && metadata.format.duration) {
                                 duration = Math.round(metadata.format.duration);
+                                context.log(`Duration: ${duration}s`);
                             }
                             if (metadata.streams && metadata.streams[0]) {
                                 width = metadata.streams[0].width || 0;
                                 height = metadata.streams[0].height || 0;
+                                context.log(`Dimensions: ${width}x${height}`);
                             }
                             
                             // Extract creation date from metadata
@@ -292,12 +295,16 @@ module.exports = async function (context, req) {
                                         if (!isNaN(dateTaken.getTime())) {
                                             month = dateTaken.getMonth() + 1;
                                             year = dateTaken.getFullYear();
-                                            context.log(`Extracted date from video metadata: ${month}/${year}`);
+                                            context.log(`✓ Extracted date from video metadata: ${month}/${year}`);
                                         }
                                     } catch (dateErr) {
-                                        context.log('Could not parse video date:', dateErr.message);
+                                        context.log('⚠️ Could not parse video date:', dateErr.message);
                                     }
+                                } else {
+                                    context.log('⚠️ No date tags found in video metadata');
                                 }
+                            } else {
+                                context.log('⚠️ No tags found in video metadata');
                             }
                             
                             context.log(`Video: ${width}x${height}, duration: ${duration}s`);
@@ -306,34 +313,37 @@ module.exports = async function (context, req) {
                     });
                 });
                 
-                // Fallback to file modification date if no video metadata date found
-                if ((!month || !year) && fileModifiedDate) {
-                    context.log(`📅 Attempting to use file modification date: ${fileModifiedDate}`);
-                    try {
-                        const modDate = new Date(fileModifiedDate);
-                        context.log(`Parsed mod date:`, modDate);
-                        if (!isNaN(modDate.getTime())) {
-                            month = modDate.getMonth() + 1;
-                            year = modDate.getFullYear();
-                            context.log(`✓ Using file modification date as fallback: ${month}/${year}`);
-                        } else {
-                            context.log(`❌ Invalid date parsed from: ${fileModifiedDate}`);
-                        }
-                    } catch (err) {
-                        context.log('Could not parse file modification date:', err.message);
-                    }
-                } else {
-                    context.log(`Date extraction status: month=${month}, year=${year}, fileModifiedDate=${fileModifiedDate}`);
-                }
-
-                // Thumbnail will be generated dynamically via API
-                thumbnailUrl = apiThumbUrl;
+                context.log(`📅 After ffprobe: month=${month}, year=${year}`);
 
             } catch (err) {
-                context.log.error('Error processing video:', err);
-                // Continue without thumbnail
-                thumbnailUrl = apiUrl;
+                context.log.error('❌ Error during video metadata extraction:', err);
+                context.log('Will attempt to use file modification date fallback');
             }
+            
+            // ALWAYS try to use file modification date if we don't have month/year yet
+            if ((!month || !year) && fileModifiedDate) {
+                context.log(`📅 No date from metadata, attempting file modification date: ${fileModifiedDate}`);
+                try {
+                    const modDate = new Date(fileModifiedDate);
+                    context.log(`Parsed mod date:`, modDate);
+                    if (!isNaN(modDate.getTime())) {
+                        month = modDate.getMonth() + 1;
+                        year = modDate.getFullYear();
+                        context.log(`✅ SUCCESS: Using file modification date: ${month}/${year}`);
+                    } else {
+                        context.log(`❌ Invalid date parsed from: ${fileModifiedDate}`);
+                    }
+                } catch (err) {
+                    context.log.error('❌ Could not parse file modification date:', err);
+                }
+            } else if (month && year) {
+                context.log(`✓ Date already set from metadata: ${month}/${year}`);
+            } else if (!fileModifiedDate) {
+                context.log(`⚠️ No fileModifiedDate provided in request`);
+            }
+
+            // Thumbnail will be generated dynamically via API
+            thumbnailUrl = apiThumbUrl;
         }
 
         // Add to UnindexedFiles table for processing
@@ -357,7 +367,11 @@ module.exports = async function (context, req) {
             year: year,
         };
         
+        context.log('📝 ============ FINAL INSERT PARAMETERS ============');
         context.log('📝 Inserting into UnindexedFiles with params:', JSON.stringify(insertParams, null, 2));
+        context.log('📝 month value:', month, 'type:', typeof month);
+        context.log('📝 year value:', year, 'type:', typeof year);
+        context.log('📝 ================================================');
 
         await execute(insertQuery, insertParams);
 
