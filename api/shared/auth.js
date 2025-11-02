@@ -131,8 +131,32 @@ function getUserName(context) {
 /**
  * Middleware to check user authorization
  * Returns { authorized, user, error } object
+ * 
+ * DEV MODE: Set DEV_MODE=true in environment to bypass authentication for testing.
+ * Optionally set DEV_USER_EMAIL and DEV_USER_ROLE to simulate a specific user.
  */
 async function checkAuthorization(context, requiredRole = 'Read') {
+  // Dev mode bypass for testing (only in development)
+  if (process.env.DEV_MODE === 'true') {
+    const devEmail = process.env.DEV_USER_EMAIL || 'dev@example.com';
+    const devRole = process.env.DEV_USER_ROLE || 'Admin';
+    
+    context.log.warn(`DEV MODE: Bypassing authentication. User: ${devEmail}, Role: ${devRole}`);
+    
+    return {
+      authorized: true,
+      user: {
+        ID: 0,
+        Email: devEmail,
+        Role: devRole,
+        Status: 'Active',
+        LastLoginAt: new Date(),
+        Notes: 'Dev mode user'
+      },
+      error: null
+    };
+  }
+  
   const email = getUserEmail(context);
   
   if (!email) {

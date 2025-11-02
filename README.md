@@ -106,6 +106,23 @@ npm run dev
 
 Open [http://localhost:3000](http://localhost:3000) in your browser.
 
+### 4. Testing (Optional)
+
+The application includes Playwright tests for automated testing:
+
+```bash
+# Run all tests
+npm test
+
+# Run tests with browser visible
+npm run test:headed
+
+# Run tests in debug mode
+npm run test:debug
+```
+
+Tests use **dev mode** to bypass authentication. See [tests/README.md](tests/README.md) for more details.
+
 ## Deployment to Azure
 
 ### Option 1: Azure Static Web Apps (Recommended)
