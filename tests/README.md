@@ -22,6 +22,23 @@ Playwright browsers are installed automatically when you run tests for the first
 npx playwright install
 ```
 
+**Note**: If Playwright browser installation fails (common in CI or restricted environments), you can use the simple verification script:
+
+```bash
+# Start dev server in one terminal
+npm run dev
+
+# Run verification in another terminal (requires Azure Functions Core Tools)
+node tests/verify-dev-mode.js
+```
+
+**Important**: The verification script requires both the Next.js dev server AND Azure Functions Core Tools to be running for the API endpoints. In production environments (Azure Static Web Apps), the API is automatically available. For full local testing:
+
+1. Install Azure Functions Core Tools: https://docs.microsoft.com/azure/azure-functions/functions-run-local
+2. Start the Azure Functions: `cd api && func start`
+3. Start Next.js: `npm run dev`
+4. Run tests: `npm test`
+
 ### Configuration
 
 Tests are configured to run with dev mode enabled automatically. The configuration is in `playwright.config.ts`.

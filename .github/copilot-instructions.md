@@ -63,6 +63,11 @@ When developing and testing with GitHub Copilot or Playwright, you can enable **
 
 Dev mode allows automated testing without requiring actual OAuth authentication.
 
+**Local Development Note**: This application uses Azure Static Web Apps architecture where the API (Azure Functions) runs separately from the frontend (Next.js). For full local testing:
+- Frontend: `npm run dev` (runs on port 3000)
+- API: Requires Azure Functions Core Tools (`func start` in the `/api` directory)
+- In production (Azure), both are automatically configured and integrated
+
 ### Database Schema
 
 Main tables:
