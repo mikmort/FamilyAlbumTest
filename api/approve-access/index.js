@@ -185,7 +185,8 @@ module.exports = async function (context, req) {
                     newStatus = 'Active';
                     break;
                 case 'Deny':
-                    newRole = data.Role || 'Read'; // Keep existing role
+                    // Keep existing role for denied users (they won't be able to access anyway)
+                    newRole = data.Role;
                     newStatus = 'Denied';
                     break;
                 default:

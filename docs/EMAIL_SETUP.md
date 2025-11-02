@@ -45,9 +45,11 @@ The email approval feature is **implemented and ready** but currently only **log
    npm install @azure/communication-email
    ```
 
-3. **Add environment variable**:
+3. **Add environment variables**:
    ```env
    AZURE_COMMUNICATION_CONNECTION_STRING=endpoint=https://...;accesskey=...
+   EMAIL_FROM_ADDRESS=DoNotReply@your-domain.azurecomm.net
+   SITE_URL=https://your-app.azurestaticapps.net
    ```
 
 4. **Update `api/notify-admins/index.js`**:
@@ -58,7 +60,7 @@ The email approval feature is **implemented and ready** but currently only **log
    const emailClient = new EmailClient(process.env.AZURE_COMMUNICATION_CONNECTION_STRING);
    
    const emailMessage = {
-       senderAddress: "DoNotReply@your-verified-domain.azurecomm.net",
+       senderAddress: process.env.EMAIL_FROM_ADDRESS, // e.g., "DoNotReply@your-domain.azurecomm.net"
        recipients: {
            to: admins.map(a => ({ address: a.Email }))
        },
@@ -110,9 +112,11 @@ The email approval feature is **implemented and ready** but currently only **log
    npm install @sendgrid/mail
    ```
 
-3. **Add environment variable**:
+3. **Add environment variables**:
    ```env
    SENDGRID_API_KEY=SG.xxxxxxxxxxxxx
+   EMAIL_FROM_ADDRESS=noreply@your-verified-domain.com
+   SITE_URL=https://your-app.azurestaticapps.net
    ```
 
 4. **Update `api/notify-admins/index.js`**:
@@ -123,7 +127,7 @@ The email approval feature is **implemented and ready** but currently only **log
    // After generating approval links, add:
    const msg = {
        to: admins.map(a => a.Email),
-       from: 'noreply@your-verified-domain.com',
+       from: process.env.EMAIL_FROM_ADDRESS, // e.g., 'noreply@your-verified-domain.com'
        subject: 'New Access Request - Family Album',
        html: `
            <h2>New User Access Request</h2>
@@ -146,6 +150,44 @@ Similar integration patterns work for:
 - **Mailgun**: npm install `mailgun-js`
 - **Postmark**: npm install `postmark`
 - **AWS SES**: npm install `@aws-sdk/client-ses`
+
+## Required Environment Variables
+
+The following environment variables must be configured in your Azure Static Web App settings:
+
+### Core Variables (Always Required)
+
+```env
+# Base URL of your application (for generating approval links)
+# Usually auto-detected from request headers, but required as fallback
+SITE_URL=https://your-app.azurestaticapps.net
+
+# Sender email address for notifications
+EMAIL_FROM_ADDRESS=noreply@your-domain.com
+```
+
+### Email Service Variables (Choose One)
+
+**For Azure Communication Services:**
+```env
+AZURE_COMMUNICATION_CONNECTION_STRING=endpoint=https://...;accesskey=...
+```
+
+**For SendGrid:**
+```env
+SENDGRID_API_KEY=SG.xxxxxxxxxxxxx
+```
+
+**For other services:** See their respective documentation.
+
+### How to Set Environment Variables
+
+In Azure Portal:
+1. Go to your Static Web App
+2. Navigate to Configuration
+3. Click "Application settings"
+4. Add each environment variable
+5. Save and redeploy
 
 ## Database Setup
 

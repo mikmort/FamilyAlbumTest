@@ -16,8 +16,11 @@ function getBaseUrl(context) {
         return `${proto}://${host}`;
     }
     
-    // Fallback to environment variable or default
-    return process.env.SITE_URL || 'https://your-app.azurestaticapps.net';
+    // Fallback to environment variable (required if headers not available)
+    if (!process.env.SITE_URL) {
+        throw new Error('SITE_URL environment variable must be set for approval links');
+    }
+    return process.env.SITE_URL;
 }
 
 module.exports = async function (context, req) {
