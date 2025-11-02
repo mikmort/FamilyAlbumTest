@@ -103,9 +103,12 @@ export default function MediaDetailModal({
       const data = await res.json();
       console.log('📦 Raw API response:', data);
       
-      if (data && Array.isArray(data) && data.length > 0) {
-        console.log(`✅ Loaded ${data.length} people from API`);
-        setAllPeople(data);
+      // API returns { success: true, people: [...] }
+      const peopleArray = data.people || data;
+      
+      if (peopleArray && Array.isArray(peopleArray) && peopleArray.length > 0) {
+        console.log(`✅ Loaded ${peopleArray.length} people from API`);
+        setAllPeople(peopleArray);
       } else {
         console.error('❌ API returned empty or invalid data:', data);
         setAllPeople([]);
