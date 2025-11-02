@@ -597,16 +597,6 @@ export default function MediaDetailModal({
                   <strong>Relation:</strong> {selectedPersonDetail.neRelation}
                 </div>
               )}
-              
-              {selectedPersonDetail.neCount !== undefined && selectedPersonDetail.neCount > 0 && (
-                <div style={{
-                  fontSize: '0.9rem',
-                  color: '#6c757d',
-                  margin: '1rem 0'
-                }}>
-                  Tagged in {selectedPersonDetail.neCount} photo{selectedPersonDetail.neCount !== 1 ? 's' : ''}
-                </div>
-              )}
             </div>
           </div>
         </div>
