@@ -9,10 +9,6 @@
       "allowedRoles": ["anonymous"]
     },
     {
-      "route": "/.auth/login/github",
-      "allowedRoles": ["anonymous"]
-    },
-    {
       "route": "/.auth/login/google",
       "allowedRoles": ["anonymous"]
     },
