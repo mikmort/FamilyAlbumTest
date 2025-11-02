@@ -1,7 +1,8 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Person, Event } from '../lib/types';
+import Fuse from 'fuse.js';
 
 interface PeopleSelectorProps {
   selectedPeople: number[];
@@ -189,50 +190,51 @@ export default function PeopleSelector({
     }
   };
 
-  // Filter people based on search, prioritizing starts-with matches
-  const filteredPeople = people
-    .filter(p => !selectedPeople.includes(p.ID)) // Exclude already selected
-    .filter(p => {
-      const search = peopleSearch.toLowerCase();
-      if (!search) return true;
-      const name = p.neName.toLowerCase();
-      return name.includes(search);
-    })
-    .sort((a, b) => {
-      const search = peopleSearch.toLowerCase();
-      if (!search) return a.neName.localeCompare(b.neName);
-      
-      const aName = a.neName.toLowerCase();
-      const bName = b.neName.toLowerCase();
-      const aStarts = aName.startsWith(search);
-      const bStarts = bName.startsWith(search);
-      
-      if (aStarts && !bStarts) return -1;
-      if (!aStarts && bStarts) return 1;
-      return aName.localeCompare(bName);
+  // Create Fuse instance for fuzzy search on people (only depends on people list)
+  const peopleFuse = useMemo(() => {
+    return new Fuse(people, {
+      keys: ['neName'],
+      threshold: 0.4, // 0.0 = exact match, 1.0 = match anything
+      includeScore: true,
     });
+  }, [people]);
 
-  // Filter events based on search
-  const filteredEvents = events
-    .filter(e => {
-      const search = eventSearch.toLowerCase();
-      if (!search) return true;
-      const name = e.neName.toLowerCase();
-      return name.includes(search);
-    })
-    .sort((a, b) => {
-      const search = eventSearch.toLowerCase();
-      if (!search) return a.neName.localeCompare(b.neName);
-      
-      const aName = a.neName.toLowerCase();
-      const bName = b.neName.toLowerCase();
-      const aStarts = aName.startsWith(search);
-      const bStarts = bName.startsWith(search);
-      
-      if (aStarts && !bStarts) return -1;
-      if (!aStarts && bStarts) return 1;
-      return aName.localeCompare(bName);
+  // Filter people with fuzzy matching
+  const filteredPeople = useMemo(() => {
+    const unselectedPeople = people.filter(p => !selectedPeople.includes(p.ID));
+    
+    if (!peopleSearch) {
+      // No search - return all unselected people, sorted by name
+      return unselectedPeople.sort((a, b) => a.neName.localeCompare(b.neName));
+    }
+    
+    // Use fuzzy search on all people, then filter out selected ones
+    const results = peopleFuse.search(peopleSearch);
+    return results
+      .map(result => result.item)
+      .filter(person => !selectedPeople.includes(person.ID));
+  }, [people, selectedPeople, peopleSearch, peopleFuse]);
+
+  // Create Fuse instance for fuzzy search on events
+  const eventsFuse = useMemo(() => {
+    return new Fuse(events, {
+      keys: ['neName'],
+      threshold: 0.4,
+      includeScore: true,
     });
+  }, [events]);
+
+  // Filter events with fuzzy matching
+  const filteredEvents = useMemo(() => {
+    if (!eventSearch) {
+      // No search - return all events, sorted by name
+      return events.sort((a, b) => a.neName.localeCompare(b.neName));
+    }
+    
+    // Use fuzzy search
+    const results = eventsFuse.search(eventSearch);
+    return results.map(result => result.item);
+  }, [events, eventSearch, eventsFuse]);
 
   const getSelectedPeopleNames = () => {
     return selectedPeople.map(id => people.find(p => p.ID === id)?.neName).filter(Boolean);
@@ -341,21 +343,19 @@ export default function PeopleSelector({
                   <em>{peopleSearch ? 'No matching people found' : 'All people selected'}</em>
                 </div>
               ) : (
-                filteredPeople.slice(0, 20).map(person => (
+                filteredPeople.map(person => (
                   <div
                     key={person.ID}
-                    className="autocomplete-item"
+                    className="autocomplete-item autocomplete-item-columns"
                     onClick={() => {
                       togglePerson(person.ID);
                       setPeopleSearch('');
                       setPeopleDropdownOpen(false);
                     }}
                   >
-                    <span className="person-name">{person.neName}</span>
-                    {person.neRelation && (
-                      <span className="person-relation"> — {person.neRelation}</span>
-                    )}
-                    <span className="count"> ({person.neCount} photos)</span>
+                    <span className="person-name-col">{person.neName}</span>
+                    <span className="person-relation-col">{person.neRelation || '—'}</span>
+                    <span className="person-count-col">{person.neCount}</span>
                   </div>
                 ))
               )}
@@ -493,14 +493,16 @@ export default function PeopleSelector({
                 filteredEvents.map(event => (
                   <div
                     key={event.ID}
-                    className="autocomplete-item"
+                    className="autocomplete-item autocomplete-item-columns"
                     onClick={() => {
                       onSelectedEventChange(event.ID);
                       setEventSearch('');
                       setEventDropdownOpen(false);
                     }}
                   >
-                    {event.neName} <span className="count">({event.neCount} photos)</span>
+                    <span className="person-name-col">{event.neName}</span>
+                    <span className="person-relation-col">{event.neRelation || '—'}</span>
+                    <span className="person-count-col">{event.neCount}</span>
                   </div>
                 ))
               )}

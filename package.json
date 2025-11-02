@@ -13,6 +13,7 @@
     "@azure/storage-blob": "^12.29.1",
     "exif-reader": "^2.0.2",
     "exifreader": "^4.18.0",
+    "fuse.js": "^7.0.0",
     "mssql": "^10.0.1",
     "next": "^14.0.0",
     "react": "^18.2.0",
