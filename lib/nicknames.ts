@@ -17,7 +17,7 @@ export interface NicknameMap {
 export const nicknameMap: NicknameMap = {
   // M names
   'michael': ['mike', 'mikey', 'mick', 'mickey'],
-  'michelle': ['mike', 'mickey', 'shelly', 'shell'],
+  'michelle': ['micky', 'shelly', 'shell'],
   'margaret': ['maggie', 'meg', 'peggy', 'peg'],
   'matthew': ['matt'],
   'melissa': ['missy', 'mel'],

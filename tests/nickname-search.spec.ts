@@ -9,15 +9,21 @@ test.describe('Nickname Search Functionality', () => {
   test('should find Michael when searching for Mike', async ({ page }) => {
     await page.goto('/');
     await page.waitForLoadState('networkidle');
-    await page.waitForTimeout(2000);
     
     // Look for the people search input
     const peopleSearchInput = page.locator('input[placeholder*="search people" i]').first();
     
+    // Wait for the input to be visible and enabled
+    await peopleSearchInput.waitFor({ state: 'visible', timeout: 10000 }).catch(() => {
+      console.log('People search input not found - may need authentication');
+    });
+    
     if (await peopleSearchInput.count() > 0) {
       // Search for "Mike"
       await peopleSearchInput.fill('Mike');
-      await page.waitForTimeout(500);
+      
+      // Wait a moment for the search to trigger
+      await page.waitForTimeout(300);
       
       // Check if dropdown appears with results
       const dropdown = page.locator('.autocomplete-dropdown').first();
@@ -35,13 +41,13 @@ test.describe('Nickname Search Functionality', () => {
   test('should find Jonathan when searching for Jon', async ({ page }) => {
     await page.goto('/');
     await page.waitForLoadState('networkidle');
-    await page.waitForTimeout(2000);
     
     const peopleSearchInput = page.locator('input[placeholder*="search people" i]').first();
+    await peopleSearchInput.waitFor({ state: 'visible', timeout: 10000 }).catch(() => {});
     
     if (await peopleSearchInput.count() > 0) {
       await peopleSearchInput.fill('Jon');
-      await page.waitForTimeout(500);
+      await page.waitForTimeout(300);
       
       const dropdown = page.locator('.autocomplete-dropdown').first();
       if (await dropdown.isVisible()) {
@@ -55,13 +61,13 @@ test.describe('Nickname Search Functionality', () => {
   test('should find Jeffrey when searching for Jeff', async ({ page }) => {
     await page.goto('/');
     await page.waitForLoadState('networkidle');
-    await page.waitForTimeout(2000);
     
     const peopleSearchInput = page.locator('input[placeholder*="search people" i]').first();
+    await peopleSearchInput.waitFor({ state: 'visible', timeout: 10000 }).catch(() => {});
     
     if (await peopleSearchInput.count() > 0) {
       await peopleSearchInput.fill('Jeff');
-      await page.waitForTimeout(500);
+      await page.waitForTimeout(300);
       
       const dropdown = page.locator('.autocomplete-dropdown').first();
       if (await dropdown.isVisible()) {
@@ -75,13 +81,13 @@ test.describe('Nickname Search Functionality', () => {
   test('should find Daniel when searching for Dan', async ({ page }) => {
     await page.goto('/');
     await page.waitForLoadState('networkidle');
-    await page.waitForTimeout(2000);
     
     const peopleSearchInput = page.locator('input[placeholder*="search people" i]').first();
+    await peopleSearchInput.waitFor({ state: 'visible', timeout: 10000 }).catch(() => {});
     
     if (await peopleSearchInput.count() > 0) {
       await peopleSearchInput.fill('Dan');
-      await page.waitForTimeout(500);
+      await page.waitForTimeout(300);
       
       const dropdown = page.locator('.autocomplete-dropdown').first();
       if (await dropdown.isVisible()) {
@@ -95,14 +101,14 @@ test.describe('Nickname Search Functionality', () => {
   test('should still find exact name matches', async ({ page }) => {
     await page.goto('/');
     await page.waitForLoadState('networkidle');
-    await page.waitForTimeout(2000);
     
     const peopleSearchInput = page.locator('input[placeholder*="search people" i]').first();
+    await peopleSearchInput.waitFor({ state: 'visible', timeout: 10000 }).catch(() => {});
     
     if (await peopleSearchInput.count() > 0) {
       // Try searching for a partial name that might exist
       await peopleSearchInput.fill('a');
-      await page.waitForTimeout(500);
+      await page.waitForTimeout(300);
       
       const dropdown = page.locator('.autocomplete-dropdown').first();
       // Should still show results for regular searches
@@ -117,14 +123,14 @@ test.describe('Nickname Search Functionality', () => {
   test('should handle case-insensitive nickname searches', async ({ page }) => {
     await page.goto('/');
     await page.waitForLoadState('networkidle');
-    await page.waitForTimeout(2000);
     
     const peopleSearchInput = page.locator('input[placeholder*="search people" i]').first();
+    await peopleSearchInput.waitFor({ state: 'visible', timeout: 10000 }).catch(() => {});
     
     if (await peopleSearchInput.count() > 0) {
       // Search with different cases
       await peopleSearchInput.fill('MIKE');
-      await page.waitForTimeout(500);
+      await page.waitForTimeout(300);
       
       const dropdown = page.locator('.autocomplete-dropdown').first();
       if (await dropdown.isVisible()) {
@@ -136,7 +142,7 @@ test.describe('Nickname Search Functionality', () => {
       // Clear and try lowercase
       await peopleSearchInput.fill('');
       await peopleSearchInput.fill('mike');
-      await page.waitForTimeout(500);
+      await page.waitForTimeout(300);
       
       if (await dropdown.isVisible()) {
         const dropdownText = await dropdown.textContent();
@@ -149,13 +155,13 @@ test.describe('Nickname Search Functionality', () => {
   test('should allow selecting person found via nickname', async ({ page }) => {
     await page.goto('/');
     await page.waitForLoadState('networkidle');
-    await page.waitForTimeout(2000);
     
     const peopleSearchInput = page.locator('input[placeholder*="search people" i]').first();
+    await peopleSearchInput.waitFor({ state: 'visible', timeout: 10000 }).catch(() => {});
     
     if (await peopleSearchInput.count() > 0) {
       await peopleSearchInput.fill('Bob');
-      await page.waitForTimeout(500);
+      await page.waitForTimeout(300);
       
       const dropdown = page.locator('.autocomplete-dropdown').first();
       if (await dropdown.isVisible()) {
@@ -163,7 +169,7 @@ test.describe('Nickname Search Functionality', () => {
         const firstResult = dropdown.locator('.autocomplete-item').first();
         if (await firstResult.count() > 0) {
           await firstResult.click();
-          await page.waitForTimeout(500);
+          await page.waitForTimeout(300);
           
           // Check if a person was selected (look for selected tags)
           const selectedTags = page.locator('.selected-tags');
