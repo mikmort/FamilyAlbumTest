@@ -287,7 +287,7 @@ export default function PeopleSelector({
   if (loading) {
     return (
       <div className="card">
-        <h1 className="text-center mb-2">Select People to Browse</h1>
+        <h1 className="text-center mb-2">Select People</h1>
         <div className="form-group">
           <label style={{ marginBottom: '0.5rem', display: 'block' }}>Loading people...</label>
           <div style={{ 
@@ -335,7 +335,7 @@ export default function PeopleSelector({
         Family Album
       </h1>
       <h2 className="text-center mb-2" style={{ fontSize: '1.5rem', fontWeight: '500', marginBottom: '1.5rem' }}>
-        Select People to Browse
+        Select People
       </h2>
 
       {/* People Selection - TOP */}
@@ -476,6 +476,9 @@ export default function PeopleSelector({
       </div>
 
       {/* Event Selection - BOTTOM */}
+      <h2 className="text-center mb-2" style={{ fontSize: '1.5rem', fontWeight: '500', marginTop: '1.5rem', marginBottom: '1.5rem' }}>
+        Select Event
+      </h2>
       <div className="form-group">
         <label>Or Select an Event {events.length > 0 && `(${events.length} available)`}</label>
         <div className="autocomplete-wrapper">
