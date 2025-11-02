@@ -123,16 +123,16 @@ async function runTests() {
     
     // If auth works, test other endpoints
     if (authResult.success) {
-      // Test people endpoint
-      const peopleResult = await testEndpoint('/api/people', [200, 404].includes);
+      // Test people endpoint (200 or 404 are both acceptable)
+      const peopleResult = await testEndpoint('/api/people', 200);
       results.push({ name: 'People API', success: [200, 404].includes(peopleResult.status) });
       
-      // Test events endpoint
-      const eventsResult = await testEndpoint('/api/events', [200, 404].includes);
+      // Test events endpoint (200 or 404 are both acceptable)
+      const eventsResult = await testEndpoint('/api/events', 200);
       results.push({ name: 'Events API', success: [200, 404].includes(eventsResult.status) });
       
-      // Test media endpoint
-      const mediaResult = await testEndpoint('/api/media?page=1&pageSize=10', [200, 404].includes);
+      // Test media endpoint (200 or 404 are both acceptable)
+      const mediaResult = await testEndpoint('/api/media?page=1&pageSize=10', 200);
       results.push({ name: 'Media API', success: [200, 404].includes(mediaResult.status) });
     }
     

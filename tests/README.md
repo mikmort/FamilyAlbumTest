@@ -34,7 +34,7 @@ node tests/verify-dev-mode.js
 
 **Important**: The verification script requires both the Next.js dev server AND Azure Functions Core Tools to be running for the API endpoints. In production environments (Azure Static Web Apps), the API is automatically available. For full local testing:
 
-1. Install Azure Functions Core Tools: https://docs.microsoft.com/azure/azure-functions/functions-run-local
+1. Install Azure Functions Core Tools: https://learn.microsoft.com/azure/azure-functions/functions-run-local
 2. Start the Azure Functions: `cd api && func start`
 3. Start Next.js: `npm run dev`
 4. Run tests: `npm test`
