@@ -1131,16 +1131,6 @@ export default function MediaDetailModal({
                                   <div style={{ fontWeight: '600', color: '#0056b3' }}>
                                     {person.neName || `Person #${person.ID}`}
                                   </div>
-                                  {person.neRelation && (
-                                    <div style={{ fontSize: '0.9rem', color: '#6c757d', marginTop: '0.25rem' }}>
-                                      {person.neRelation}
-                                    </div>
-                                  )}
-                                  {person.neCount !== undefined && person.neCount > 0 && (
-                                    <div style={{ fontSize: '0.85rem', color: '#999', marginTop: '0.25rem' }}>
-                                      {person.neCount} photo{person.neCount !== 1 ? 's' : ''}
-                                    </div>
-                                  )}
                                 </button>
                               ))
                           ) : (
