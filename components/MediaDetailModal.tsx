@@ -966,11 +966,6 @@ export default function MediaDetailModal({
                         <div style={{ fontWeight: '600', color: '#0056b3', fontSize: '1rem', textDecoration: 'underline' }}>
                           {idx + 1}. {person.neName}
                         </div>
-                        {person.neRelation && (
-                          <div style={{ fontSize: '0.9rem', color: '#495057', marginTop: '0.25rem' }}>
-                            {person.neRelation}
-                          </div>
-                        )}
                       </div>
                       {editing && (
                         <button
