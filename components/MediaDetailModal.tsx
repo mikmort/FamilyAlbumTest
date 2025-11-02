@@ -34,6 +34,7 @@ export default function MediaDetailModal({
     peopleList: string | undefined
   ) => {
     const taggedArr = tagged || [];
+    console.log('computeOrderedTaggedPeople - tagged array:', JSON.stringify(taggedArr, null, 2));
     if (!peopleList) return taggedArr;
     // PPeopleList contains comma-separated IDs that reference NameEvent records.
     // The server now returns them in the correct order, so just return them as-is.
@@ -74,6 +75,7 @@ export default function MediaDetailModal({
   const [newEventDetails, setNewEventDetails] = useState('');
   const [creatingPerson, setCreatingPerson] = useState(false);
   const [creatingEvent, setCreatingEvent] = useState(false);
+  const [selectedPersonDetail, setSelectedPersonDetail] = useState<{ ID: number; neName: string; neRelation?: string } | null>(null);
 
   useEffect(() => {
     if (editing && allEvents.length === 0) {
@@ -90,17 +92,21 @@ export default function MediaDetailModal({
   const fetchPeople = async () => {
     try {
       setLoadingPeople(true);
+      console.log('📥 Fetching people from /api/people...');
       const { fetchWithFallback, samplePeople } = await import('../lib/api');
       const data = await fetchWithFallback('/api/people');
+      
       if (data && Array.isArray(data)) {
+        console.log(`✅ Loaded ${data.length} people from API`);
         setAllPeople(data);
       } else {
-        // fallback to sample data when API unavailable or returns unexpected shape
+        console.warn('⚠️ API returned unexpected format, falling back to sample data');
         setAllPeople(normalizePeople(samplePeople()));
       }
     } catch (error) {
       console.error('❌ MediaDetailModal fetchPeople error:', error);
-  setAllPeople(normalizePeople((await import('../lib/api')).samplePeople()));
+      console.warn('⚠️ Using sample data as fallback');
+      setAllPeople(normalizePeople((await import('../lib/api')).samplePeople()));
     } finally {
       setLoadingPeople(false);
     }
@@ -531,6 +537,67 @@ export default function MediaDetailModal({
         </div>
       )}
 
+      {/* Person Detail Modal */}
+      {selectedPersonDetail && (
+        <div 
+          className="modal-overlay" 
+          onClick={() => setSelectedPersonDetail(null)}
+          style={{ zIndex: 1001 }}
+        >
+          <div 
+            className="modal-content" 
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              maxWidth: '400px',
+              padding: '2rem',
+              textAlign: 'center'
+            }}
+          >
+            <button
+              onClick={() => setSelectedPersonDetail(null)}
+              style={{
+                position: 'absolute',
+                top: '0.5rem',
+                right: '0.5rem',
+                background: 'none',
+                border: 'none',
+                fontSize: '2rem',
+                cursor: 'pointer',
+                color: '#6c757d',
+                padding: '0',
+                width: '2.5rem',
+                height: '2.5rem',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center'
+              }}
+            >
+              ×
+            </button>
+            
+            <div style={{ marginTop: '0.5rem' }}>
+              <h2 style={{
+                fontSize: '1.5rem',
+                fontWeight: '600',
+                color: '#0056b3',
+                margin: '1rem 0 0.5rem 0'
+              }}>
+                {selectedPersonDetail.neName}
+              </h2>
+              
+              <div style={{
+                fontSize: '1.25rem',
+                color: '#495057',
+                margin: '0.5rem 0 1rem 0',
+                fontWeight: '500'
+              }}>
+                {selectedPersonDetail.neRelation || 'No relation specified'}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Detail Modal */}
       <div className="modal-overlay" onClick={onClose}>
       <div className="modal-content" onClick={(e) => e.stopPropagation()}>
@@ -865,41 +932,47 @@ export default function MediaDetailModal({
               <label>Tagged People:</label>
               {taggedPeople.length > 0 ? (
                 <div className="tagged-people-list">
-                  {taggedPeople.map((person) => (
-                    <div key={person.ID} className="tagged-person-item">
-                      <span 
-                        className="person-name-clickable"
-                        onClick={async () => {
-                          // Fetch fresh data from the API
-                          try {
-                            const response = await fetch(`/api/people/${person.ID}`);
-                            if (response.ok) {
-                              const data = await response.json();
-                              
-                              if (data.success && data.person && data.person.neRelation) {
-                                alert(`${person.neName}\n${data.person.neRelation}`);
-                              } else {
-                                alert(`${person.neName}\n(No relation specified)`);
-                              }
-                            } else {
-                              alert(`${person.neName}\n(Could not fetch relation data)`);
-                            }
-                          } catch (error) {
-                            console.error('Error fetching person:', error);
-                            alert(`${person.neName}\n(Error fetching relation)`);
-                          }
-                        }}
-                        title="Click to see relation"
-                      >
-                        {person.neName}
-                      </span>
+                  {taggedPeople.map((person, idx) => (
+                    <div key={person.ID} className="tagged-person-item" style={{
+                      padding: '0.75rem',
+                      marginBottom: '0.5rem',
+                      backgroundColor: '#e7f3ff',
+                      border: '1px solid #b3d9ff',
+                      borderRadius: '6px',
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      gap: '0.5rem'
+                    }}>
+                      <div style={{ flex: 1, cursor: 'pointer' }} onClick={() => {
+                        console.log('Clicked person:', JSON.stringify(person, null, 2));
+                        setSelectedPersonDetail(person);
+                      }}>
+                        <div style={{ fontWeight: '600', color: '#0056b3', fontSize: '1rem', textDecoration: 'underline' }}>
+                          {idx + 1}. {person.neName}
+                        </div>
+                        {person.neRelation && (
+                          <div style={{ fontSize: '0.9rem', color: '#495057', marginTop: '0.25rem' }}>
+                            {person.neRelation}
+                          </div>
+                        )}
+                      </div>
                       {editing && (
                         <button
                           onClick={() => handleRemovePerson(person.ID)}
                           className="btn-remove-tag"
                           title="Remove tag"
+                          style={{
+                            background: '#dc3545',
+                            color: 'white',
+                            border: 'none',
+                            borderRadius: '4px',
+                            padding: '0.25rem 0.5rem',
+                            cursor: 'pointer',
+                            fontSize: '0.9rem'
+                          }}
                         >
-                          ✕
+                          ✕ Remove
                         </button>
                       )}
                     </div>
@@ -1012,25 +1085,51 @@ export default function MediaDetailModal({
                         <div className="loading-spinner"></div>
                       ) : (
                         <div className="people-list-scroll">
-                          {allPeople
-                            .filter(p => !taggedPeople.some(tp => tp.ID === p.ID))
-                            .map((person) => (
-                              <button
-                                key={person.ID}
-                                className="person-list-item"
-                                onClick={() => handleAddPerson(person.ID)}
-                                disabled={savingTag}
-                              >
-                                {person.neName}
-                                {person.neRelation && (
-                                  <span className="person-relation"> - {person.neRelation}</span>
-                                )}
-                                {person.neCount > 0 && (
-                                  <span className="person-count"> ({person.neCount} photos)</span>
-                                )}
-                              </button>
-                            ))}
-                          {allPeople.filter(p => !taggedPeople.some(tp => tp.ID === p.ID)).length === 0 && (
+                          {allPeople && allPeople.length > 0 ? (
+                            allPeople
+                              .filter(p => !taggedPeople.some(tp => tp.ID === p.ID))
+                              .map((person) => (
+                                <button
+                                  key={person.ID}
+                                  className="person-list-item"
+                                  onClick={() => handleAddPerson(person.ID)}
+                                  disabled={savingTag}
+                                  style={{
+                                    display: 'block',
+                                    width: '100%',
+                                    padding: '0.75rem',
+                                    marginBottom: '0.5rem',
+                                    textAlign: 'left',
+                                    backgroundColor: '#f8f9fa',
+                                    border: '1px solid #dee2e6',
+                                    borderRadius: '4px',
+                                    cursor: savingTag ? 'not-allowed' : 'pointer',
+                                    transition: 'background-color 0.2s'
+                                  }}
+                                  onMouseEnter={(e) => !savingTag && (e.currentTarget.style.backgroundColor = '#e9ecef')}
+                                  onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#f8f9fa')}
+                                >
+                                  <div style={{ fontWeight: '600', color: '#0056b3' }}>
+                                    {person.neName || `Person #${person.ID}`}
+                                  </div>
+                                  {person.neRelation && (
+                                    <div style={{ fontSize: '0.9rem', color: '#6c757d', marginTop: '0.25rem' }}>
+                                      {person.neRelation}
+                                    </div>
+                                  )}
+                                  {person.neCount !== undefined && person.neCount > 0 && (
+                                    <div style={{ fontSize: '0.85rem', color: '#999', marginTop: '0.25rem' }}>
+                                      {person.neCount} photo{person.neCount !== 1 ? 's' : ''}
+                                    </div>
+                                  )}
+                                </button>
+                              ))
+                          ) : (
+                            <p className="text-center" style={{ padding: '1rem', color: '#6c757d' }}>
+                              No people available to tag
+                            </p>
+                          )}
+                          {allPeople && allPeople.filter(p => !taggedPeople.some(tp => tp.ID === p.ID)).length === 0 && allPeople.length > 0 && (
                             <p className="text-center" style={{ padding: '1rem', color: '#6c757d' }}>
                               All people are already tagged
                             </p>
