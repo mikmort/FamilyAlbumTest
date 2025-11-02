@@ -65,6 +65,12 @@ export default function PeopleManager() {
     }
 
     try {
+      console.log('Updating person:', { 
+        id: editingPerson.ID, 
+        name: formName, 
+        relation: formRelation 
+      });
+      
       const response = await fetch('/api/people', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
@@ -75,13 +81,21 @@ export default function PeopleManager() {
         }),
       });
 
-      if (!response.ok) throw new Error('Failed to update person');
+      console.log('Update response status:', response.status);
+      const responseData = await response.json();
+      console.log('Update response data:', responseData);
+
+      if (!response.ok) {
+        throw new Error(responseData.error || 'Failed to update person');
+      }
       
       await fetchPeople();
       setEditingPerson(null);
       setFormName('');
       setFormRelation('');
+      alert('Person updated successfully!');
     } catch (err) {
+      console.error('Error updating person:', err);
       alert('Error updating person: ' + (err instanceof Error ? err.message : 'Unknown error'));
     }
   };
