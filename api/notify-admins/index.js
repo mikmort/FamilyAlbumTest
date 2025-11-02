@@ -101,6 +101,7 @@ async function sendEmail(context, adminEmails, userEmail, userName, message, ful
     // Check if Azure Communication Services is configured
     if (process.env.AZURE_COMMUNICATION_CONNECTION_STRING && fromAddress) {
         try {
+            // Dynamically require the package - it's optional
             const { EmailClient } = require('@azure/communication-email');
             const emailClient = new EmailClient(process.env.AZURE_COMMUNICATION_CONNECTION_STRING);
             
@@ -121,6 +122,10 @@ async function sendEmail(context, adminEmails, userEmail, userName, message, ful
             context.log('✅ Email sent successfully via Azure Communication Services');
             return { success: true, method: 'Azure Communication Services' };
         } catch (error) {
+            if (error.code === 'MODULE_NOT_FOUND') {
+                context.log.error('Azure Communication Services package not installed. Run: npm install @azure/communication-email');
+                return { success: false, method: 'none', error: 'Package not installed' };
+            }
             context.log.error('Failed to send email via Azure Communication Services:', error);
             throw error;
         }
@@ -129,6 +134,7 @@ async function sendEmail(context, adminEmails, userEmail, userName, message, ful
     // Check if SendGrid is configured
     if (process.env.SENDGRID_API_KEY && fromAddress) {
         try {
+            // Dynamically require the package - it's optional
             const sgMail = require('@sendgrid/mail');
             sgMail.setApiKey(process.env.SENDGRID_API_KEY);
             
@@ -144,6 +150,10 @@ async function sendEmail(context, adminEmails, userEmail, userName, message, ful
             context.log('✅ Email sent successfully via SendGrid');
             return { success: true, method: 'SendGrid' };
         } catch (error) {
+            if (error.code === 'MODULE_NOT_FOUND') {
+                context.log.error('SendGrid package not installed. Run: npm install @sendgrid/mail');
+                return { success: false, method: 'none', error: 'Package not installed' };
+            }
             context.log.error('Failed to send email via SendGrid:', error);
             throw error;
         }

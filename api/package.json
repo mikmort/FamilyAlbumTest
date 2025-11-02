@@ -15,8 +15,15 @@
     "mssql": "^11.0.1",
     "sharp": "^0.33.0"
   },
+  "optionalDependencies": {
+    "@azure/communication-email": "^1.0.0",
+    "@sendgrid/mail": "^8.1.0"
+  },
   "devDependencies": {
     "@azure/functions": "^4.0.0",
     "typescript": "^5.0.0"
+  },
+  "comments": {
+    "optionalDependencies": "Email packages are optional. Install one to enable email notifications for user access requests. See docs/EMAIL_NOTIFICATIONS.md for setup instructions."
   }
 }
