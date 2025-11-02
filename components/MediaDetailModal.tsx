@@ -34,6 +34,7 @@ export default function MediaDetailModal({
     peopleList: string | undefined
   ) => {
     const taggedArr = tagged || [];
+    console.log('computeOrderedTaggedPeople - tagged array:', JSON.stringify(taggedArr, null, 2));
     if (!peopleList) return taggedArr;
     // PPeopleList contains comma-separated IDs that reference NameEvent records.
     // The server now returns them in the correct order, so just return them as-is.
@@ -943,7 +944,10 @@ export default function MediaDetailModal({
                       alignItems: 'center',
                       gap: '0.5rem'
                     }}>
-                      <div style={{ flex: 1, cursor: 'pointer' }} onClick={() => setSelectedPersonDetail(person)}>
+                      <div style={{ flex: 1, cursor: 'pointer' }} onClick={() => {
+                        console.log('Clicked person:', JSON.stringify(person, null, 2));
+                        setSelectedPersonDetail(person);
+                      }}>
                         <div style={{ fontWeight: '600', color: '#0056b3', fontSize: '1rem', textDecoration: 'underline' }}>
                           {idx + 1}. {person.neName}
                         </div>
