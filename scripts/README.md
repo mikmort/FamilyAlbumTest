@@ -1,106 +1,34 @@
-# PowerShell Scripts
+# Scripts Directory
 
 This folder contains utility scripts for deploying and managing the Family Album application.
 
-## Deployment Scripts
+## Directory Structure
 
-### `deploy.ps1`
-Deploys the Azure infrastructure using Bicep templates.
-- Creates resource group, SQL database, storage account, and static web app
-- Generates deployment info file with connection details
-- **Usage**: `.\scripts\deploy.ps1`
+- **`maintenance/`** - Active maintenance and deployment scripts (deploy, setup, upload utilities, video conversion)
+- **`sql/`** - SQL scripts for database updates and fixes
+- **`archived/`** - One-off debugging scripts and old migration scripts that are no longer actively used
 
-### `setup-database.ps1`
-Initializes the Azure SQL database schema.
-- Creates tables: NameEvent, Pictures, NamePhoto, UnindexedFiles
-- Sets up indexes and triggers
-- **Usage**: `.\scripts\setup-database.ps1`
+## Active Scripts
 
-### `setup-github-azure.ps1`
-Configures GitHub repository with Azure deployment secrets.
-- Adds AZURE_STATIC_WEB_APPS_API_TOKEN secret
-- Sets up environment variables for database and storage
-- **Usage**: `.\scripts\setup-github-azure.ps1`
+See the `maintenance/` folder for deployment, setup, upload, and video conversion scripts.
 
-## Data Migration Scripts
+Key scripts include:
+- **`maintenance/deploy.ps1`** - Deploy Azure infrastructure
+- **`maintenance/setup-database.ps1`** - Initialize database schema  
+- **`maintenance/setup-github-azure.ps1`** - Configure GitHub secrets
+- **`maintenance/bulk-upload-photos.ps1`** - Bulk upload media files
+- **`maintenance/convert-videos-to-mp4.ps1`** - Convert videos to web format
 
-### `migrate-sqlite-v4.ps1` (Recommended)
-Migrates data from SQLite database to Azure SQL.
-- Migrates people, pictures, and photo tags
-- Handles schema mapping between SQLite and Azure SQL
-- **Usage**: `.\scripts\migrate-sqlite-v4.ps1 -SqliteDbPath "C:\path\to\database.db"`
+See the `sql/` folder for SQL scripts used for database updates and fixes.
 
-### `migrate-data.ps1`
-Generic migration script with multiple options.
-- CSV import
-- SQL backup restore
-- SQL script execution
-- Media file upload
-- **Usage**: `.\scripts\migrate-data.ps1`
+## Archived Scripts
 
-## Utility Scripts
-
-### `inspect-sqlite.ps1`
-Inspects SQLite database structure and contents.
-- Lists tables and columns
-- Shows row counts
-- **Usage**: `.\scripts\inspect-sqlite.ps1`
-
-### `bulk-upload-photos.ps1`
-Bulk uploads photos and videos from a local directory to the Family Album application.
-- Supports multiple file formats (jpg, png, gif, mp4, mov, etc.)
-- Uploads files via the API to Azure Blob Storage
-- Adds files to UnindexedFiles table for processing
-- Preserves directory structure
-- **Usage**: `.\scripts\bulk-upload-photos.ps1 -SourceDirectory "C:\path\to\photos"`
-- **Options**:
-  - `-ApiEndpoint` - API endpoint URL (default: http://localhost:7071/api/upload)
-  - `-BatchSize` - Number of files per batch (default: 10)
-  - `-WhatIf` - Preview files without uploading
-
-### `upload-albums.ps1`
-Quick upload script specifically for the Albums directory.
-- Uploads photos from `E:\Family Album\Albums`
-- Checks if API is running before starting
-- Calls `bulk-upload-photos.ps1` with pre-configured settings
-- **Usage**: `.\scripts\upload-albums.ps1`
-
-### `convert-videos-to-mp4.ps1`
-Converts old MOV files to modern MP4 format with H.264 codec.
-- Downloads MOV files from Azure Blob Storage
-- Converts to web-compatible MP4 format
-- Uploads converted files back to storage
-- Shows file size savings
-- **Usage**: `.\scripts\convert-videos-to-mp4.ps1`
-- **Options**:
-  - `-DryRun` - Preview files without converting
-  - `-Filter` - Filter specific files (default: `*.MOV`)
-  - `-MaxConcurrent` - Concurrent conversions (default: 3)
-- **Prerequisites**: FFmpeg must be installed (`winget install Gyan.FFmpeg`)
-- **See**: [VIDEO_CONVERSION.md](../docs/VIDEO_CONVERSION.md) for full guide
-
-### `update-database-after-conversion.js`
-Updates database after video conversion from MOV to MP4.
-- Finds converted MP4 files in blob storage
-- Generates SQL script to update Pictures table
-- **Usage**: `cd api && node ..\scripts\update-database-after-conversion.js`
-- **Output**: `scripts/update-mov-to-mp4.sql`
-
-### `cleanup-placeholder-thumbnails.js`
-Deletes tiny placeholder thumbnails to force regeneration.
-- Finds thumbnails < 100 bytes (placeholders)
-- Deletes them from blob storage
-- New thumbnails regenerate on next view
-- **Usage**: `cd api && node ..\scripts\cleanup-placeholder-thumbnails.js`
-
-## Legacy Scripts
-
-The following scripts are older versions kept for reference:
-- `migrate-sqlite.ps1` - First migration attempt (had compatibility issues)
-- `migrate-sqlite-v2.ps1` - Second attempt (schema mismatch errors)
-- `migrate-sqlite-v3.ps1` - Third attempt (syntax errors)
-
-Use `migrate-sqlite-v4.ps1` for data migration instead.
+The `archived/` folder contains one-off debugging and diagnostic scripts that were used during development and troubleshooting. These scripts are kept for historical reference but are not actively maintained:
+- Check scripts (check-*.js, check-*.ps1) - Used for debugging specific issues
+- Test scripts (test-*.js) - One-off tests for specific features
+- Migration scripts (migrate-sqlite*.ps1) - Older migration attempts
+- Fix scripts (fix-*.js, fix-*.ps1) - One-time database fixes
+- Various query, analysis, and utility scripts used during development
 
 ## Prerequisites
 
