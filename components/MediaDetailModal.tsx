@@ -93,20 +93,26 @@ export default function MediaDetailModal({
     try {
       setLoadingPeople(true);
       console.log('📥 Fetching people from /api/people...');
-      const { fetchWithFallback, samplePeople } = await import('../lib/api');
-      const data = await fetchWithFallback('/api/people');
       
-      if (data && Array.isArray(data)) {
+      const res = await fetch('/api/people');
+      
+      if (!res.ok) {
+        throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+      }
+      
+      const data = await res.json();
+      console.log('📦 Raw API response:', data);
+      
+      if (data && Array.isArray(data) && data.length > 0) {
         console.log(`✅ Loaded ${data.length} people from API`);
         setAllPeople(data);
       } else {
-        console.warn('⚠️ API returned unexpected format, falling back to sample data');
-        setAllPeople(normalizePeople(samplePeople()));
+        console.error('❌ API returned empty or invalid data:', data);
+        setAllPeople([]);
       }
     } catch (error) {
       console.error('❌ MediaDetailModal fetchPeople error:', error);
-      console.warn('⚠️ Using sample data as fallback');
-      setAllPeople(normalizePeople((await import('../lib/api')).samplePeople()));
+      setAllPeople([]);
     } finally {
       setLoadingPeople(false);
     }
