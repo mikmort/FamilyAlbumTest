@@ -1267,6 +1267,31 @@ button {
   align-items: center;
 }
 
+.item-name-col {
+  font-weight: 500;
+  color: #333;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.item-description-col {
+  color: #666;
+  font-size: 0.9em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.item-count-col {
+  color: #666;
+  font-size: 0.9em;
+  text-align: right;
+  white-space: nowrap;
+  min-width: 3rem;
+}
+
+/* Backward compatibility aliases */
 .person-name-col {
   font-weight: 500;
   color: #333;

@@ -190,15 +190,14 @@ export default function PeopleSelector({
     }
   };
 
-  // Create Fuse instance for fuzzy search on people
+  // Create Fuse instance for fuzzy search on people (only depends on people list)
   const peopleFuse = useMemo(() => {
-    const unselectedPeople = people.filter(p => !selectedPeople.includes(p.ID));
-    return new Fuse(unselectedPeople, {
+    return new Fuse(people, {
       keys: ['neName'],
       threshold: 0.4, // 0.0 = exact match, 1.0 = match anything
       includeScore: true,
     });
-  }, [people, selectedPeople]);
+  }, [people]);
 
   // Filter people with fuzzy matching
   const filteredPeople = useMemo(() => {
@@ -209,9 +208,11 @@ export default function PeopleSelector({
       return unselectedPeople.sort((a, b) => a.neName.localeCompare(b.neName));
     }
     
-    // Use fuzzy search
+    // Use fuzzy search on all people, then filter out selected ones
     const results = peopleFuse.search(peopleSearch);
-    return results.map(result => result.item);
+    return results
+      .map(result => result.item)
+      .filter(person => !selectedPeople.includes(person.ID));
   }, [people, selectedPeople, peopleSearch, peopleFuse]);
 
   // Create Fuse instance for fuzzy search on events
