@@ -3,6 +3,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { Person, Event } from '../lib/types';
 import Fuse from 'fuse.js';
+import { getNameVariations } from '../lib/nicknames';
 
 interface PeopleSelectorProps {
   selectedPeople: number[];
@@ -199,7 +200,7 @@ export default function PeopleSelector({
     });
   }, [people]);
 
-  // Filter people with fuzzy matching
+  // Filter people with fuzzy matching and nickname support
   const filteredPeople = useMemo(() => {
     const unselectedPeople = people.filter(p => !selectedPeople.includes(p.ID));
     
@@ -208,7 +209,24 @@ export default function PeopleSelector({
       return unselectedPeople.sort((a, b) => a.neName.localeCompare(b.neName));
     }
     
-    // Use fuzzy search on all people, then filter out selected ones
+    // Get nickname variations of the search term
+    const searchVariations = getNameVariations(peopleSearch.toLowerCase().trim());
+    
+    // First, try exact/nickname matches
+    const exactMatches = unselectedPeople.filter(person => {
+      const personNameLower = person.neName.toLowerCase();
+      // Check if person's name matches any of the search variations
+      return searchVariations.some(variation => 
+        personNameLower.includes(variation) || variation.includes(personNameLower)
+      );
+    });
+    
+    // If we have exact/nickname matches, return those
+    if (exactMatches.length > 0) {
+      return exactMatches.sort((a, b) => a.neName.localeCompare(b.neName));
+    }
+    
+    // Otherwise, fall back to fuzzy search
     const results = peopleFuse.search(peopleSearch);
     return results
       .map(result => result.item)
