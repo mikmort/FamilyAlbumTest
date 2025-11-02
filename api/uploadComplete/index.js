@@ -1,5 +1,6 @@
 const { execute } = require('../shared/db');
 const { getContainerClient } = require('../shared/storage');
+const { checkAuthorization } = require('../shared/auth');
 const sharp = require('sharp');
 const exifReader = require('exif-reader');
 const ffmpeg = require('fluent-ffmpeg');
@@ -10,6 +11,17 @@ ffmpeg.setFfmpegPath(ffmpegPath);
 
 module.exports = async function (context, req) {
     context.log('Upload complete notification received');
+
+    // Check authorization - upload requires 'Full' role
+    const authResult = await checkAuthorization(context, 'Full');
+    if (!authResult.authorized) {
+        context.res = {
+            status: authResult.status,
+            headers: { 'Content-Type': 'application/json' },
+            body: { error: authResult.message }
+        };
+        return;
+    }
 
     try {
         const { fileName, contentType, fileModifiedDate } = req.body;

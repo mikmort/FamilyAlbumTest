@@ -11,10 +11,26 @@ import PeopleManager from '@/components/PeopleManager';
 import EventManager from '@/components/EventManager';
 import ProcessNewFiles from '@/components/ProcessNewFiles';
 import UploadMedia from '@/components/UploadMedia';
+import AdminSettings from '@/components/AdminSettings';
+import AccessRequest from '@/components/AccessRequest';
 import { Person, Event, MediaItem } from '../lib/types';
 
+interface AuthStatus {
+  authenticated: boolean;
+  authorized: boolean;
+  user: {
+    email: string;
+    name: string;
+    role: string;
+    status: string;
+  } | null;
+  error: string | null;
+}
+
 export default function Home() {
-  const [view, setView] = useState<'select' | 'gallery' | 'manage-people' | 'manage-events' | 'process-files' | 'upload-media'>('select');
+  const [view, setView] = useState<'select' | 'gallery' | 'manage-people' | 'manage-events' | 'process-files' | 'upload-media' | 'admin-settings'>('select');
+  const [authStatus, setAuthStatus] = useState<AuthStatus | null>(null);
+  const [loadingAuth, setLoadingAuth] = useState(true);
   const [selectedPeople, setSelectedPeople] = useState<number[]>([]);
   const [selectedEvent, setSelectedEvent] = useState<number | null>(null);
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
@@ -22,6 +38,23 @@ export default function Home() {
   const [exclusiveFilter, setExclusiveFilter] = useState(false);
   const [selectedMedia, setSelectedMedia] = useState<MediaItem | null>(null);
   const [startFullscreen, setStartFullscreen] = useState(false);
+
+  // Check authorization on mount
+  useEffect(() => {
+    checkAuthStatus();
+  }, []);
+
+  const checkAuthStatus = async () => {
+    try {
+      const response = await fetch('/api/auth-status');
+      const data = await response.json();
+      setAuthStatus(data);
+    } catch (err) {
+      console.error('Error checking auth status:', err);
+    } finally {
+      setLoadingAuth(false);
+    }
+  };
 
   const handleContinue = () => {
     setView('gallery');
@@ -49,6 +82,29 @@ export default function Home() {
     setStartFullscreen(true);
   };
 
+  // Show loading while checking auth
+  if (loadingAuth) {
+    return (
+      <div style={{
+        minHeight: '100vh',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center'
+      }}>
+        <div style={{ textAlign: 'center' }}>
+          <div className="loading-spinner" style={{ margin: '0 auto 20px' }}></div>
+          <p>Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Show access request page if not authenticated or not authorized
+  if (!authStatus?.authenticated || !authStatus?.authorized) {
+    return <AccessRequest />;
+  }
+
+  const isAdmin = authStatus?.user?.role === 'Admin';
 
   return (
     <>
@@ -60,6 +116,7 @@ export default function Home() {
           onSelectPeople={() => setView('select')}
           onProcessFiles={() => setView('process-files')}
           onUploadMedia={() => setView('upload-media')}
+          onAdminSettings={isAdmin ? () => setView('admin-settings') : undefined}
         />
         <UserInfo />
       </div>
@@ -142,6 +199,15 @@ export default function Home() {
               ← Back
             </button>
             <UploadMedia onProcessFiles={() => setView('process-files')} />
+          </>
+        )}
+
+        {view === 'admin-settings' && isAdmin && (
+          <>
+            <button className="btn btn-secondary mb-2" onClick={() => setView('select')}>
+              ← Back
+            </button>
+            <AdminSettings />
           </>
         )}
 

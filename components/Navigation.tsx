@@ -6,6 +6,7 @@ interface NavigationProps {
   onSelectPeople: () => void;
   onProcessFiles: () => void;
   onUploadMedia: () => void;
+  onAdminSettings?: () => void;
 }
 
 export default function Navigation({
@@ -14,6 +15,7 @@ export default function Navigation({
   onSelectPeople,
   onProcessFiles,
   onUploadMedia,
+  onAdminSettings,
 }: NavigationProps) {
   return (
     <nav className="nav-menu">
@@ -22,6 +24,14 @@ export default function Navigation({
       <button onClick={onManageEvents}>Manage Events</button>
       <button onClick={onUploadMedia}>Upload Media</button>
       <button onClick={onProcessFiles}>Process New Files</button>
+      {onAdminSettings && (
+        <button onClick={onAdminSettings} style={{ 
+          background: '#dc3545', 
+          borderColor: '#dc3545' 
+        }}>
+          🔒 Admin Settings
+        </button>
+      )}
     </nav>
   );
 }

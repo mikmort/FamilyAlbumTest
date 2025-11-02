@@ -1,5 +1,6 @@
 const { generateUploadSasUrl } = require('../shared/storage');
 const { query } = require('../shared/db');
+const { checkAuthorization } = require('../shared/auth');
 
 /**
  * Check if filename exists and generate Windows-style duplicate name if needed
@@ -57,6 +58,17 @@ async function getUniqueFilename(originalFilename) {
 
 module.exports = async function (context, req) {
     context.log('Get upload URL API called');
+
+    // Check authorization - upload requires 'Full' role
+    const authResult = await checkAuthorization(context, 'Full');
+    if (!authResult.authorized) {
+        context.res = {
+            status: authResult.status,
+            headers: { 'Content-Type': 'application/json' },
+            body: { error: authResult.message }
+        };
+        return;
+    }
 
     try {
         let { fileName } = req.query;

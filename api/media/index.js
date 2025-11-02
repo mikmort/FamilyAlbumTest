@@ -1,5 +1,6 @@
 const { query, execute } = require('../shared/db');
 const { blobExists, getContainerClient, uploadBlob, deleteBlob } = require('../shared/storage');
+const { checkAuthorization } = require('../shared/auth');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
@@ -53,6 +54,22 @@ function releaseThumbnailLock(filepath) {
 }
 
 module.exports = async function (context, req) {
+    // Check authorization for all endpoints
+    // Read operations (GET) require 'Read' role
+    // Write operations (POST, PUT, DELETE) require 'Full' role
+    const method = req.method;
+    const requiredRole = (method === 'GET') ? 'Read' : 'Full';
+    
+    const authResult = await checkAuthorization(context, requiredRole);
+    if (!authResult.authorized) {
+        context.res = {
+            status: authResult.status,
+            headers: { 'Content-Type': 'application/json' },
+            body: { error: authResult.message }
+        };
+        return;
+    }
+
     // Temporary debug endpoint: /api/media/debug/list
     if (req.url && req.url.startsWith('/api/media/debug/list')) {
         // Query all media items (limit to 100 for safety)
@@ -84,8 +101,6 @@ module.exports = async function (context, req) {
     context.log('======================');
     
     context.log('Media API function processed a request.');
-
-    const method = req.method;
     
     // Health check endpoint
     if (req.url === '/api/media' && method === 'GET' && !filename) {

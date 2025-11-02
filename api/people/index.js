@@ -1,9 +1,25 @@
 const { query, execute } = require('../shared/db');
+const { checkAuthorization } = require('../shared/auth');
 
 module.exports = async function (context, req) {
     context.log('People API function processed a request.');
 
     const method = req.method;
+    
+    // Check authorization
+    // Read operations (GET) require 'Read' role
+    // Write operations (POST, PUT, DELETE) require 'Full' role
+    const requiredRole = (method === 'GET') ? 'Read' : 'Full';
+    
+    const authResult = await checkAuthorization(context, requiredRole);
+    if (!authResult.authorized) {
+        context.res = {
+            status: authResult.status,
+            headers: { 'Content-Type': 'application/json' },
+            body: { error: authResult.message }
+        };
+        return;
+    }
     
     // Extract ID from URL path if present (e.g., /api/people/123)
     const personId = context.bindingData?.id || req.params?.id;

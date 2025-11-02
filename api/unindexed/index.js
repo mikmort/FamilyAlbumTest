@@ -1,10 +1,26 @@
 const { query, execute } = require('../shared/db');
+const { checkAuthorization } = require('../shared/auth');
 
 module.exports = async function (context, req) {
   context.log('Unindexed files API called');
 
   const action = context.bindingData.action || 'list';
   const method = req.method;
+
+  // Check authorization
+  // Read operations (GET) require 'Read' role
+  // Write operations (POST, PUT, DELETE) require 'Full' role
+  const requiredRole = (method === 'GET') ? 'Read' : 'Full';
+  
+  const authResult = await checkAuthorization(context, requiredRole);
+  if (!authResult.authorized) {
+    context.res = {
+      status: authResult.status,
+      headers: { 'Content-Type': 'application/json' },
+      body: { error: authResult.message }
+    };
+    return;
+  }
 
   try {
     // GET /api/unindexed - List all unindexed files

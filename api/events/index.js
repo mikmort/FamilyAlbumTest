@@ -1,7 +1,19 @@
 const { query } = require('../shared/db');
+const { checkAuthorization } = require('../shared/auth');
 
 module.exports = async function (context, req) {
     context.log('Events API function processed a request.');
+
+    // Check authorization - events are read-only for now, require 'Read' role
+    const authResult = await checkAuthorization(context, 'Read');
+    if (!authResult.authorized) {
+        context.res = {
+            status: authResult.status,
+            headers: { 'Content-Type': 'application/json' },
+            body: { error: authResult.message }
+        };
+        return;
+    }
 
     try {
         const eventsQuery = `
