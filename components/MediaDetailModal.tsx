@@ -865,41 +865,44 @@ export default function MediaDetailModal({
               <label>Tagged People:</label>
               {taggedPeople.length > 0 ? (
                 <div className="tagged-people-list">
-                  {taggedPeople.map((person) => (
-                    <div key={person.ID} className="tagged-person-item">
-                      <span 
-                        className="person-name-clickable"
-                        onClick={async () => {
-                          // Fetch fresh data from the API
-                          try {
-                            const response = await fetch(`/api/people/${person.ID}`);
-                            if (response.ok) {
-                              const data = await response.json();
-                              
-                              if (data.success && data.person && data.person.neRelation) {
-                                alert(`${person.neName}\n${data.person.neRelation}`);
-                              } else {
-                                alert(`${person.neName}\n(No relation specified)`);
-                              }
-                            } else {
-                              alert(`${person.neName}\n(Could not fetch relation data)`);
-                            }
-                          } catch (error) {
-                            console.error('Error fetching person:', error);
-                            alert(`${person.neName}\n(Error fetching relation)`);
-                          }
-                        }}
-                        title="Click to see relation"
-                      >
-                        {person.neName}
-                      </span>
+                  {taggedPeople.map((person, idx) => (
+                    <div key={person.ID} className="tagged-person-item" style={{
+                      padding: '0.75rem',
+                      marginBottom: '0.5rem',
+                      backgroundColor: '#e7f3ff',
+                      border: '1px solid #b3d9ff',
+                      borderRadius: '6px',
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      gap: '0.5rem'
+                    }}>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontWeight: '600', color: '#0056b3', fontSize: '1rem' }}>
+                          {idx + 1}. {person.neName}
+                        </div>
+                        {person.neRelation && (
+                          <div style={{ fontSize: '0.9rem', color: '#495057', marginTop: '0.25rem' }}>
+                            {person.neRelation}
+                          </div>
+                        )}
+                      </div>
                       {editing && (
                         <button
                           onClick={() => handleRemovePerson(person.ID)}
                           className="btn-remove-tag"
                           title="Remove tag"
+                          style={{
+                            background: '#dc3545',
+                            color: 'white',
+                            border: 'none',
+                            borderRadius: '4px',
+                            padding: '0.25rem 0.5rem',
+                            cursor: 'pointer',
+                            fontSize: '0.9rem'
+                          }}
                         >
-                          ✕
+                          ✕ Remove
                         </button>
                       )}
                     </div>
@@ -1012,25 +1015,51 @@ export default function MediaDetailModal({
                         <div className="loading-spinner"></div>
                       ) : (
                         <div className="people-list-scroll">
-                          {allPeople
-                            .filter(p => !taggedPeople.some(tp => tp.ID === p.ID))
-                            .map((person) => (
-                              <button
-                                key={person.ID}
-                                className="person-list-item"
-                                onClick={() => handleAddPerson(person.ID)}
-                                disabled={savingTag}
-                              >
-                                {person.neName}
-                                {person.neRelation && (
-                                  <span className="person-relation"> - {person.neRelation}</span>
-                                )}
-                                {person.neCount > 0 && (
-                                  <span className="person-count"> ({person.neCount} photos)</span>
-                                )}
-                              </button>
-                            ))}
-                          {allPeople.filter(p => !taggedPeople.some(tp => tp.ID === p.ID)).length === 0 && (
+                          {allPeople && allPeople.length > 0 ? (
+                            allPeople
+                              .filter(p => !taggedPeople.some(tp => tp.ID === p.ID))
+                              .map((person) => (
+                                <button
+                                  key={person.ID}
+                                  className="person-list-item"
+                                  onClick={() => handleAddPerson(person.ID)}
+                                  disabled={savingTag}
+                                  style={{
+                                    display: 'block',
+                                    width: '100%',
+                                    padding: '0.75rem',
+                                    marginBottom: '0.5rem',
+                                    textAlign: 'left',
+                                    backgroundColor: '#f8f9fa',
+                                    border: '1px solid #dee2e6',
+                                    borderRadius: '4px',
+                                    cursor: savingTag ? 'not-allowed' : 'pointer',
+                                    transition: 'background-color 0.2s'
+                                  }}
+                                  onMouseEnter={(e) => !savingTag && (e.currentTarget.style.backgroundColor = '#e9ecef')}
+                                  onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#f8f9fa')}
+                                >
+                                  <div style={{ fontWeight: '600', color: '#0056b3' }}>
+                                    {person.neName || `Person #${person.ID}`}
+                                  </div>
+                                  {person.neRelation && (
+                                    <div style={{ fontSize: '0.9rem', color: '#6c757d', marginTop: '0.25rem' }}>
+                                      {person.neRelation}
+                                    </div>
+                                  )}
+                                  {person.neCount !== undefined && person.neCount > 0 && (
+                                    <div style={{ fontSize: '0.85rem', color: '#999', marginTop: '0.25rem' }}>
+                                      {person.neCount} photo{person.neCount !== 1 ? 's' : ''}
+                                    </div>
+                                  )}
+                                </button>
+                              ))
+                          ) : (
+                            <p className="text-center" style={{ padding: '1rem', color: '#6c757d' }}>
+                              No people available to tag
+                            </p>
+                          )}
+                          {allPeople && allPeople.filter(p => !taggedPeople.some(tp => tp.ID === p.ID)).length === 0 && allPeople.length > 0 && (
                             <p className="text-center" style={{ padding: '1rem', color: '#6c757d' }}>
                               All people are already tagged
                             </p>
