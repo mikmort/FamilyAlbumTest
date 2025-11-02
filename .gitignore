@@ -43,3 +43,19 @@ deployment-info-*.txt
 # TypeScript
 *.tsbuildinfo
 next-env.d.ts
+
+# Log files and temporary outputs
+*.log
+deployment-log.txt
+dev-full.log
+dev.log
+build.log
+out.html
+action-*.zip
+
+# Temporary data files
+api_media.json
+page-chunk.js
+recent-runs.json
+run-jobs*.json
+*.dat
