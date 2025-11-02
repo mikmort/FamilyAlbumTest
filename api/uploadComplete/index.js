@@ -1,6 +1,7 @@
 const { execute } = require('../shared/db');
 const { getContainerClient } = require('../shared/storage');
 const { checkAuthorization } = require('../shared/auth');
+const { StorageSharedKeyCredential, generateBlobSASQueryParameters, BlobSASPermissions } = require('@azure/storage-blob');
 const sharp = require('sharp');
 const exifReader = require('exif-reader');
 const ffmpeg = require('fluent-ffmpeg');
@@ -8,6 +9,29 @@ const ffmpegPath = require('@ffmpeg-installer/ffmpeg').path;
 const { Readable } = require('stream');
 
 ffmpeg.setFfmpegPath(ffmpegPath);
+
+// Helper function to generate a read SAS token for a blob
+function generateReadSasUrl(blockBlobClient, expiresInMinutes = 60) {
+    const accountName = process.env.AZURE_STORAGE_ACCOUNT_NAME;
+    const accountKey = process.env.AZURE_STORAGE_ACCOUNT_KEY;
+    
+    const sharedKeyCredential = new StorageSharedKeyCredential(accountName, accountKey);
+    const startsOn = new Date();
+    const expiresOn = new Date(startsOn.getTime() + expiresInMinutes * 60 * 1000);
+    
+    const sasToken = generateBlobSASQueryParameters(
+        {
+            containerName: blockBlobClient.containerName,
+            blobName: blockBlobClient.name,
+            permissions: BlobSASPermissions.parse("r"), // read only
+            startsOn: startsOn,
+            expiresOn: expiresOn,
+        },
+        sharedKeyCredential
+    ).toString();
+    
+    return `${blockBlobClient.url}?${sasToken}`;
+}
 
 module.exports = async function (context, req) {
     context.log('Upload complete notification received');
@@ -233,11 +257,14 @@ module.exports = async function (context, req) {
             // Video processing
             try {
                 context.log('Processing video...');
-                context.log('Video blob URL:', blobUrl);
                 
-                // Get video metadata using ffprobe
+                // Generate a read SAS URL for ffprobe to access the blob
+                const blobSasUrl = generateReadSasUrl(blockBlobClient, 10); // 10 minute expiry
+                context.log('Generated SAS URL for video processing');
+                
+                // Get video metadata using ffprobe with SAS URL
                 await new Promise((resolve, reject) => {
-                    ffmpeg.ffprobe(blobUrl, (err, metadata) => {
+                    ffmpeg.ffprobe(blobSasUrl, (err, metadata) => {
                         if (err) {
                             context.log.error('FFprobe error:', err);
                             reject(err);
