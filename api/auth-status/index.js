@@ -1,4 +1,4 @@
-const { checkAuthorization, getUserEmail, getUserName } = require('../shared/auth');
+const { checkAuthorization, getUserEmail, getUserName, getPendingRequests } = require('../shared/auth');
 
 module.exports = async function (context, req) {
   context.log('Auth status check called');
@@ -22,6 +22,13 @@ module.exports = async function (context, req) {
     // Check authorization (this will create user if doesn't exist)
     const authResult = await checkAuthorization(context, 'Read');
 
+    // If user is admin, get pending request count
+    let pendingCount = 0;
+    if (authResult.user?.Role === 'Admin') {
+      const pendingRequests = await getPendingRequests();
+      pendingCount = pendingRequests.length;
+    }
+
     context.res = {
       status: 200,
       body: {
@@ -35,6 +42,7 @@ module.exports = async function (context, req) {
           status: authResult.user?.Status,
           lastLogin: authResult.user?.LastLoginAt
         },
+        pendingCount: pendingCount,
         error: authResult.error
       }
     };

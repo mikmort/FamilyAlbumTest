@@ -23,6 +23,150 @@ function getBaseUrl(context) {
     return process.env.SITE_URL;
 }
 
+// Generate HTML email content
+function generateEmailHtml(userEmail, userName, message, fullAccessUrl, readOnlyUrl, denyUrl, expiresAt) {
+    return `
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>New Access Request - Family Album</title>
+</head>
+<body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
+    <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 30px; border-radius: 10px 10px 0 0; text-align: center;">
+        <h1 style="margin: 0; font-size: 28px;">🔔 New Access Request</h1>
+        <p style="margin: 10px 0 0 0; opacity: 0.9;">Family Album</p>
+    </div>
+    
+    <div style="background: white; border: 1px solid #e0e0e0; border-top: none; border-radius: 0 0 10px 10px; padding: 30px;">
+        <p style="font-size: 16px; margin-top: 0;">A new user is requesting access to the Family Album:</p>
+        
+        <div style="background: #f8f9fa; border-left: 4px solid #667eea; padding: 15px; margin: 20px 0; border-radius: 4px;">
+            <p style="margin: 5px 0;"><strong>Name:</strong> ${userName || 'Not provided'}</p>
+            <p style="margin: 5px 0;"><strong>Email:</strong> ${userEmail}</p>
+            <p style="margin: 5px 0;"><strong>Message:</strong> ${message || 'No message provided'}</p>
+            <p style="margin: 5px 0;"><strong>Time:</strong> ${new Date().toLocaleString()}</p>
+        </div>
+        
+        <h2 style="color: #333; font-size: 20px; margin-top: 30px;">Action Required</h2>
+        <p>Please click one of the following buttons to approve or deny access:</p>
+        
+        <table style="width: 100%; margin: 20px 0;" cellpadding="10" cellspacing="0">
+            <tr>
+                <td align="center">
+                    <a href="${fullAccessUrl}" style="display: inline-block; background: #28a745; color: white; padding: 14px 28px; text-decoration: none; border-radius: 6px; font-weight: 600; font-size: 16px;">
+                        ✅ Approve (Full Access)
+                    </a>
+                </td>
+            </tr>
+            <tr>
+                <td align="center">
+                    <a href="${readOnlyUrl}" style="display: inline-block; background: #007bff; color: white; padding: 14px 28px; text-decoration: none; border-radius: 6px; font-weight: 600; font-size: 16px;">
+                        📖 Approve (Read Only)
+                    </a>
+                </td>
+            </tr>
+            <tr>
+                <td align="center">
+                    <a href="${denyUrl}" style="display: inline-block; background: #dc3545; color: white; padding: 14px 28px; text-decoration: none; border-radius: 6px; font-weight: 600; font-size: 16px;">
+                        ❌ Deny Access
+                    </a>
+                </td>
+            </tr>
+        </table>
+        
+        <div style="background: #fff3cd; border: 1px solid #ffc107; border-radius: 4px; padding: 15px; margin: 20px 0;">
+            <p style="margin: 0; color: #856404; font-size: 14px;">
+                <strong>⏰ Note:</strong> These approval links will expire on <strong>${new Date(expiresAt).toLocaleString()}</strong>
+            </p>
+        </div>
+        
+        <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #e0e0e0; font-size: 12px; color: #666; text-align: center;">
+            <p style="margin: 5px 0;">This is an automated message from Family Album.</p>
+            <p style="margin: 5px 0;">If you did not expect this email, please ignore it.</p>
+        </div>
+    </div>
+</body>
+</html>
+    `.trim();
+}
+
+// Send email using configured service
+async function sendEmail(context, adminEmails, userEmail, userName, message, fullAccessUrl, readOnlyUrl, denyUrl, expiresAt) {
+    const fromAddress = process.env.EMAIL_FROM_ADDRESS;
+    const subject = 'New Access Request - Family Album';
+    const html = generateEmailHtml(userEmail, userName, message, fullAccessUrl, readOnlyUrl, denyUrl, expiresAt);
+    
+    // Check if Azure Communication Services is configured
+    if (process.env.AZURE_COMMUNICATION_CONNECTION_STRING && fromAddress) {
+        try {
+            // Dynamically require the package - it's optional
+            const { EmailClient } = require('@azure/communication-email');
+            const emailClient = new EmailClient(process.env.AZURE_COMMUNICATION_CONNECTION_STRING);
+            
+            const emailMessage = {
+                senderAddress: fromAddress,
+                recipients: {
+                    to: adminEmails.map(email => ({ address: email }))
+                },
+                content: {
+                    subject: subject,
+                    html: html
+                }
+            };
+            
+            context.log('Sending email via Azure Communication Services...');
+            const poller = await emailClient.beginSend(emailMessage);
+            await poller.pollUntilDone();
+            context.log('✅ Email sent successfully via Azure Communication Services');
+            return { success: true, method: 'Azure Communication Services' };
+        } catch (error) {
+            if (error.code === 'MODULE_NOT_FOUND') {
+                context.log.error('Azure Communication Services package not installed. Run: npm install @azure/communication-email');
+                return { success: false, method: 'none', error: 'Package not installed' };
+            }
+            context.log.error('Failed to send email via Azure Communication Services:', error);
+            throw error;
+        }
+    }
+    
+    // Check if SendGrid is configured
+    if (process.env.SENDGRID_API_KEY && fromAddress) {
+        try {
+            // Dynamically require the package - it's optional
+            const sgMail = require('@sendgrid/mail');
+            sgMail.setApiKey(process.env.SENDGRID_API_KEY);
+            
+            const msg = {
+                to: adminEmails,
+                from: fromAddress,
+                subject: subject,
+                html: html
+            };
+            
+            context.log('Sending email via SendGrid...');
+            await sgMail.send(msg);
+            context.log('✅ Email sent successfully via SendGrid');
+            return { success: true, method: 'SendGrid' };
+        } catch (error) {
+            if (error.code === 'MODULE_NOT_FOUND') {
+                context.log.error('SendGrid package not installed. Run: npm install @sendgrid/mail');
+                return { success: false, method: 'none', error: 'Package not installed' };
+            }
+            context.log.error('Failed to send email via SendGrid:', error);
+            throw error;
+        }
+    }
+    
+    // No email service configured - log to console
+    context.log.warn('⚠️ No email service configured. Email not sent.');
+    context.log.warn('To enable email notifications, configure one of:');
+    context.log.warn('  - AZURE_COMMUNICATION_CONNECTION_STRING + EMAIL_FROM_ADDRESS (for Azure Communication Services)');
+    context.log.warn('  - SENDGRID_API_KEY + EMAIL_FROM_ADDRESS (for SendGrid)');
+    return { success: false, method: 'none' };
+}
+
 module.exports = async function (context, req) {
     context.log('Notify admins API called');
 
@@ -110,43 +254,49 @@ module.exports = async function (context, req) {
         const readOnlyUrl = `${baseUrl}/api/approve-access?token=${readOnlyToken}`;
         const denyUrl = `${baseUrl}/api/approve-access?token=${denyToken}`;
 
-        const adminEmails = admins.map(a => a.Email).join(', ');
+        const adminEmailsList = admins.map(a => a.Email);
         
-        // TODO: Implement actual email sending using Azure Communication Services, SendGrid, or similar
-        // For now, log the email content with the approval links
-        context.log(`📧 Would send email notification to: ${adminEmails}`);
+        // Log the email content for debugging
+        context.log(`📧 Notifying ${adminEmailsList.length} admin(s): ${adminEmailsList.join(', ')}`);
         context.log(`Subject: New Access Request - Family Album`);
-        context.log(`\nBody:\n`);
-        context.log(`A new user is requesting access to the Family Album:`);
-        context.log(`  User: ${userName || userEmail}`);
-        context.log(`  Email: ${userEmail}`);
-        context.log(`  Message: ${message || 'No message provided'}`);
-        context.log(`  Time: ${new Date().toISOString()}`);
-        context.log(`\nPlease click one of the following links to approve or deny access:\n`);
-        context.log(`✅ Approve (Full Access): ${fullAccessUrl}`);
-        context.log(`📖 Approve (Read Only): ${readOnlyUrl}`);
-        context.log(`❌ Deny Access: ${denyUrl}`);
-        context.log(`\nThese links will expire on: ${expiresAt.toISOString()}`);
+        context.log(`User: ${userName || userEmail} (${userEmail})`);
+        context.log(`Approval links generated:`);
+        context.log(`  ✅ Full Access: ${fullAccessUrl}`);
+        context.log(`  📖 Read Only: ${readOnlyUrl}`);
+        context.log(`  ❌ Deny: ${denyUrl}`);
+        context.log(`Links expire: ${expiresAt.toISOString()}`);
 
-        // Here you would integrate with your email service:
-        // 
-        // Example with Azure Communication Services:
-        // const { EmailClient } = require("@azure/communication-email");
-        // const client = new EmailClient(process.env.AZURE_COMMUNICATION_CONNECTION_STRING);
-        // await client.send({
-        //     from: "noreply@your-domain.com",
-        //     to: admins.map(a => ({ email: a.Email })),
-        //     subject: "New Access Request - Family Album",
-        //     html: generateEmailHtml(...)
-        // });
+        // Attempt to send email via configured service
+        let emailResult;
+        try {
+            emailResult = await sendEmail(
+                context, 
+                adminEmailsList, 
+                userEmail, 
+                userName, 
+                message, 
+                fullAccessUrl, 
+                readOnlyUrl, 
+                denyUrl, 
+                expiresAt
+            );
+        } catch (emailError) {
+            // Log error but don't fail the request - tokens are still created
+            context.log.error('Email sending failed, but tokens were created:', emailError);
+            emailResult = { success: false, method: 'error', error: emailError.message };
+        }
 
         context.res = {
             status: 200,
             headers: { 'Content-Type': 'application/json' },
             body: {
                 success: true,
-                message: 'Admin notification sent (logged)',
-                admins: admins.map(a => a.Email),
+                message: emailResult.success 
+                    ? `Admin notification sent via ${emailResult.method}` 
+                    : 'Tokens created (email not sent - see logs)',
+                admins: adminEmailsList,
+                emailSent: emailResult.success,
+                emailMethod: emailResult.method,
                 approvalLinks: {
                     fullAccess: fullAccessUrl,
                     readOnly: readOnlyUrl,
