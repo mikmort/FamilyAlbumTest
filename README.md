@@ -20,6 +20,7 @@ A comprehensive family photo and video management web application built with Nex
 
 - **Media Management**: Upload, organize, and manage family photos and videos
 - **People Tagging**: Tag people in photos and videos with relationships
+- **Nickname Search**: Search for people using common nicknames (e.g., "Mike" finds "Michael")
 - **Event Management**: Associate media with family events (weddings, reunions, etc.)
 - **Advanced Filtering**: Browse photos by people (OR/AND logic), events, or untagged media
 - **Rich Metadata**: Add descriptions, dates, and embedded metadata to media files
