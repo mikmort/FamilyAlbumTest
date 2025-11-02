@@ -74,6 +74,7 @@ export default function MediaDetailModal({
   const [newEventDetails, setNewEventDetails] = useState('');
   const [creatingPerson, setCreatingPerson] = useState(false);
   const [creatingEvent, setCreatingEvent] = useState(false);
+  const [selectedPersonDetail, setSelectedPersonDetail] = useState<{ ID: number; neName: string; neRelation?: string } | null>(null);
 
   useEffect(() => {
     if (editing && allEvents.length === 0) {
@@ -90,17 +91,21 @@ export default function MediaDetailModal({
   const fetchPeople = async () => {
     try {
       setLoadingPeople(true);
+      console.log('📥 Fetching people from /api/people...');
       const { fetchWithFallback, samplePeople } = await import('../lib/api');
       const data = await fetchWithFallback('/api/people');
+      
       if (data && Array.isArray(data)) {
+        console.log(`✅ Loaded ${data.length} people from API`);
         setAllPeople(data);
       } else {
-        // fallback to sample data when API unavailable or returns unexpected shape
+        console.warn('⚠️ API returned unexpected format, falling back to sample data');
         setAllPeople(normalizePeople(samplePeople()));
       }
     } catch (error) {
       console.error('❌ MediaDetailModal fetchPeople error:', error);
-  setAllPeople(normalizePeople((await import('../lib/api')).samplePeople()));
+      console.warn('⚠️ Using sample data as fallback');
+      setAllPeople(normalizePeople((await import('../lib/api')).samplePeople()));
     } finally {
       setLoadingPeople(false);
     }
@@ -531,6 +536,82 @@ export default function MediaDetailModal({
         </div>
       )}
 
+      {/* Person Detail Modal */}
+      {selectedPersonDetail && (
+        <div 
+          className="modal-overlay" 
+          onClick={() => setSelectedPersonDetail(null)}
+          style={{ zIndex: 1001 }}
+        >
+          <div 
+            className="modal-content" 
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              maxWidth: '400px',
+              padding: '2rem',
+              textAlign: 'center'
+            }}
+          >
+            <button
+              onClick={() => setSelectedPersonDetail(null)}
+              style={{
+                position: 'absolute',
+                top: '0.5rem',
+                right: '0.5rem',
+                background: 'none',
+                border: 'none',
+                fontSize: '2rem',
+                cursor: 'pointer',
+                color: '#6c757d',
+                padding: '0',
+                width: '2.5rem',
+                height: '2.5rem',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center'
+              }}
+            >
+              ×
+            </button>
+            
+            <div style={{ marginTop: '0.5rem' }}>
+              <h2 style={{
+                fontSize: '2rem',
+                fontWeight: 'bold',
+                color: '#0056b3',
+                margin: '1rem 0'
+              }}>
+                {selectedPersonDetail.neName}
+              </h2>
+              
+              {selectedPersonDetail.neRelation && (
+                <div style={{
+                  fontSize: '1.1rem',
+                  color: '#495057',
+                  backgroundColor: '#f8f9fa',
+                  padding: '1rem',
+                  borderRadius: '6px',
+                  margin: '1rem 0',
+                  border: '1px solid #dee2e6'
+                }}>
+                  <strong>Relation:</strong> {selectedPersonDetail.neRelation}
+                </div>
+              )}
+              
+              {selectedPersonDetail.neCount !== undefined && selectedPersonDetail.neCount > 0 && (
+                <div style={{
+                  fontSize: '0.9rem',
+                  color: '#6c757d',
+                  margin: '1rem 0'
+                }}>
+                  Tagged in {selectedPersonDetail.neCount} photo{selectedPersonDetail.neCount !== 1 ? 's' : ''}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Detail Modal */}
       <div className="modal-overlay" onClick={onClose}>
       <div className="modal-content" onClick={(e) => e.stopPropagation()}>
@@ -877,8 +958,8 @@ export default function MediaDetailModal({
                       alignItems: 'center',
                       gap: '0.5rem'
                     }}>
-                      <div style={{ flex: 1 }}>
-                        <div style={{ fontWeight: '600', color: '#0056b3', fontSize: '1rem' }}>
+                      <div style={{ flex: 1, cursor: 'pointer' }} onClick={() => setSelectedPersonDetail(person)}>
+                        <div style={{ fontWeight: '600', color: '#0056b3', fontSize: '1rem', textDecoration: 'underline' }}>
                           {idx + 1}. {person.neName}
                         </div>
                         {person.neRelation && (
