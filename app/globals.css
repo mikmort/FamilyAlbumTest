@@ -1218,7 +1218,7 @@ button {
   top: 100%;
   left: 0;
   right: 0;
-  max-height: 282px;
+  max-height: 400px;
   overflow-y: auto;
   background: white;
   border: 1px solid #ddd;
@@ -1257,6 +1257,38 @@ button {
   color: #666;
   font-size: 0.9em;
   margin-left: auto;
+}
+
+/* Column-based layout for autocomplete items */
+.autocomplete-item-columns {
+  display: grid;
+  grid-template-columns: 2fr 2fr auto;
+  gap: 1rem;
+  align-items: center;
+}
+
+.person-name-col {
+  font-weight: 500;
+  color: #333;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.person-relation-col {
+  color: #666;
+  font-size: 0.9em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.person-count-col {
+  color: #666;
+  font-size: 0.9em;
+  text-align: right;
+  white-space: nowrap;
+  min-width: 3rem;
 }
 
 .person-checkbox {
