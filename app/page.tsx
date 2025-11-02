@@ -24,6 +24,7 @@ interface AuthStatus {
     role: string;
     status: string;
   } | null;
+  pendingCount?: number;
   error: string | null;
 }
 
@@ -117,6 +118,7 @@ export default function Home() {
           onProcessFiles={() => setView('process-files')}
           onUploadMedia={() => setView('upload-media')}
           onAdminSettings={isAdmin ? () => setView('admin-settings') : undefined}
+          pendingCount={authStatus?.pendingCount || 0}
         />
         <UserInfo />
       </div>
@@ -207,7 +209,7 @@ export default function Home() {
             <button className="btn btn-secondary mb-2" onClick={() => setView('select')}>
               ← Back
             </button>
-            <AdminSettings />
+            <AdminSettings onRequestsChange={checkAuthStatus} />
           </>
         )}
 

@@ -24,13 +24,22 @@ interface PendingRequest {
   Notes: string | null;
 }
 
-export default function AdminSettings() {
+interface RequestRoleSelection {
+  [userId: number]: 'Admin' | 'Full' | 'Read';
+}
+
+interface AdminSettingsProps {
+  onRequestsChange?: () => void;
+}
+
+export default function AdminSettings({ onRequestsChange }: AdminSettingsProps) {
   const [users, setUsers] = useState<User[]>([]);
   const [pendingRequests, setPendingRequests] = useState<PendingRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showAddUser, setShowAddUser] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
+  const [requestRoles, setRequestRoles] = useState<RequestRoleSelection>({});
   
   // Add user form state
   const [newEmail, setNewEmail] = useState('');
@@ -68,6 +77,12 @@ export default function AdminSettings() {
       
       if (data.success) {
         setPendingRequests(data.requests);
+        // Initialize role selection for each request (default to 'Read')
+        const initialRoles: RequestRoleSelection = {};
+        data.requests.forEach((req: PendingRequest) => {
+          initialRoles[req.ID] = 'Read';
+        });
+        setRequestRoles(initialRoles);
       }
     } catch (err) {
       console.error('Error loading pending requests:', err);
@@ -124,6 +139,10 @@ export default function AdminSettings() {
         fetchUsers();
         fetchPendingRequests();
         setEditingUser(null);
+        // Notify parent component to refresh auth status (updates badge count)
+        if (onRequestsChange) {
+          onRequestsChange();
+        }
         alert('User updated successfully');
       } else {
         alert(data.error || 'Failed to update user');
@@ -160,8 +179,8 @@ export default function AdminSettings() {
     }
   };
 
-  const approveRequest = async (userId: number) => {
-    await updateUser(userId, { Status: 'Active' });
+  const approveRequest = async (userId: number, role: 'Admin' | 'Full' | 'Read' = 'Read') => {
+    await updateUser(userId, { Role: role, Status: 'Active' });
   };
 
   const denyRequest = async (userId: number) => {
@@ -229,8 +248,8 @@ export default function AdminSettings() {
               marginBottom: '0.5rem',
               border: '1px solid #ffc107'
             }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
+                <div style={{ flex: '1 1 250px' }}>
                   <strong>{request.Email}</strong>
                   <div style={{ fontSize: '0.9rem', color: '#666', marginTop: '0.25rem' }}>
                     Requested {Math.floor(request.HoursSinceRequest / 24)}d {request.HoursSinceRequest % 24}h ago
@@ -241,10 +260,27 @@ export default function AdminSettings() {
                     </div>
                   )}
                 </div>
-                <div style={{ display: 'flex', gap: '0.5rem' }}>
+                <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                  <select 
+                    value={requestRoles[request.ID] || 'Read'}
+                    onChange={(e) => setRequestRoles({
+                      ...requestRoles,
+                      [request.ID]: e.target.value as 'Admin' | 'Full' | 'Read'
+                    })}
+                    style={{ 
+                      padding: '0.4rem 0.6rem', 
+                      borderRadius: '4px', 
+                      border: '1px solid #ddd',
+                      fontSize: '0.9rem'
+                    }}
+                  >
+                    <option value="Read">Read</option>
+                    <option value="Full">Full</option>
+                    <option value="Admin">Admin</option>
+                  </select>
                   <button 
                     className="btn btn-success btn-sm"
-                    onClick={() => approveRequest(request.ID)}
+                    onClick={() => approveRequest(request.ID, requestRoles[request.ID] || 'Read')}
                   >
                     ✓ Approve
                   </button>
