@@ -725,7 +725,7 @@ module.exports = async function (context, req) {
                         const eventRows = await query(eventQuery, eventParams);
                         context.log(`Found ${eventRows.length} NameEvent records`);
                         eventRows.forEach(r => {
-                            eventLookup[r.ID] = { ID: r.ID, neName: r.neName, neType: r.neType };
+                            eventLookup[r.ID] = { ID: r.ID, neName: r.neName, neType: r.neType, neRelation: r.neRelation };
                         });
                     } catch (evErr) {
                         context.log.error('Error querying NameEvent IDs:', evErr);
@@ -794,7 +794,7 @@ module.exports = async function (context, req) {
                                 const eventRows = await query(eventQuery, eventParams);
                                 context.log(`Fetched ${eventRows.length} NameEvent records for NamePhoto events`);
                                 eventRows.forEach(r => {
-                                    eventLookup[r.ID] = { ID: r.ID, neName: r.neName, neType: r.neType };
+                                    eventLookup[r.ID] = { ID: r.ID, neName: r.neName, neType: r.neType, neRelation: r.neRelation };
                                 });
                             }
                         }

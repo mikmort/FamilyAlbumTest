@@ -593,6 +593,21 @@ export default function MediaDetailModal({
               }}>
                 {selectedPersonDetail.neRelation || 'No relation specified'}
               </div>
+              
+              {/* Debug info */}
+              <div style={{
+                fontSize: '0.75rem',
+                color: '#999',
+                marginTop: '1rem',
+                padding: '0.5rem',
+                backgroundColor: '#f8f9fa',
+                borderRadius: '4px',
+                fontFamily: 'monospace',
+                textAlign: 'left',
+                wordBreak: 'break-all'
+              }}>
+                DEBUG: {JSON.stringify(selectedPersonDetail)}
+              </div>
             </div>
           </div>
         </div>
