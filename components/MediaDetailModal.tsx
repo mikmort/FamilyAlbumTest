@@ -576,25 +576,22 @@ export default function MediaDetailModal({
             
             <div style={{ marginTop: '0.5rem' }}>
               <h2 style={{
-                fontSize: '2rem',
-                fontWeight: 'bold',
+                fontSize: '1.5rem',
+                fontWeight: '600',
                 color: '#0056b3',
-                margin: '1rem 0'
+                margin: '1rem 0 0.5rem 0'
               }}>
                 {selectedPersonDetail.neName}
               </h2>
               
               {selectedPersonDetail.neRelation && (
                 <div style={{
-                  fontSize: '1.1rem',
+                  fontSize: '1.25rem',
                   color: '#495057',
-                  backgroundColor: '#f8f9fa',
-                  padding: '1rem',
-                  borderRadius: '6px',
-                  margin: '1rem 0',
-                  border: '1px solid #dee2e6'
+                  margin: '0.5rem 0 1rem 0',
+                  fontWeight: '500'
                 }}>
-                  <strong>Relation:</strong> {selectedPersonDetail.neRelation}
+                  {selectedPersonDetail.neRelation}
                 </div>
               )}
             </div>
