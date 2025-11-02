@@ -65,6 +65,7 @@ export default function MediaDetailModal({
   const [loadingEvents, setLoadingEvents] = useState(false);
   const [savingTag, setSavingTag] = useState(false);
   const [insertPosition, setInsertPosition] = useState<number | 'end'>('end');
+  const [peopleSearchFilter, setPeopleSearchFilter] = useState('');
   
   // Inline creation state
   const [showCreatePerson, setShowCreatePerson] = useState(false);
@@ -228,6 +229,7 @@ export default function MediaDetailModal({
       // Reset position for next add
       setInsertPosition('end');
       setShowPeopleSelector(false);
+      setPeopleSearchFilter('');
     } catch (error) {
       console.error('❌ MediaDetailModal handleAddPerson error:', error);
       
@@ -1025,7 +1027,10 @@ export default function MediaDetailModal({
                           </button>
                           <button
                             className="btn btn-secondary btn-sm"
-                            onClick={() => setShowPeopleSelector(false)}
+                            onClick={() => {
+                              setShowPeopleSelector(false);
+                              setPeopleSearchFilter('');
+                            }}
                           >
                             Cancel
                           </button>
@@ -1100,6 +1105,26 @@ export default function MediaDetailModal({
                         </div>
                       )}
                       
+                      {/* Search filter input */}
+                      {!loadingPeople && allPeople && allPeople.length > 0 && (
+                        <div style={{ marginBottom: '0.75rem' }}>
+                          <input
+                            type="text"
+                            placeholder="Type to filter names..."
+                            value={peopleSearchFilter}
+                            onChange={(e) => setPeopleSearchFilter(e.target.value)}
+                            style={{
+                              width: '100%',
+                              padding: '0.5rem',
+                              border: '1px solid #dee2e6',
+                              borderRadius: '4px',
+                              fontSize: '0.95rem'
+                            }}
+                            autoFocus
+                          />
+                        </div>
+                      )}
+                      
                       {loadingPeople ? (
                         <div className="loading-spinner"></div>
                       ) : (
@@ -1107,6 +1132,7 @@ export default function MediaDetailModal({
                           {allPeople && allPeople.length > 0 ? (
                             allPeople
                               .filter(p => !taggedPeople.some(tp => tp.ID === p.ID))
+                              .filter(p => !peopleSearchFilter || p.neName.toLowerCase().includes(peopleSearchFilter.toLowerCase()))
                               .map((person) => (
                                 <button
                                   key={person.ID}
