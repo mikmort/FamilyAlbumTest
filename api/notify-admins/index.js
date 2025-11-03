@@ -34,9 +34,9 @@ function generateEmailHtml(userEmail, userName, message, fullAccessUrl, readOnly
     <title>New Access Request - Family Album</title>
 </head>
 <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
-    <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 30px; border-radius: 10px 10px 0 0; text-align: center;">
-        <h1 style="margin: 0; font-size: 28px;">🔔 New Access Request</h1>
-        <p style="margin: 10px 0 0 0; opacity: 0.9;">Family Album</p>
+    <div style="background: #667eea; color: white; padding: 30px; border-radius: 10px 10px 0 0; text-align: center;">
+        <h1 style="margin: 0; font-size: 28px;">New Access Request</h1>
+        <p style="margin: 10px 0 0 0;">Family Album</p>
     </div>
     
     <div style="background: white; border: 1px solid #e0e0e0; border-top: none; border-radius: 0 0 10px 10px; padding: 30px;">
@@ -56,21 +56,21 @@ function generateEmailHtml(userEmail, userName, message, fullAccessUrl, readOnly
             <tr>
                 <td align="center">
                     <a href="${fullAccessUrl}" style="display: inline-block; background: #28a745; color: white; padding: 14px 28px; text-decoration: none; border-radius: 6px; font-weight: 600; font-size: 16px;">
-                        ✅ Approve (Full Access)
+                        Approve (Full Access)
                     </a>
                 </td>
             </tr>
             <tr>
                 <td align="center">
                     <a href="${readOnlyUrl}" style="display: inline-block; background: #007bff; color: white; padding: 14px 28px; text-decoration: none; border-radius: 6px; font-weight: 600; font-size: 16px;">
-                        📖 Approve (Read Only)
+                        Approve (Read Only)
                     </a>
                 </td>
             </tr>
             <tr>
                 <td align="center">
                     <a href="${denyUrl}" style="display: inline-block; background: #dc3545; color: white; padding: 14px 28px; text-decoration: none; border-radius: 6px; font-weight: 600; font-size: 16px;">
-                        ❌ Deny Access
+                        Deny Access
                     </a>
                 </td>
             </tr>
@@ -78,7 +78,7 @@ function generateEmailHtml(userEmail, userName, message, fullAccessUrl, readOnly
         
         <div style="background: #fff3cd; border: 1px solid #ffc107; border-radius: 4px; padding: 15px; margin: 20px 0;">
             <p style="margin: 0; color: #856404; font-size: 14px;">
-                <strong>⏰ Note:</strong> These approval links will expire on <strong>${new Date(expiresAt).toLocaleString()}</strong>
+                <strong>Note:</strong> These approval links will expire on <strong>${new Date(expiresAt).toLocaleString()}</strong>
             </p>
         </div>
         
@@ -92,11 +92,45 @@ function generateEmailHtml(userEmail, userName, message, fullAccessUrl, readOnly
     `.trim();
 }
 
+// Generate plain text version of email
+function generateEmailPlainText(userEmail, userName, message, fullAccessUrl, readOnlyUrl, denyUrl, expiresAt) {
+    return `
+NEW ACCESS REQUEST - FAMILY ALBUM
+
+A new user is requesting access to the Family Album:
+
+Name: ${userName || 'Not provided'}
+Email: ${userEmail}
+Message: ${message || 'No message provided'}
+Time: ${new Date().toLocaleString()}
+
+ACTION REQUIRED
+
+Please click one of the following links to approve or deny access:
+
+Approve (Full Access):
+${fullAccessUrl}
+
+Approve (Read Only):
+${readOnlyUrl}
+
+Deny Access:
+${denyUrl}
+
+NOTE: These approval links will expire on ${new Date(expiresAt).toLocaleString()}
+
+---
+This is an automated message from Family Album.
+If you did not expect this email, please ignore it.
+    `.trim();
+}
+
 // Send email using configured service
 async function sendEmail(context, adminEmails, userEmail, userName, message, fullAccessUrl, readOnlyUrl, denyUrl, expiresAt) {
     const fromAddress = process.env.EMAIL_FROM_ADDRESS;
     const subject = 'New Access Request - Family Album';
     const html = generateEmailHtml(userEmail, userName, message, fullAccessUrl, readOnlyUrl, denyUrl, expiresAt);
+    const plainText = generateEmailPlainText(userEmail, userName, message, fullAccessUrl, readOnlyUrl, denyUrl, expiresAt);
     
     // Check if Azure Communication Services is configured
     if (process.env.AZURE_COMMUNICATION_CONNECTION_STRING && fromAddress) {
@@ -112,7 +146,16 @@ async function sendEmail(context, adminEmails, userEmail, userName, message, ful
                 },
                 content: {
                     subject: subject,
+                    plainText: plainText,
                     html: html
+                },
+                headers: {
+                    // Add custom headers to improve deliverability
+                    'X-Priority': '3',
+                    'X-Mailer': 'Family Album Application',
+                    'List-Unsubscribe': '<mailto:donotreply@mortonfamilyalbum.com?subject=unsubscribe>',
+                    'Precedence': 'bulk',
+                    'Auto-Submitted': 'auto-generated'
                 }
             };
             
