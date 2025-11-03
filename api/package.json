@@ -16,7 +16,7 @@
     "sharp": "^0.33.0"
   },
   "optionalDependencies": {
-    "@azure/communication-email": "^1.0.0",
+    "@azure/communication-email": "^1.1.0",
     "@sendgrid/mail": "^8.1.6"
   },
   "devDependencies": {
