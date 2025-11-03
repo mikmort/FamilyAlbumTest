@@ -180,11 +180,73 @@ export default function AdminSettings({ onRequestsChange }: AdminSettingsProps) 
   };
 
   const approveRequest = async (userId: number, role: 'Admin' | 'Full' | 'Read' = 'Read') => {
-    await updateUser(userId, { Role: role, Status: 'Active' });
+    try {
+      // Optimistically update UI - remove request immediately
+      setPendingRequests(prev => prev.filter(req => req.ID !== userId));
+      
+      // Notify parent to update badge immediately
+      if (onRequestsChange) {
+        onRequestsChange();
+      }
+
+      const response = await fetch('/api/users', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: userId, Role: role, Status: 'Active' })
+      });
+
+      const data = await response.json();
+      
+      if (data.success) {
+        // Refresh data to ensure consistency
+        fetchUsers();
+        fetchPendingRequests();
+      } else {
+        // If failed, restore the request and show error
+        fetchPendingRequests();
+        alert(data.error || 'Failed to approve request');
+      }
+    } catch (err) {
+      // If failed, restore the request and show error
+      fetchPendingRequests();
+      alert('Error approving request');
+      console.error(err);
+    }
   };
 
   const denyRequest = async (userId: number) => {
-    await updateUser(userId, { Status: 'Denied' });
+    try {
+      // Optimistically update UI - remove request immediately
+      setPendingRequests(prev => prev.filter(req => req.ID !== userId));
+      
+      // Notify parent to update badge immediately
+      if (onRequestsChange) {
+        onRequestsChange();
+      }
+
+      const response = await fetch('/api/users', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: userId, Status: 'Denied' })
+      });
+
+      const data = await response.json();
+      
+      if (data.success) {
+        // Refresh data to ensure consistency
+        fetchUsers();
+        fetchPendingRequests();
+      } else {
+        // If failed, restore the request and show error
+        fetchPendingRequests();
+        alert(data.error || 'Failed to deny request');
+      }
+    } catch (err) {
+      // If failed, restore the request and show error
+      fetchPendingRequests();
+      alert('Error denying request');
+      console.error(err);
+    }
   };
 
   const getRoleColor = (role: string) => {
