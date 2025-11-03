@@ -127,10 +127,16 @@ export default function AdminSettings({ onRequestsChange }: AdminSettingsProps) 
 
   const updateUser = async (userId: number, updates: Partial<User>) => {
     try {
+      // Transform capitalized field names to lowercase for API
+      const apiUpdates: any = { id: userId };
+      if (updates.Role !== undefined) apiUpdates.role = updates.Role;
+      if (updates.Status !== undefined) apiUpdates.status = updates.Status;
+      if (updates.Notes !== undefined) apiUpdates.notes = updates.Notes;
+      
       const response = await fetch('/api/users', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: userId, ...updates })
+        body: JSON.stringify(apiUpdates)
       });
 
       const data = await response.json();
@@ -192,7 +198,7 @@ export default function AdminSettings({ onRequestsChange }: AdminSettingsProps) 
       const response = await fetch('/api/users', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: userId, Role: role, Status: 'Active' })
+        body: JSON.stringify({ id: userId, role: role, status: 'Active' })
       });
 
       const data = await response.json();
@@ -227,7 +233,7 @@ export default function AdminSettings({ onRequestsChange }: AdminSettingsProps) 
       const response = await fetch('/api/users', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: userId, Status: 'Denied' })
+        body: JSON.stringify({ id: userId, status: 'Denied' })
       });
 
       const data = await response.json();
@@ -431,8 +437,8 @@ export default function AdminSettings({ onRequestsChange }: AdminSettingsProps) 
                   <td>
                     {editingUser?.ID === user.ID ? (
                       <select 
-                        value={user.Role}
-                        onChange={(e) => setEditingUser({...user, Role: e.target.value as any})}
+                        value={editingUser.Role}
+                        onChange={(e) => setEditingUser({...editingUser, Role: e.target.value as any})}
                         style={{ padding: '0.25rem', borderRadius: '4px' }}
                       >
                         <option value="Read">Read</option>
@@ -455,8 +461,8 @@ export default function AdminSettings({ onRequestsChange }: AdminSettingsProps) 
                   <td>
                     {editingUser?.ID === user.ID ? (
                       <select 
-                        value={user.Status}
-                        onChange={(e) => setEditingUser({...user, Status: e.target.value as any})}
+                        value={editingUser.Status}
+                        onChange={(e) => setEditingUser({...editingUser, Status: e.target.value as any})}
                         style={{ padding: '0.25rem', borderRadius: '4px' }}
                       >
                         <option value="Active">Active</option>
