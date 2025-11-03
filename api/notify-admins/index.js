@@ -128,7 +128,13 @@ If you did not expect this email, please ignore it.
 // Send email using configured service
 async function sendEmail(context, adminEmails, userEmail, userName, message, fullAccessUrl, readOnlyUrl, denyUrl, expiresAt) {
     const fromAddress = process.env.EMAIL_FROM_ADDRESS;
-    const subject = 'New Access Request - Family Album';
+    const senderName = process.env.EMAIL_SENDER_NAME || 'Family Album';
+    
+    // More personal subject line
+    const subject = userName 
+        ? `${userName} wants to join the Family Album`
+        : `${userEmail} wants to join the Family Album`;
+    
     const html = generateEmailHtml(userEmail, userName, message, fullAccessUrl, readOnlyUrl, denyUrl, expiresAt);
     const plainText = generateEmailPlainText(userEmail, userName, message, fullAccessUrl, readOnlyUrl, denyUrl, expiresAt);
     
@@ -141,8 +147,13 @@ async function sendEmail(context, adminEmails, userEmail, userName, message, ful
             
             const emailMessage = {
                 senderAddress: fromAddress,
+                // Add reply-to with a friendly name
+                replyTo: [{ address: fromAddress, displayName: senderName }],
                 recipients: {
-                    to: adminEmails.map(email => ({ address: email }))
+                    to: adminEmails.map(email => ({ 
+                        address: email,
+                        displayName: email.split('@')[0]
+                    }))
                 },
                 content: {
                     subject: subject,
@@ -150,12 +161,10 @@ async function sendEmail(context, adminEmails, userEmail, userName, message, ful
                     html: html
                 },
                 headers: {
-                    // Add custom headers to improve deliverability
-                    'X-Priority': '3',
-                    'X-Mailer': 'Family Album Application',
-                    'List-Unsubscribe': '<mailto:donotreply@mortonfamilyalbum.com?subject=unsubscribe>',
-                    'Precedence': 'bulk',
-                    'Auto-Submitted': 'auto-generated'
+                    // Keep it simple - fewer headers can be better
+                    'X-Priority': '1',
+                    'Importance': 'high',
+                    'X-Mailer': 'Family Album'
                 }
             };
             
