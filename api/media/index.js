@@ -477,6 +477,7 @@ module.exports = async function (context, req) {
                         if (sharp) {
                             try {
                                 const thumbnailBuffer = await sharp(originalBuffer)
+                                    .rotate() // Auto-rotate based on EXIF orientation
                                     .resize(300, null, {
                                         fit: 'inside',
                                         withoutEnlargement: true
