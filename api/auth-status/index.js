@@ -1,4 +1,5 @@
 const { checkAuthorization, getUserEmail, getUserName, getPendingRequests } = require('../shared/auth');
+const { DatabaseWarmupError } = require('../shared/db');
 
 module.exports = async function (context, req) {
   context.log('Auth status check called');
@@ -49,6 +50,20 @@ module.exports = async function (context, req) {
 
   } catch (error) {
     context.log.error('Error checking auth status:', error);
+    
+    // Check if this is a database warmup error
+    if (error.isWarmupError || error instanceof DatabaseWarmupError) {
+      context.res = {
+        status: 503, // Service Unavailable
+        body: {
+          success: false,
+          databaseWarming: true,
+          error: 'Database is warming up. Please wait a moment...'
+        }
+      };
+      return;
+    }
+    
     context.res = {
       status: 500,
       body: {
