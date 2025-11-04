@@ -104,7 +104,7 @@ async function queryWithRetry(queryText, params, maxRetries = 3, retryDelay = 50
         
         // If not the last attempt, wait and retry
         if (attempt < maxRetries) {
-          const waitTime = retryDelay * Math.pow(1.5, attempt); // Exponential backoff
+          const waitTime = retryDelay * Math.pow(2.0, attempt); // Exponential backoff
           await new Promise(resolve => setTimeout(resolve, waitTime));
           continue;
         }
