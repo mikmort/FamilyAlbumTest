@@ -668,13 +668,23 @@ module.exports = async function (context, req) {
             }
 
             // Filter for photos with no people
+            // This includes photos with ONLY ID=1 ("No Tagged People") or truly no people tagged
             if (noPeople) {
                 whereClauses.push(`
-                    NOT EXISTS (
-                        SELECT 1 FROM dbo.NamePhoto np 
-                        INNER JOIN dbo.NameEvent ne ON np.npID = ne.ID
-                        WHERE np.npFileName = p.PFileName
-                        AND ne.neType = 'N'
+                    (
+                        -- Option 1: Only tagged with ID=1 ("No Tagged People")
+                        (p.PPeopleList = '1' AND p.PNameCount = 1)
+                        OR
+                        -- Option 2: Legacy photos with no tags at all
+                        (
+                            NOT EXISTS (
+                                SELECT 1 FROM dbo.NamePhoto np 
+                                INNER JOIN dbo.NameEvent ne ON np.npID = ne.ID
+                                WHERE np.npFileName = p.PFileName
+                                AND ne.neType = 'N'
+                            )
+                            AND (p.PNameCount = 0 OR p.PNameCount IS NULL)
+                        )
                     )
                 `);
             }
