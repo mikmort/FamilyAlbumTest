@@ -92,9 +92,13 @@ module.exports = async function (context, req) {
 
         // POST /api/people - Create new person
         if (method === 'POST') {
-            const { name } = req.body;
+            const { name, neName, relation, neRelation } = req.body;
+            
+            // Accept both 'name' and 'neName' for backwards compatibility
+            const personName = name || neName;
+            const personRelation = relation || neRelation;
 
-            if (!name) {
+            if (!personName) {
                 context.res = {
                     status: 400,
                     body: { error: 'Name is required' }
@@ -103,16 +107,22 @@ module.exports = async function (context, req) {
             }
 
             const insertQuery = `
-                INSERT INTO dbo.NameEvent (neName, neType, neCount)
-                OUTPUT INSERTED.ID as id, INSERTED.neName as name, INSERTED.neCount as photoCount
-                VALUES (@name, 'N', 0)
+                INSERT INTO dbo.NameEvent (neName, neRelation, neType, neCount)
+                OUTPUT INSERTED.ID, INSERTED.neName, INSERTED.neRelation, INSERTED.neType, INSERTED.neCount as photoCount
+                VALUES (@name, @relation, 'N', 0)
             `;
 
-            const result = await query(insertQuery, { name });
+            const result = await query(insertQuery, { 
+                name: personName,
+                relation: personRelation || null
+            });
 
             context.res = {
                 status: 201,
-                body: result[0]
+                body: {
+                    success: true,
+                    person: result[0]
+                }
             };
             return;
         }

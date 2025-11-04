@@ -18,8 +18,19 @@ if (Test-Path ".env.local") {
 }
 
 $storageAccountName = $env:AZURE_STORAGE_ACCOUNT_NAME
+if (-not $storageAccountName) {
+    $storageAccountName = $env:AZURE_STORAGE_ACCOUNT
+}
+
 $storageAccountKey = $env:AZURE_STORAGE_ACCOUNT_KEY
-$containerName = "family-album-media"
+if (-not $storageAccountKey) {
+    $storageAccountKey = $env:AZURE_STORAGE_KEY
+}
+
+$containerName = $env:AZURE_STORAGE_CONTAINER
+if (-not $containerName) {
+    $containerName = "family-album-media"
+}
 
 if (-not $storageAccountName -or -not $storageAccountKey) {
     Write-Host "ERROR: Storage account credentials not found in .env.local" -ForegroundColor Red
