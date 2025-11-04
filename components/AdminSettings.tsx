@@ -115,7 +115,7 @@ export default function AdminSettings({ onRequestsChange }: AdminSettingsProps) 
         setNewNotes('');
         setShowAddUser(false);
         fetchUsers();
-        alert('User added successfully');
+        // Success - no notification needed
       } else {
         alert(data.error || 'Failed to add user');
       }
@@ -149,7 +149,7 @@ export default function AdminSettings({ onRequestsChange }: AdminSettingsProps) 
         if (onRequestsChange) {
           onRequestsChange();
         }
-        alert('User updated successfully');
+        // Success - no notification needed
       } else {
         alert(data.error || 'Failed to update user');
       }
@@ -175,7 +175,7 @@ export default function AdminSettings({ onRequestsChange }: AdminSettingsProps) 
       
       if (data.success) {
         fetchUsers();
-        alert('User deleted successfully');
+        // Success - no notification needed
       } else {
         alert(data.error || 'Failed to delete user');
       }

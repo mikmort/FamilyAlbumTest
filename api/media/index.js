@@ -1070,8 +1070,17 @@ module.exports = async function (context, req) {
                 const clampedPos = Math.max(0, Math.min(insertPos, currentPeopleIds.length));
                 context.log('Insert position:', clampedPos);
                 
-                // Insert the new person at the specified position
-                currentPeopleIds.splice(clampedPos, 0, personId);
+                // Check if this is the first real person being tagged (currently only has ID=1 "No Tagged People")
+                const isCurrentlyUntagged = currentPeopleIds.length === 1 && currentPeopleIds[0] === 1;
+                
+                if (isCurrentlyUntagged) {
+                    context.log('First real person being tagged, will remove "No Tagged People" (ID=1)');
+                    // Remove ID=1 and replace with the new person
+                    currentPeopleIds[0] = personId;
+                } else {
+                    // Insert the new person at the specified position
+                    currentPeopleIds.splice(clampedPos, 0, personId);
+                }
                 context.log('New people IDs after insert:', currentPeopleIds);
 
                 // Use the actual filename from database (with backslashes) for all DB operations
@@ -1097,6 +1106,28 @@ module.exports = async function (context, req) {
                 }
                 
                 context.log('Existing NamePhoto records:', checkResult[0].cnt);
+                
+                // If this is the first real person being tagged, remove "No Tagged People" (ID=1)
+                if (isCurrentlyUntagged) {
+                    context.log('Removing "No Tagged People" (ID=1) from NamePhoto...');
+                    const deleteNoTagQuery = `
+                        DELETE FROM dbo.NamePhoto
+                        WHERE npFileName = @filename AND npID = 1
+                    `;
+                    await execute(deleteNoTagQuery, { filename: dbFileName });
+                    
+                    // Update neCount for "No Tagged People"
+                    await execute(`
+                        UPDATE NameEvent
+                        SET neCount = (
+                            SELECT COUNT(*)
+                            FROM NamePhoto
+                            WHERE npID = 1
+                        )
+                        WHERE ID = 1
+                    `);
+                    context.log('✅ Removed "No Tagged People" tag');
+                }
                 
                 if (checkResult[0].cnt === 0) {
                     // Insert the NamePhoto record
@@ -1220,8 +1251,37 @@ module.exports = async function (context, req) {
                 // Remove person from the list
                 currentPeopleIds.splice(personIndex, 1);
                 
+                // If no people left, add "No Tagged People" (ID=1)
+                let newPeopleList;
+                let newNameCount;
+                
+                if (currentPeopleIds.length === 0) {
+                    context.log('Last person removed, adding "No Tagged People" (ID=1)');
+                    newPeopleList = '1';
+                    newNameCount = 1;
+                    
+                    // Insert "No Tagged People" into NamePhoto
+                    await execute(`
+                        INSERT INTO NamePhoto (npID, npFileName, npPosition)
+                        VALUES (1, @filename, 0)
+                    `, { filename: dbFileName });
+                    
+                    // Update neCount for "No Tagged People"
+                    await execute(`
+                        UPDATE NameEvent
+                        SET neCount = (
+                            SELECT COUNT(*)
+                            FROM NamePhoto
+                            WHERE npID = 1
+                        )
+                        WHERE ID = 1
+                    `);
+                } else {
+                    newPeopleList = currentPeopleIds.join(',');
+                    newNameCount = currentPeopleIds.length;
+                }
+                
                 // Update PPeopleList and PNameCount in Pictures table
-                const newPeopleList = currentPeopleIds.join(',');
                 const updatePictureQuery = `
                     UPDATE dbo.Pictures
                     SET PPeopleList = @peopleList,
@@ -1232,12 +1292,12 @@ module.exports = async function (context, req) {
                 await execute(updatePictureQuery, {
                     filename: dbFileName,
                     peopleList: newPeopleList,
-                    nameCount: currentPeopleIds.length
+                    nameCount: newNameCount
                 });
 
                 context.res = {
                     status: 200,
-                    body: { success: true, peopleList: newPeopleList, nameCount: currentPeopleIds.length }
+                    body: { success: true, peopleList: newPeopleList, nameCount: newNameCount }
                 };
             } catch (error) {
                 context.log('❌ Error removing person tag:', error);

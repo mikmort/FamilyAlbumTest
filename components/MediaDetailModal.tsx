@@ -320,7 +320,7 @@ export default function MediaDetailModal({
       }
 
       setEditing(false);
-      alert('Successfully updated!');
+      // Success - no notification needed
     } catch (error) {
       console.error('❌ MediaDetailModal handleSave error:', error);
       alert('Failed to update media');
@@ -401,7 +401,7 @@ export default function MediaDetailModal({
       const result = await response.json();
       console.log('DELETE success:', result);
 
-      alert('File deleted successfully');
+      // Success - no notification needed, just close and refresh
       onClose(); // Close the modal
       
       // Refresh the page to update the gallery

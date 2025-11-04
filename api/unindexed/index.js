@@ -152,7 +152,10 @@ module.exports = async function (context, req) {
 
       try {
         // 1. Insert into Pictures table
-        const peopleList = people && people.length > 0 ? people.join(',') : '';
+        // If no people are tagged, use ID=1 ("No Tagged People")
+        const hasPeople = people && people.length > 0;
+        const peopleList = hasPeople ? people.join(',') : '1'; // ID=1 for untagged
+        const nameCount = hasPeople ? people.length : 1;
         
         await execute(`
           INSERT INTO Pictures (
@@ -172,7 +175,7 @@ module.exports = async function (context, req) {
           month: month || null,
           year: year || null,
           peopleList,
-          nameCount: people ? people.length : 0,
+          nameCount,
           thumbUrl: thumbUrl || '',
           type: type || 1,
           time: vtime || 0,
@@ -180,8 +183,8 @@ module.exports = async function (context, req) {
           reviewed: 1
         });
 
-        // 2. Insert into NamePhoto for each tagged person
-        if (people && people.length > 0) {
+        // 2. Insert into NamePhoto for each tagged person (or "No Tagged People")
+        if (hasPeople) {
           for (let i = 0; i < people.length; i++) {
             await execute(`
               INSERT INTO NamePhoto (npID, npFileName, npPosition)
@@ -205,6 +208,24 @@ module.exports = async function (context, req) {
               WHERE ID = @personID
             `, { personID });
           }
+        } else {
+          // No people tagged - insert "No Tagged People" (ID=1)
+          context.log('No people tagged, adding "No Tagged People" (ID=1)');
+          await execute(`
+            INSERT INTO NamePhoto (npID, npFileName, npPosition)
+            VALUES (1, @fileName, 0)
+          `, { fileName });
+          
+          // Update neCount for "No Tagged People"
+          await execute(`
+            UPDATE NameEvent
+            SET neCount = (
+              SELECT COUNT(*)
+              FROM NamePhoto
+              WHERE npID = 1
+            )
+            WHERE ID = 1
+          `);
         }
 
         // 4. Mark unindexed file as processed

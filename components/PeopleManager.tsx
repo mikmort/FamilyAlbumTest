@@ -93,7 +93,7 @@ export default function PeopleManager() {
       setEditingPerson(null);
       setFormName('');
       setFormRelation('');
-      alert('Person updated successfully!');
+      // Success - no notification needed
     } catch (err) {
       console.error('Error updating person:', err);
       alert('Error updating person: ' + (err instanceof Error ? err.message : 'Unknown error'));
