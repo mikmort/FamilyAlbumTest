@@ -66,6 +66,7 @@ export default function MediaDetailModal({
   const [savingTag, setSavingTag] = useState(false);
   const [insertPosition, setInsertPosition] = useState<number | 'end'>('end');
   const [peopleSearchFilter, setPeopleSearchFilter] = useState('');
+  const [showPositionSelector, setShowPositionSelector] = useState(false);
   
   // Inline creation state
   const [showCreatePerson, setShowCreatePerson] = useState(false);
@@ -226,10 +227,10 @@ export default function MediaDetailModal({
         }
       }
       
-      // Reset position for next add
-      setInsertPosition('end');
-      setShowPeopleSelector(false);
+      // Keep selector open for multi-tagging, just clear search and reset position
       setPeopleSearchFilter('');
+      setInsertPosition('end');
+      setShowPositionSelector(false);
     } catch (error) {
       console.error('❌ MediaDetailModal handleAddPerson error:', error);
       
@@ -245,6 +246,28 @@ export default function MediaDetailModal({
       alert(`❌ Failed to tag person\n\nError: ${displayMessage}\n\nCheck browser console (F12) for more details.`);
     } finally {
       setSavingTag(false);
+    }
+  };
+
+  // Keyboard handler for people selector
+  const handlePeopleSelectorKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Escape') {
+      setShowPeopleSelector(false);
+      setPeopleSearchFilter('');
+      setShowCreatePerson(false);
+      return;
+    }
+    
+    if (e.key === 'Enter' && !showCreatePerson && peopleSearchFilter) {
+      e.preventDefault();
+      // Find first filtered person and add them
+      const filteredPeople = allPeople
+        .filter(p => !taggedPeople.some(tp => tp.ID === p.ID))
+        .filter(p => p.neName.toLowerCase().includes(peopleSearchFilter.toLowerCase()));
+      
+      if (filteredPeople.length > 0) {
+        handleAddPerson(filteredPeople[0].ID);
+      }
     }
   };
 
@@ -999,9 +1022,9 @@ export default function MediaDetailModal({
                       + Add Person
                     </button>
                   ) : (
-                    <div className="people-selector-dropdown">
+                    <div className="people-selector-dropdown" onKeyDown={handlePeopleSelectorKeyDown}>
                       <div className="flex flex-between mb-1">
-                        <strong>Select a person:</strong>
+                        <strong>Select people to tag:</strong>
                         <div style={{ display: 'flex', gap: '0.5rem' }}>
                           <button
                             className="btn btn-success btn-sm"
@@ -1011,18 +1034,18 @@ export default function MediaDetailModal({
                             + New
                           </button>
                           <button
-                            className="btn btn-secondary btn-sm"
+                            className="btn btn-primary btn-sm"
                             onClick={() => {
                               setShowPeopleSelector(false);
                               setPeopleSearchFilter('');
                             }}
                           >
-                            Cancel
+                            Done
                           </button>
                         </div>
                       </div>
                       
-                      {/* Position selector */}
+                      {/* Position selector - always visible */}
                       {taggedPeople.length > 0 && (
                         <div style={{ 
                           padding: '0.75rem', 
@@ -1095,7 +1118,7 @@ export default function MediaDetailModal({
                         <div style={{ marginBottom: '0.75rem' }}>
                           <input
                             type="text"
-                            placeholder="Type to filter names..."
+                            placeholder="Type to search... (Enter to add first match, Esc to close)"
                             value={peopleSearchFilter}
                             onChange={(e) => setPeopleSearchFilter(e.target.value)}
                             style={{
