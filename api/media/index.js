@@ -184,8 +184,9 @@ module.exports = async function (context, req) {
 
     // Check if thumbnail is requested
     const thumbnail = req.query.thumbnail === 'true';
+    const forceRegenerate = req.query.regenerate === 'true';
 
-    context.log(`Method: ${method}, URL: ${req.url}, Filename: ${filename}, Thumbnail: ${thumbnail}`);
+    context.log(`Method: ${method}, URL: ${req.url}, Filename: ${filename}, Thumbnail: ${thumbnail}, ForceRegenerate: ${forceRegenerate}`);
 
     try {
             // Helper to normalize file name strings for consistent in-memory lookup.
@@ -365,10 +366,10 @@ module.exports = async function (context, req) {
                     const thumbnailPath = `thumbnails/${foundPath}`;
                     const thumbnailExists = await blobExists(thumbnailPath);
                     
-                    let shouldRegenerate = false;
+                    let shouldRegenerate = forceRegenerate;
                     
                     // If thumbnail exists, check if it's a placeholder (too small)
-                    if (thumbnailExists) {
+                    if (thumbnailExists && !forceRegenerate) {
                         context.log(`Thumbnail exists at ${thumbnailPath}, checking size...`);
                         const containerClient = getContainerClient();
                         const thumbnailBlobClient = containerClient.getBlobClient(thumbnailPath);
@@ -382,6 +383,8 @@ module.exports = async function (context, req) {
                         context.log(`⚠️ Thumbnail is too small (${thumbnailSize} bytes), likely a placeholder. Regenerating...`);
                         shouldRegenerate = true;
                     }
+                } else if (forceRegenerate) {
+                    context.log('Force regenerate requested');
                 }
                 
                 if (!thumbnailExists || shouldRegenerate) {
