@@ -11,6 +11,7 @@ interface AuthStatus {
     role: string;
     status: string;
   } | null;
+  databaseWarming?: boolean;
   error: string | null;
 }
 
@@ -28,6 +29,17 @@ export default function AccessRequest() {
     try {
       const response = await fetch('/api/auth-status');
       const data = await response.json();
+      
+      // If database is warming up, retry after a delay
+      if (data.databaseWarming) {
+        setAuthStatus(data);
+        setLoading(false); // Show the warmup message
+        setTimeout(() => {
+          checkAuthStatus();
+        }, 3000); // Retry every 3 seconds
+        return;
+      }
+      
       setAuthStatus(data);
       
       // If user has just authenticated and status is Pending, send notification
@@ -59,6 +71,21 @@ export default function AccessRequest() {
   };
 
   const getStatusMessage = () => {
+    // Database warming up
+    if (authStatus?.databaseWarming) {
+      return {
+        icon: '⏳',
+        title: 'Database is Loading',
+        message: 'The database is warming up. This typically takes 30-60 seconds when the site hasn\'t been accessed recently.',
+        subtitle: 'Please wait...',
+        details: [
+          'The database will be ready shortly',
+          'You will be automatically redirected',
+          'No action is required from you'
+        ]
+      };
+    }
+    
     if (!authStatus?.user) {
       return {
         icon: '🔒',
@@ -123,7 +150,7 @@ export default function AccessRequest() {
     }
   };
 
-  if (loading) {
+  if (loading && !authStatus?.databaseWarming) {
     return (
       <div style={{
         minHeight: '100vh',
@@ -172,6 +199,10 @@ export default function AccessRequest() {
             {status.message}
           </p>
         </div>
+
+        {authStatus?.databaseWarming && (
+          <div className="loading-spinner" style={{ margin: '20px auto' }}></div>
+        )}
 
         {status.subtitle && (
           <div style={{

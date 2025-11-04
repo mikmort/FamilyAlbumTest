@@ -25,6 +25,7 @@ interface AuthStatus {
     status: string;
   } | null;
   pendingCount?: number;
+  databaseWarming?: boolean;
   error: string | null;
 }
 
@@ -49,6 +50,16 @@ export default function Home() {
     try {
       const response = await fetch('/api/auth-status');
       const data = await response.json();
+      
+      // If database is warming up, retry after a delay
+      if (data.databaseWarming) {
+        setAuthStatus(data);
+        setTimeout(() => {
+          checkAuthStatus();
+        }, 3000); // Retry every 3 seconds
+        return;
+      }
+      
       setAuthStatus(data);
     } catch (err) {
       console.error('Error checking auth status:', err);
@@ -82,6 +93,38 @@ export default function Home() {
     setSelectedMedia(media);
     setStartFullscreen(true);
   };
+
+  // Show database warming message
+  if (authStatus?.databaseWarming) {
+    return (
+      <div style={{
+        minHeight: '100vh',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'
+      }}>
+        <div style={{
+          background: 'white',
+          borderRadius: '12px',
+          padding: '40px',
+          boxShadow: '0 10px 40px rgba(0, 0, 0, 0.2)',
+          textAlign: 'center',
+          maxWidth: '500px'
+        }}>
+          <div style={{ fontSize: '64px', marginBottom: '20px' }}>⏳</div>
+          <h1 style={{ margin: '0 0 15px 0', color: '#333' }}>Database is Loading</h1>
+          <p style={{ color: '#666', fontSize: '16px', lineHeight: '1.6', marginBottom: '20px' }}>
+            The database is warming up. This typically takes 30-60 seconds when the site hasn't been accessed recently.
+          </p>
+          <div className="loading-spinner" style={{ margin: '20px auto' }}></div>
+          <p style={{ color: '#999', fontSize: '14px' }}>
+            Please wait, you'll be automatically redirected when ready...
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   // Show loading while checking auth
   if (loadingAuth) {
