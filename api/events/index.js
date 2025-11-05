@@ -153,6 +153,8 @@ module.exports = async function (context, req) {
             const eventName = name || neName;
             const eventRelation = relation || neRelation;
 
+            context.log(`📝 Updating event ${id}: name="${eventName}", relation="${eventRelation}"`);
+
             if (!eventName || !eventName.trim()) {
                 context.res = {
                     status: 400,
@@ -168,6 +170,7 @@ module.exports = async function (context, req) {
             const existing = await query(existingQuery, { id: parseInt(id) });
 
             if (existing.length === 0) {
+                context.log(`❌ Event ${id} not found`);
                 context.res = {
                     status: 404,
                     body: { error: 'Event not found' }
@@ -189,6 +192,8 @@ module.exports = async function (context, req) {
                 name: eventName.trim(),
                 relation: eventRelation || null
             });
+
+            context.log(`✅ Event ${id} updated successfully`);
 
             // Fetch updated event
             const updatedEvent = await query(

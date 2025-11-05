@@ -106,7 +106,12 @@ export default function ManageEvents() {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(payload),
             })
-            if (!res.ok) throw new Error(`Update failed (${res.status})`)
+            
+            if (!res.ok) {
+                const data = await res.json();
+                throw new Error(data.error || `Update failed (${res.status})`);
+            }
+            
             const updated = await res.json()
             const ev: EventItem = {
                 id: updated.event?.ID ?? editingId,
@@ -119,6 +124,7 @@ export default function ManageEvents() {
             setEvents(prev => prev.map(x => (x.id === editingId ? ev : x)))
             cancelEdit()
         } catch (err: any) {
+            console.error('Update error:', err);
             setError(err?.message ?? 'Update error')
         }
     }
