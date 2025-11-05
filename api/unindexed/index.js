@@ -25,7 +25,7 @@ module.exports = async function (context, req) {
   try {
     // GET /api/unindexed - List all unindexed files for current user
     if (method === 'GET' && action === 'list') {
-      const userEmail = authResult.user?.email;
+      const userEmail = authResult.user?.Email;  // Capital E from database
       
       const result = await query(`
         SELECT 
@@ -62,7 +62,7 @@ module.exports = async function (context, req) {
 
     // GET /api/unindexed/count - Get count of unindexed files for current user
     if (method === 'GET' && action === 'count') {
-      const userEmail = authResult.user?.email;
+      const userEmail = authResult.user?.Email;  // Capital E from database
       
       const result = await query(`
         SELECT COUNT(*) as count
@@ -82,7 +82,7 @@ module.exports = async function (context, req) {
 
     // GET /api/unindexed/next - Get next unindexed file to process for current user
     if (method === 'GET' && action === 'next') {
-      const userEmail = authResult.user?.email;
+      const userEmail = authResult.user?.Email;  // Capital E from database
       
       const result = await query(`
         SELECT TOP 1

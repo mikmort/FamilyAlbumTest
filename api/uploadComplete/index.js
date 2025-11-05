@@ -38,6 +38,13 @@ module.exports = async function (context, req) {
 
     // Check authorization - upload requires 'Full' role
     const authResult = await checkAuthorization(context, 'Full');
+    
+    context.log('🔐 ============ AUTH RESULT DEBUG ============');
+    context.log('🔐 authResult:', JSON.stringify(authResult, null, 2));
+    context.log('🔐 authResult.user:', JSON.stringify(authResult.user, null, 2));
+    context.log('🔐 authResult.user?.email:', authResult.user?.email);
+    context.log('🔐 ==========================================');
+    
     if (!authResult.authorized) {
         context.res = {
             status: authResult.status,
@@ -365,14 +372,14 @@ module.exports = async function (context, req) {
             blobUrl: apiUrl,  // Store API URL instead of direct blob URL
             month: month,
             year: year,
-            uploadedBy: authResult.user?.email || null,  // Track who uploaded
+            uploadedBy: authResult.user?.Email || null,  // Track who uploaded (note: capital E from DB)
         };
         
         context.log('📝 ============ FINAL INSERT PARAMETERS ============');
         context.log('📝 Inserting into UnindexedFiles with params:', JSON.stringify(insertParams, null, 2));
         context.log('📝 month value:', month, 'type:', typeof month);
         context.log('📝 year value:', year, 'type:', typeof year);
-        context.log('📝 uploadedBy:', authResult.user?.email);
+        context.log('📝 uploadedBy:', authResult.user?.Email);
         context.log('📝 ================================================');
 
         await execute(insertQuery, insertParams);
