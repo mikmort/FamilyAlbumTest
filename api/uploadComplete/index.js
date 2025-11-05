@@ -349,9 +349,9 @@ module.exports = async function (context, req) {
         // Add to UnindexedFiles table for processing
         const insertQuery = `
             INSERT INTO dbo.UnindexedFiles 
-                (uiFileName, uiDirectory, uiThumbUrl, uiType, uiWidth, uiHeight, uiVtime, uiStatus, uiBlobUrl, uiMonth, uiYear)
+                (uiFileName, uiDirectory, uiThumbUrl, uiType, uiWidth, uiHeight, uiVtime, uiStatus, uiBlobUrl, uiMonth, uiYear, uiUploadedBy)
             VALUES 
-                (@fileName, @directory, @thumbUrl, @type, @width, @height, @duration, 'N', @blobUrl, @month, @year)
+                (@fileName, @directory, @thumbUrl, @type, @width, @height, @duration, 'N', @blobUrl, @month, @year, @uploadedBy)
         `;
 
         const insertParams = {
@@ -365,12 +365,14 @@ module.exports = async function (context, req) {
             blobUrl: apiUrl,  // Store API URL instead of direct blob URL
             month: month,
             year: year,
+            uploadedBy: authResult.user?.email || null,  // Track who uploaded
         };
         
         context.log('📝 ============ FINAL INSERT PARAMETERS ============');
         context.log('📝 Inserting into UnindexedFiles with params:', JSON.stringify(insertParams, null, 2));
         context.log('📝 month value:', month, 'type:', typeof month);
         context.log('📝 year value:', year, 'type:', typeof year);
+        context.log('📝 uploadedBy:', authResult.user?.email);
         context.log('📝 ================================================');
 
         await execute(insertQuery, insertParams);

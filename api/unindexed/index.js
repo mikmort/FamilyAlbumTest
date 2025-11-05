@@ -23,8 +23,10 @@ module.exports = async function (context, req) {
   }
 
   try {
-    // GET /api/unindexed - List all unindexed files
+    // GET /api/unindexed - List all unindexed files for current user
     if (method === 'GET' && action === 'list') {
+      const userEmail = authResult.user?.email;
+      
       const result = await query(`
         SELECT 
           uiID,
@@ -39,11 +41,14 @@ module.exports = async function (context, req) {
           uiBlobUrl,
           uiDateAdded,
           uiMonth,
-          uiYear
+          uiYear,
+          uiUploadedBy
         FROM UnindexedFiles
-        WHERE uiStatus = 'N'
+        WHERE uiStatus = 'N' AND uiUploadedBy = @userEmail
         ORDER BY uiDateAdded ASC
-      `);
+      `, { userEmail });
+
+      context.log(`📋 Found ${result.length} unindexed files for user: ${userEmail}`);
 
       context.res = {
         status: 200,
@@ -55,13 +60,15 @@ module.exports = async function (context, req) {
       return;
     }
 
-    // GET /api/unindexed/count - Get count of unindexed files
+    // GET /api/unindexed/count - Get count of unindexed files for current user
     if (method === 'GET' && action === 'count') {
+      const userEmail = authResult.user?.email;
+      
       const result = await query(`
         SELECT COUNT(*) as count
         FROM UnindexedFiles
-        WHERE uiStatus = 'N'
-      `);
+        WHERE uiStatus = 'N' AND uiUploadedBy = @userEmail
+      `, { userEmail });
 
       context.res = {
         status: 200,
@@ -73,8 +80,10 @@ module.exports = async function (context, req) {
       return;
     }
 
-    // GET /api/unindexed/next - Get next unindexed file to process
+    // GET /api/unindexed/next - Get next unindexed file to process for current user
     if (method === 'GET' && action === 'next') {
+      const userEmail = authResult.user?.email;
+      
       const result = await query(`
         SELECT TOP 1
           uiID,
@@ -89,11 +98,12 @@ module.exports = async function (context, req) {
           uiBlobUrl,
           uiDateAdded,
           uiMonth,
-          uiYear
+          uiYear,
+          uiUploadedBy
         FROM UnindexedFiles
-        WHERE uiStatus = 'N'
+        WHERE uiStatus = 'N' AND uiUploadedBy = @userEmail
         ORDER BY uiDateAdded ASC
-      `);
+      `, { userEmail });
 
       if (result.length === 0) {
         context.res = {
