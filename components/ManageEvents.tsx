@@ -97,11 +97,11 @@ export default function ManageEvents() {
         if (editingId == null) return
         setError(null)
         try {
-            const payload: any = { id: editingId, name: editName }
+            const payload: any = { name: editName }
             if (editDesc) payload.relation = editDesc
 
-            // People API uses PUT on /api/people; events backend currently doesn't implement PUT here
-            const res = await fetch(`/api/events`, {
+            // PUT to /api/events/{id}
+            const res = await fetch(`/api/events/${editingId}`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(payload),
@@ -109,12 +109,12 @@ export default function ManageEvents() {
             if (!res.ok) throw new Error(`Update failed (${res.status})`)
             const updated = await res.json()
             const ev: EventItem = {
-                id: updated.id ?? updated.ID,
-                neName: updated.name ?? updated.neName ?? editName,
-                neRelation: updated.relation ?? updated.neRelation ?? editDesc ?? null,
+                id: updated.event?.ID ?? editingId,
+                neName: updated.event?.neName ?? editName,
+                neRelation: updated.event?.neRelation ?? editDesc ?? null,
                 neType: 'E',
-                neDateLastModified: updated.neDateLastModified ?? null,
-                neCount: updated.photoCount ?? updated.neCount ?? 0,
+                neDateLastModified: updated.event?.neDateLastModified ?? null,
+                neCount: updated.event?.neCount ?? 0,
             }
             setEvents(prev => prev.map(x => (x.id === editingId ? ev : x)))
             cancelEdit()
@@ -127,13 +127,15 @@ export default function ManageEvents() {
         if (!confirm('Delete this event?')) return
         setError(null)
         try {
-            // Some APIs expect DELETE with body; people API expects body { id }
-            const res = await fetch('/api/events', {
+            // DELETE to /api/events/{id}
+            const res = await fetch(`/api/events/${id}`, {
                 method: 'DELETE',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ id }),
             })
-            if (!res.ok && res.status !== 204) throw new Error(`Delete failed (${res.status})`)
+            if (!res.ok && res.status !== 204) {
+                const data = await res.json();
+                throw new Error(data.error || `Delete failed (${res.status})`);
+            }
             setEvents(prev => prev.filter(ev => ev.id !== id))
         } catch (err: any) {
             setError(err?.message ?? 'Delete error')
