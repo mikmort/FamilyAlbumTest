@@ -703,9 +703,10 @@ export default function ProcessNewFiles() {
               )}
               {selectedPeople.length > 0 && (
                 <div className="selected-tags">
-                  {people
-                    .filter(p => selectedPeople.includes(p.ID))
-                    .map(person => (
+                  {selectedPeople.map(personId => {
+                    const person = people.find(p => p.ID === personId);
+                    if (!person) return null;
+                    return (
                       <span key={person.ID} className="tag">
                         {person.neName}
                         <button
@@ -717,7 +718,8 @@ export default function ProcessNewFiles() {
                           ×
                         </button>
                       </span>
-                    ))}
+                    );
+                  })}
                 </div>
               )}
             </div>
