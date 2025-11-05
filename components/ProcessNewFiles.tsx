@@ -101,7 +101,8 @@ export default function ProcessNewFiles() {
       // Pre-populate month/year if extracted from metadata
       setMonth(file.uiMonth || '');
       setYear(file.uiYear || '');
-      setSelectedEvent('');
+      // Keep selectedEvent - don't reset it
+      // setSelectedEvent(''); // REMOVED - keep event selection across files
       setEventSearch('');
       setSelectedPeople([]);
       setPeopleSearch('');
@@ -226,11 +227,11 @@ export default function ProcessNewFiles() {
       if (data.success) {
         if (data.file) {
           setCurrentFile(data.file);
-          // Reset form
+          // Reset form but keep event selection
           setDescription('');
           setMonth('');
           setYear('');
-          setSelectedEvent('');
+          // setSelectedEvent(''); // REMOVED - keep event selection
           setSelectedPeople([]);
           
           // Try to auto-extract month/year from file metadata if available
