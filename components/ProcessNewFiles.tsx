@@ -60,6 +60,12 @@ export default function ProcessNewFiles() {
   const [peopleLoading, setPeopleLoading] = useState(false);
   const [eventsLoading, setEventsLoading] = useState(false);
 
+  // New event creation
+  const [showNewEventForm, setShowNewEventForm] = useState(false);
+  const [newEventName, setNewEventName] = useState('');
+  const [newEventDesc, setNewEventDesc] = useState('');
+  const [creatingEvent, setCreatingEvent] = useState(false);
+
   // Load people and events for dropdowns
   useEffect(() => {
     loadPeople();
@@ -131,6 +137,58 @@ export default function ProcessNewFiles() {
       console.error('Error loading events:', err);
     } finally {
       setEventsLoading(false);
+    }
+  };
+
+  const handleCreateEvent = async () => {
+    if (!newEventName.trim()) {
+      setError('Event name is required');
+      return;
+    }
+
+    setCreatingEvent(true);
+    setError('');
+    try {
+      const res = await fetch('/api/events', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: newEventName.trim(),
+          relation: newEventDesc.trim() || null
+        })
+      });
+
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || 'Failed to create event');
+      }
+
+      const data = await res.json();
+      
+      // Add new event to the list
+      const newEvent: Event = {
+        ID: data.id || data.event?.ID,
+        neName: data.name || data.event?.neName,
+        neRelation: data.relation || data.event?.neRelation || '',
+        neCount: 0
+      };
+      
+      setEvents(prev => [newEvent, ...prev]);
+      
+      // Select the newly created event
+      setSelectedEvent(newEvent.ID);
+      
+      // Close form and reset
+      setShowNewEventForm(false);
+      setNewEventName('');
+      setNewEventDesc('');
+      setEventDropdownOpen(false);
+      
+    } catch (err: any) {
+      console.error('Error creating event:', err);
+      setError(err.message || 'Failed to create event');
+    } finally {
+      setCreatingEvent(false);
     }
   };
 
@@ -549,9 +607,21 @@ export default function ProcessNewFiles() {
                   >
                     <em>-- No Event --</em>
                   </div>
+                  
+                  {/* Create New Event Button */}
+                  <div 
+                    className="autocomplete-item create-new"
+                    onClick={() => {
+                      setShowNewEventForm(true);
+                      setEventDropdownOpen(false);
+                    }}
+                  >
+                    <strong>+ Create New Event</strong>
+                  </div>
+                  
                   {filteredEvents.length === 0 ? (
                     <div className="autocomplete-item disabled">
-                      <em>No events in database</em>
+                      <em>No matching events found</em>
                     </div>
                   ) : (
                     filteredEvents.map(event => (
@@ -670,6 +740,56 @@ export default function ProcessNewFiles() {
           </div>
         </div>
       </div>
+
+      {/* New Event Modal */}
+      {showNewEventForm && (
+        <div className="modal-overlay" onClick={() => setShowNewEventForm(false)}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+            <h3>Create New Event</h3>
+            <div className="form-group">
+              <label>Event Name *</label>
+              <input
+                type="text"
+                value={newEventName}
+                onChange={(e) => setNewEventName(e.target.value)}
+                placeholder="e.g., Summer Vacation 2024"
+                autoFocus
+                disabled={creatingEvent}
+              />
+            </div>
+            <div className="form-group">
+              <label>Description (Optional)</label>
+              <input
+                type="text"
+                value={newEventDesc}
+                onChange={(e) => setNewEventDesc(e.target.value)}
+                placeholder="e.g., Family trip to the beach"
+                disabled={creatingEvent}
+              />
+            </div>
+            <div className="modal-actions">
+              <button
+                onClick={handleCreateEvent}
+                disabled={creatingEvent || !newEventName.trim()}
+                className="btn btn-primary"
+              >
+                {creatingEvent ? 'Creating...' : 'Create Event'}
+              </button>
+              <button
+                onClick={() => {
+                  setShowNewEventForm(false);
+                  setNewEventName('');
+                  setNewEventDesc('');
+                }}
+                disabled={creatingEvent}
+                className="btn btn-secondary"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
