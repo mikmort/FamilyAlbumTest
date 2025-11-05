@@ -7,12 +7,17 @@ module.exports = async function (context, req) {
   const action = context.bindingData.action || 'list';
   const method = req.method;
 
+  context.log(`🔍 Unindexed API - Method: ${method}, Action: ${action}`);
+
   // Check authorization
   // Read operations (GET) require 'Read' role
   // Write operations (POST, PUT, DELETE) require 'Full' role
   const requiredRole = (method === 'GET') ? 'Read' : 'Full';
   
   const authResult = await checkAuthorization(context, requiredRole);
+  
+  context.log(`👤 User Email: ${authResult.user?.Email}`);
+  
   if (!authResult.authorized) {
     context.res = {
       status: authResult.status,
@@ -23,9 +28,19 @@ module.exports = async function (context, req) {
   }
 
   try {
-    // GET /api/unindexed - List all unindexed files for current user
-    if (method === 'GET' && action === 'list') {
+    // GET /api/unindexed or /api/unindexed/list - List all unindexed files for current user
+    if (method === 'GET' && (action === 'list' || !action)) {
       const userEmail = authResult.user?.Email;  // Capital E from database
+      
+      context.log(`📋 Querying unindexed files for user: ${userEmail}`);
+      
+      // Debug: Check what's actually in the database
+      const debugResult = await query(`
+        SELECT TOP 10 uiID, uiFileName, uiUploadedBy, uiStatus 
+        FROM UnindexedFiles 
+        ORDER BY uiDateAdded DESC
+      `);
+      context.log(`🔍 DEBUG - Recent unindexed files (all users):`, JSON.stringify(debugResult, null, 2));
       
       const result = await query(`
         SELECT 
