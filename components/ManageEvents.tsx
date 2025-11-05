@@ -100,6 +100,8 @@ export default function ManageEvents() {
             const payload: any = { name: editName }
             if (editDesc) payload.relation = editDesc
 
+            console.log('🔍 Updating event:', { id: editingId, payload });
+
             // PUT to /api/events/{id}
             const res = await fetch(`/api/events/${editingId}`, {
                 method: 'PUT',
@@ -107,12 +109,20 @@ export default function ManageEvents() {
                 body: JSON.stringify(payload),
             })
             
+            console.log('📡 Response status:', res.status);
+            
             if (!res.ok) {
                 const data = await res.json();
-                throw new Error(data.error || `Update failed (${res.status})`);
+                console.error('❌ Update failed:', data);
+                const errorMsg = data.error || `Update failed (${res.status})`;
+                setError(errorMsg);
+                alert('Error updating event: ' + errorMsg); // Show alert too
+                throw new Error(errorMsg);
             }
             
             const updated = await res.json()
+            console.log('✅ Update successful:', updated);
+            
             const ev: EventItem = {
                 id: updated.event?.ID ?? editingId,
                 neName: updated.event?.neName ?? editName,
@@ -124,8 +134,12 @@ export default function ManageEvents() {
             setEvents(prev => prev.map(x => (x.id === editingId ? ev : x)))
             cancelEdit()
         } catch (err: any) {
-            console.error('Update error:', err);
-            setError(err?.message ?? 'Update error')
+            console.error('💥 Update error:', err);
+            const errorMsg = err?.message ?? 'Update error';
+            setError(errorMsg);
+            if (!errorMsg.includes('failed')) { // Don't double-alert
+                alert('Error updating event: ' + errorMsg);
+            }
         }
     }
 
