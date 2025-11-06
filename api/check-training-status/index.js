@@ -18,12 +18,21 @@ const { query } = require('../../shared/db');
 module.exports = async function (context, req) {
   context.log('Check training status processing request');
 
-  // Check authorization - requires Admin role
-  const { authorized, user, error } = await checkAuthorization(context, 'Admin');
-  if (!authorized) {
+  try {
+    // Check authorization - requires Admin role
+    const { authorized, user, error } = await checkAuthorization(context, 'Admin');
+    if (!authorized) {
+      context.res = {
+        status: 403,
+        body: { error }
+      };
+      return;
+    }
+  } catch (authError) {
+    context.log.error('Authorization error:', authError);
     context.res = {
-      status: 403,
-      body: { error }
+      status: 500,
+      body: { error: 'Authorization check failed', details: authError.message }
     };
     return;
   }
