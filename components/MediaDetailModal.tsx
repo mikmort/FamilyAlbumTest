@@ -695,6 +695,7 @@ export default function MediaDetailModal({
         e.preventDefault();
         if (isFullScreen) {
           setIsFullScreen(false);
+          setShowNavigationArrows(false);
         } else {
           onClose();
         }
@@ -711,12 +712,18 @@ export default function MediaDetailModal({
       {isFullScreen && (
         <div 
           className="fullscreen-overlay" 
-          onClick={() => setIsFullScreen(false)}
+          onClick={() => {
+            setIsFullScreen(false);
+            setShowNavigationArrows(false);
+          }}
           onMouseEnter={() => setShowNavigationArrows(true)}
           onMouseLeave={() => setShowNavigationArrows(false)}
         >
           <button
-            onClick={() => setIsFullScreen(false)}
+            onClick={() => {
+              setIsFullScreen(false);
+              setShowNavigationArrows(false);
+            }}
             className="fullscreen-close"
           >
             ✕
