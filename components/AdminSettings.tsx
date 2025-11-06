@@ -268,10 +268,10 @@ export default function AdminSettings({ onRequestsChange }: AdminSettingsProps) 
     setTrainingResult(null);
 
     try {
-      // Check if baseline training has been done (query PersonEncodings to see if any exist)
+      // Check if baseline training has been done (query AzureFacePersons to see if any exist)
       setTrainingStatus('Checking for existing training data...');
       
-      const checkResponse = await fetch('/api/faces/check-training-status', {
+      const checkResponse = await fetch('/api/check-training-status', {
         method: 'GET',
         headers: { 'Content-Type': 'application/json' }
       });
