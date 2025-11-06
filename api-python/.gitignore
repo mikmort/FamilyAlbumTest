@@ -1,0 +1,15 @@
+# Add local.settings.json to gitignore (contains secrets)
+local.settings.json
+
+# Python virtual environment
+.venv/
+__pycache__/
+*.pyc
+.python_packages/
+
+# Azure Functions
+.azurefunctions/
+
+# OS files
+.DS_Store
+Thumbs.db

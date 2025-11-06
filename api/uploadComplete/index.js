@@ -437,9 +437,9 @@ async function triggerFaceDetection(filename, context) {
     const https = require('https');
     const http = require('http');
     
-    // Determine if we're running locally or in Azure
-    const functionAppUrl = process.env.FUNCTION_APP_URL || 'http://localhost:7071';
-    const endpoint = `${functionAppUrl}/api/detect-faces`;
+    // Python Function App URL (separate from Node.js API)
+    const pythonFunctionUrl = process.env.PYTHON_FUNCTION_APP_URL || 'https://familyalbum-faces-api.azurewebsites.net';
+    const endpoint = `${pythonFunctionUrl}/api/detect-faces`;
     
     const payload = JSON.stringify({
         filename: `media/${filename}`,
