@@ -1,19 +1,23 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { MediaItem, Person, Event } from '../lib/types';
 
 interface MediaDetailModalProps {
   media: MediaItem;
+  allMedia?: MediaItem[];
   onClose: () => void;
   onUpdate?: (updatedMedia: MediaItem) => void;
+  onMediaChange?: (media: MediaItem) => void;
   startFullscreen?: boolean;
 }
 
 export default function MediaDetailModal({
   media,
+  allMedia = [],
   onClose,
   onUpdate,
+  onMediaChange,
   startFullscreen = false,
 }: MediaDetailModalProps) {
   const [editing, setEditing] = useState(false);
@@ -21,6 +25,7 @@ export default function MediaDetailModal({
   const videoRef = useRef<HTMLVideoElement>(null);
   const [videoError, setVideoError] = useState(false);
   const [imageError, setImageError] = useState(false);
+  const [showNavigationArrows, setShowNavigationArrows] = useState(false);
   
   const [description, setDescription] = useState(media.PDescription || '');
   const [month, setMonth] = useState<number | ''>(media.PMonth || '');
@@ -526,6 +531,59 @@ export default function MediaDetailModal({
     }
   };
 
+  // Navigation functions
+  const getCurrentIndex = useCallback(() => {
+    if (!allMedia || allMedia.length === 0) return -1;
+    return allMedia.findIndex(item => item.PFileName === media.PFileName);
+  }, [allMedia, media.PFileName]);
+
+  const hasNext = useCallback(() => {
+    const currentIndex = getCurrentIndex();
+    return currentIndex >= 0 && currentIndex < allMedia.length - 1;
+  }, [getCurrentIndex, allMedia.length]);
+
+  const hasPrevious = useCallback(() => {
+    const currentIndex = getCurrentIndex();
+    return currentIndex > 0;
+  }, [getCurrentIndex]);
+
+  const handleNext = useCallback(() => {
+    if (!hasNext() || !onMediaChange) return;
+    const currentIndex = getCurrentIndex();
+    const nextMedia = allMedia[currentIndex + 1];
+    onMediaChange(nextMedia);
+  }, [hasNext, onMediaChange, getCurrentIndex, allMedia]);
+
+  const handlePrevious = useCallback(() => {
+    if (!hasPrevious() || !onMediaChange) return;
+    const currentIndex = getCurrentIndex();
+    const prevMedia = allMedia[currentIndex - 1];
+    onMediaChange(prevMedia);
+  }, [hasPrevious, onMediaChange, getCurrentIndex, allMedia]);
+
+  // Keyboard navigation
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'ArrowRight') {
+        e.preventDefault();
+        handleNext();
+      } else if (e.key === 'ArrowLeft') {
+        e.preventDefault();
+        handlePrevious();
+      } else if (e.key === 'Escape') {
+        e.preventDefault();
+        if (isFullScreen) {
+          setIsFullScreen(false);
+        } else {
+          onClose();
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [handleNext, handlePrevious, isFullScreen, onClose]);
+
   return (
     <>
       {/* Full Screen View */}
@@ -533,6 +591,8 @@ export default function MediaDetailModal({
         <div 
           className="fullscreen-overlay" 
           onClick={() => setIsFullScreen(false)}
+          onMouseEnter={() => setShowNavigationArrows(true)}
+          onMouseLeave={() => setShowNavigationArrows(false)}
         >
           <button
             onClick={() => setIsFullScreen(false)}
@@ -540,6 +600,34 @@ export default function MediaDetailModal({
           >
             ✕
           </button>
+          
+          {/* Navigation arrows for fullscreen */}
+          {showNavigationArrows && hasPrevious() && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                handlePrevious();
+              }}
+              className="fullscreen-nav-arrow fullscreen-nav-prev"
+              title="Previous (Left Arrow)"
+            >
+              ‹
+            </button>
+          )}
+          
+          {showNavigationArrows && hasNext() && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                handleNext();
+              }}
+              className="fullscreen-nav-arrow fullscreen-nav-next"
+              title="Next (Right Arrow)"
+            >
+              ›
+            </button>
+          )}
+          
           {media.PType === 1 ? (
             imageError ? (
               <div style={{
@@ -671,7 +759,32 @@ export default function MediaDetailModal({
         </button>
 
         <div className="detail-view">
-          <div className="media-display">
+          <div 
+            className="media-display"
+            onMouseEnter={() => setShowNavigationArrows(true)}
+            onMouseLeave={() => setShowNavigationArrows(false)}
+          >
+            {/* Navigation arrows for detail view */}
+            {showNavigationArrows && hasPrevious() && (
+              <button
+                onClick={handlePrevious}
+                className="detail-nav-arrow detail-nav-prev"
+                title="Previous (Left Arrow)"
+              >
+                ‹
+              </button>
+            )}
+            
+            {showNavigationArrows && hasNext() && (
+              <button
+                onClick={handleNext}
+                className="detail-nav-arrow detail-nav-next"
+                title="Next (Right Arrow)"
+              >
+                ›
+              </button>
+            )}
+            
             {media.PType === 1 ? (
               imageError ? (
                 <div style={{

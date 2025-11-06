@@ -9,8 +9,8 @@ interface ThumbnailGalleryProps {
   noPeople: boolean;
   sortOrder: 'asc' | 'desc';
   exclusiveFilter: boolean;
-  onMediaClick: (media: MediaItem) => void;
-  onMediaFullscreen?: (media: MediaItem) => void;
+  onMediaClick: (media: MediaItem, allMedia: MediaItem[]) => void;
+  onMediaFullscreen?: (media: MediaItem, allMedia: MediaItem[]) => void;
 }
 
 export default function ThumbnailGallery({
@@ -205,12 +205,12 @@ export default function ThumbnailGallery({
                 thumbnailUrl: item.PThumbnailUrl,
                 type: item.PType
               });
-              onMediaClick(item);
+              onMediaClick(item, media);
             }}
             onContextMenu={(e) => {
               e.preventDefault(); // Prevent default context menu
               if (onMediaFullscreen) {
-                onMediaFullscreen(item);
+                onMediaFullscreen(item, media);
               }
             }}
           >
