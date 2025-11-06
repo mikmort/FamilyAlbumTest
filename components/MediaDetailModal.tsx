@@ -26,6 +26,7 @@ export default function MediaDetailModal({
   const [videoError, setVideoError] = useState(false);
   const [imageError, setImageError] = useState(false);
   const [showNavigationArrows, setShowNavigationArrows] = useState(false);
+  const [isLoadingMedia, setIsLoadingMedia] = useState(false);
   
   const [description, setDescription] = useState(media.PDescription || '');
   const [month, setMonth] = useState<number | ''>(media.PMonth || '');
@@ -93,6 +94,19 @@ export default function MediaDetailModal({
     BoundingBox: { top: number; right: number; bottom: number; left: number };
   }> | null>(null);
   const [loadingFaces, setLoadingFaces] = useState(false);
+
+  // Reset state when media changes (for next/previous navigation)
+  useEffect(() => {
+    setIsLoadingMedia(false);
+    setVideoError(false);
+    setImageError(false);
+    setDescription(media.PDescription || '');
+    setMonth(media.PMonth || '');
+    setYear(media.PYear || '');
+    setSelectedEvent(media.Event?.ID || '');
+    setTaggedPeople(computeOrderedTaggedPeople(media.TaggedPeople, media.PPeopleList));
+    setEditing(false);
+  }, [media.PFileName]);
 
   useEffect(() => {
     if (editing && allEvents.length === 0) {
@@ -654,6 +668,7 @@ export default function MediaDetailModal({
 
   const handleNext = useCallback(() => {
     if (!hasNext() || !onMediaChange) return;
+    setIsLoadingMedia(true);
     const currentIndex = getCurrentIndex();
     const nextMedia = allMedia[currentIndex + 1];
     onMediaChange(nextMedia);
@@ -661,6 +676,7 @@ export default function MediaDetailModal({
 
   const handlePrevious = useCallback(() => {
     if (!hasPrevious() || !onMediaChange) return;
+    setIsLoadingMedia(true);
     const currentIndex = getCurrentIndex();
     const prevMedia = allMedia[currentIndex - 1];
     onMediaChange(prevMedia);
@@ -733,7 +749,16 @@ export default function MediaDetailModal({
             </button>
           )}
           
-          {media.PType === 1 ? (
+          {isLoadingMedia ? (
+            <div style={{
+              color: 'white',
+              textAlign: 'center',
+              padding: '2rem',
+              fontSize: '1.5rem'
+            }}>
+              Loading...
+            </div>
+          ) : media.PType === 1 ? (
             imageError ? (
               <div style={{
                 color: 'white',
@@ -749,6 +774,8 @@ export default function MediaDetailModal({
                 alt={media.PDescription || media.PFileName}
                 className="fullscreen-image"
                 onError={() => setImageError(true)}
+                onLoad={() => setIsLoadingMedia(false)}
+                key={media.PFileName}
               />
             )
           ) : (
@@ -757,6 +784,8 @@ export default function MediaDetailModal({
               src={media.PBlobUrl}
               className="fullscreen-video"
               autoPlay
+              onLoadedData={() => setIsLoadingMedia(false)}
+              key={media.PFileName}
             >
               Your browser does not support the video tag.
             </video>
@@ -951,6 +980,17 @@ export default function MediaDetailModal({
                     URL: {media.PBlobUrl}
                   </p>
                 </div>
+              ) : isLoadingMedia ? (
+                <div style={{
+                  minHeight: '400px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: '#6c757d',
+                  fontSize: '1.2rem'
+                }}>
+                  Loading image...
+                </div>
               ) : (
                 <img 
                   src={media.PBlobUrl} 
@@ -962,6 +1002,8 @@ export default function MediaDetailModal({
                     console.error('Image URL:', media.PBlobUrl);
                     setImageError(true);
                   }}
+                  onLoad={() => setIsLoadingMedia(false)}
+                  key={media.PFileName}
                 />
               )
             ) : (
@@ -996,6 +1038,19 @@ export default function MediaDetailModal({
                       ⬇️ Download Video to Play Locally
                     </button>
                   </div>
+                ) : isLoadingMedia ? (
+                  <div style={{
+                    minHeight: '400px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    color: '#6c757d',
+                    fontSize: '1.2rem',
+                    background: '#f8f9fa',
+                    borderRadius: '8px'
+                  }}>
+                    Loading video...
+                  </div>
                 ) : (
                   <>
                     <video 
@@ -1010,11 +1065,13 @@ export default function MediaDetailModal({
                         setVideoError(true);
                       }}
                       onLoadedMetadata={() => {
+                        setIsLoadingMedia(false);
                         // Check if video duration is valid
                         if (videoRef.current && (isNaN(videoRef.current.duration) || videoRef.current.duration === 0)) {
                           console.warn('Video has invalid duration, may not be playable');
                         }
                       }}
+                      key={media.PFileName}
                     >
                       Your browser does not support the video tag.
                     </video>
