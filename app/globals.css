@@ -287,6 +287,7 @@ button {
 }
 
 .media-display {
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -553,6 +554,78 @@ button {
   max-height: 95vh;
   object-fit: contain;
   cursor: default;
+}
+
+/* Navigation Arrows - Fullscreen */
+.fullscreen-nav-arrow {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  background: rgba(0, 0, 0, 0.5);
+  border: 2px solid rgba(255, 255, 255, 0.7);
+  color: white;
+  font-size: 3rem;
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.3s ease;
+  z-index: 2001;
+  padding: 0;
+  line-height: 1;
+}
+
+.fullscreen-nav-arrow:hover {
+  background: rgba(0, 0, 0, 0.7);
+  transform: translateY(-50%) scale(1.1);
+  border-color: white;
+}
+
+.fullscreen-nav-prev {
+  left: 2rem;
+}
+
+.fullscreen-nav-next {
+  right: 2rem;
+}
+
+/* Navigation Arrows - Detail View */
+.detail-nav-arrow {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  background: rgba(0, 0, 0, 0.5);
+  border: 2px solid rgba(255, 255, 255, 0.7);
+  color: white;
+  font-size: 2.5rem;
+  width: 50px;
+  height: 50px;
+  border-radius: 50%;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.3s ease;
+  z-index: 10;
+  padding: 0;
+  line-height: 1;
+}
+
+.detail-nav-arrow:hover {
+  background: rgba(0, 0, 0, 0.7);
+  transform: translateY(-50%) scale(1.1);
+  border-color: white;
+}
+
+.detail-nav-prev {
+  left: 1rem;
+}
+
+.detail-nav-next {
+  right: 1rem;
 }
 
 /* Tagged People */

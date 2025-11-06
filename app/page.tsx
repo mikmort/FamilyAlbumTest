@@ -40,6 +40,7 @@ export default function Home() {
   const [exclusiveFilter, setExclusiveFilter] = useState(false);
   const [selectedMedia, setSelectedMedia] = useState<MediaItem | null>(null);
   const [startFullscreen, setStartFullscreen] = useState(false);
+  const [mediaList, setMediaList] = useState<MediaItem[]>([]);
 
   // Check authorization on mount
   useEffect(() => {
@@ -78,19 +79,21 @@ export default function Home() {
     setStartFullscreen(false);
   };
 
-  const handleMediaClick = (media: MediaItem) => {
+  const handleMediaClick = (media: MediaItem, allMedia: MediaItem[]) => {
     console.log('handleMediaClick called with:', {
       fileName: media.PFileName,
       blobUrl: media.PBlobUrl,
       type: media.PType
     });
     setSelectedMedia(media);
+    setMediaList(allMedia);
     setStartFullscreen(false);
   };
 
-  const handleMediaFullscreen = (media: MediaItem) => {
+  const handleMediaFullscreen = (media: MediaItem, allMedia: MediaItem[]) => {
     console.log('handleMediaFullscreen called with:', media.PFileName);
     setSelectedMedia(media);
+    setMediaList(allMedia);
     setStartFullscreen(true);
   };
 
@@ -259,10 +262,12 @@ export default function Home() {
         {selectedMedia && (
           <MediaDetailModal
             media={selectedMedia}
+            allMedia={mediaList}
             onClose={() => {
               setSelectedMedia(null);
               setStartFullscreen(false);
             }}
+            onMediaChange={setSelectedMedia}
             startFullscreen={startFullscreen}
           />
         )}
