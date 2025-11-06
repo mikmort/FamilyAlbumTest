@@ -386,6 +386,23 @@ module.exports = async function (context, req) {
 
         context.log(`File registered in database: ${fileName}`);
 
+        // Trigger face detection for images (async, non-blocking)
+        if (mediaType === 1) { // Image
+            try {
+                context.log(`🔍 Triggering face detection for ${fileName}`);
+                
+                // Call face detection endpoint asynchronously
+                // Don't await - let it run in background
+                triggerFaceDetection(fileName, context).catch(err => {
+                    context.log.error(`Face detection failed for ${fileName}:`, err);
+                });
+                
+            } catch (faceErr) {
+                // Don't fail the upload if face detection fails
+                context.log.error('Failed to trigger face detection:', faceErr);
+            }
+        }
+
         context.res = {
             status: 200,
             body: {
@@ -411,3 +428,69 @@ module.exports = async function (context, req) {
         };
     }
 };
+
+/**
+ * Trigger face detection asynchronously
+ * This function makes an HTTP request to the Python face detection endpoint
+ */
+async function triggerFaceDetection(filename, context) {
+    const https = require('https');
+    const http = require('http');
+    
+    // Determine if we're running locally or in Azure
+    const functionAppUrl = process.env.FUNCTION_APP_URL || 'http://localhost:7071';
+    const endpoint = `${functionAppUrl}/api/detect-faces`;
+    
+    const payload = JSON.stringify({
+        filename: `media/${filename}`,
+        autoConfirm: true  // Auto-confirm high-confidence matches
+    });
+    
+    const url = new URL(endpoint);
+    const protocol = url.protocol === 'https:' ? https : http;
+    
+    return new Promise((resolve, reject) => {
+        const options = {
+            hostname: url.hostname,
+            port: url.port || (url.protocol === 'https:' ? 443 : 80),
+            path: url.pathname,
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Content-Length': Buffer.byteLength(payload)
+            }
+        };
+        
+        const req = protocol.request(options, (res) => {
+            let data = '';
+            
+            res.on('data', (chunk) => {
+                data += chunk;
+            });
+            
+            res.on('end', () => {
+                if (res.statusCode === 200) {
+                    try {
+                        const result = JSON.parse(data);
+                        context.log(`✅ Face detection completed for ${filename}: ${result.faces?.length || 0} faces detected`);
+                        resolve(result);
+                    } catch (e) {
+                        context.log.error('Failed to parse face detection response:', e);
+                        resolve(null);
+                    }
+                } else {
+                    context.log.error(`Face detection returned status ${res.statusCode}: ${data}`);
+                    resolve(null);
+                }
+            });
+        });
+        
+        req.on('error', (error) => {
+            context.log.error('Face detection request failed:', error);
+            reject(error);
+        });
+        
+        req.write(payload);
+        req.end();
+    });
+}
