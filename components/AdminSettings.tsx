@@ -343,8 +343,11 @@ export default function AdminSettings({ onRequestsChange }: AdminSettingsProps) 
       {/* Face Recognition Training Section */}
       <div className="card" style={{ marginBottom: '2rem', background: '#f0f8ff', borderColor: '#007bff' }}>
         <h2 style={{ marginTop: 0 }}>🧠 Face Recognition Training</h2>
-        <p style={{ color: '#666', marginBottom: '1rem' }}>
+        <p style={{ color: '#666', marginBottom: '0.5rem' }}>
           Train the face recognition AI on confirmed face tags to improve accuracy and performance.
+        </p>
+        <p style={{ color: '#666', fontSize: '0.9rem', marginBottom: '1rem', fontStyle: 'italic' }}>
+          Uses intelligent sampling: people with many photos are sampled across their timeline to capture aging and appearance changes.
         </p>
         <button 
           className="btn btn-primary"
@@ -377,7 +380,7 @@ export default function AdminSettings({ onRequestsChange }: AdminSettingsProps) 
                   <li>Persons updated: {trainingResult.personsUpdated}</li>
                   {trainingResult.details.slice(0, 5).map((detail: any, idx: number) => (
                     <li key={idx}>
-                      {detail.personName}: {detail.facesUsed} face{detail.facesUsed !== 1 ? 's' : ''} processed
+                      {detail.personName}: {detail.encodingCount}/{detail.totalFaces} faces ({detail.samplePercentage}% sample)
                     </li>
                   ))}
                   {trainingResult.details.length > 5 && (
