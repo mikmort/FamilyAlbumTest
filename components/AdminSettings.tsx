@@ -43,6 +43,7 @@ export default function AdminSettings({ onRequestsChange }: AdminSettingsProps) 
   
   // Face training state
   const [isTraining, setIsTraining] = useState(false);
+  const [isPaused, setIsPaused] = useState(false);
   const [trainingStatus, setTrainingStatus] = useState<string>('');
   const [trainingResult, setTrainingResult] = useState<any>(null);
   
@@ -262,22 +263,107 @@ export default function AdminSettings({ onRequestsChange }: AdminSettingsProps) 
 
   const trainFaces = async () => {
     setIsTraining(true);
-    setTrainingStatus('Starting face recognition training...');
+    setIsPaused(false);
+    setTrainingStatus('Checking training status...');
     setTrainingResult(null);
 
     try {
-      setTrainingStatus('Processing face encodings and building profiles...');
+      // Check if baseline training has been done (query PersonEncodings to see if any exist)
+      setTrainingStatus('Checking for existing training data...');
+      
+      const checkResponse = await fetch('/api/faces/check-training-status', {
+        method: 'GET',
+        headers: { 'Content-Type': 'application/json' }
+      });
+      
+      const checkData = await checkResponse.json();
+      const hasBaselineTraining = checkData.success && checkData.trainedPersons > 0;
+      
+      const isQuickTrain = !hasBaselineTraining;
+      const maxPerPerson = isQuickTrain ? 5 : undefined; // Baseline: 5 photos per person, Full: use algorithm
+      
+      if (isPaused) {
+        setTrainingStatus('Training cancelled by user');
+        setIsTraining(false);
+        return;
+      }
+      
+      // Step 1: Seed face encodings from existing manual tags
+      setTrainingStatus(
+        isQuickTrain 
+          ? 'Processing tagged photos (up to 5 per person) for baseline training...'
+          : 'Processing any new manually-tagged photos...'
+      );
+      
+      const seedResponse = await fetch('/api/faces/seed', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          limit: isQuickTrain ? 100 : 50, // More aggressive on first run
+          maxPerPerson: maxPerPerson 
+        })
+      });
+
+      if (isPaused) {
+        setTrainingStatus('Training cancelled by user');
+        setIsTraining(false);
+        return;
+      }
+
+      const seedData = await seedResponse.json();
+      
+      if (seedData.success && seedData.photosProcessed > 0) {
+        setTrainingStatus(
+          `Seeded ${seedData.facesMatched} faces from ${seedData.photosProcessed} tagged photos. ` +
+          `Now training face recognition models...`
+        );
+      } else if (seedData.success) {
+        setTrainingStatus(
+          isQuickTrain
+            ? 'No tagged photos found. Add some manual tags first!'
+            : 'All tagged photos already processed. Training face recognition models...'
+        );
+      } else {
+        setTrainingStatus(`Seeding completed with warnings. Training face recognition models...`);
+      }
+      
+      // Brief pause to show seeding results
+      await new Promise(resolve => setTimeout(resolve, 1500));
+      
+      if (isPaused) {
+        setTrainingStatus('Training cancelled by user');
+        setIsTraining(false);
+        return;
+      }
+      
+      // Step 2: Train on the confirmed encodings
+      setTrainingStatus(
+        isQuickTrain
+          ? 'Training baseline AI models (5 photos per person)...'
+          : 'Training full AI models with smart sampling...'
+      );
       
       const response = await fetch('/api/faces/train', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' }
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ quickTrain: isQuickTrain })
       });
 
       const data = await response.json();
       
+      if (isPaused) {
+        setTrainingStatus('Training cancelled by user');
+        setIsTraining(false);
+        return;
+      }
+      
       if (data.success) {
-        setTrainingStatus('Training completed successfully!');
-        setTrainingResult(data);
+        const seedInfo = seedData.photosProcessed > 0 
+          ? ` (seeded ${seedData.facesMatched} faces from existing tags)`
+          : '';
+        const trainMode = isQuickTrain ? ' Baseline training complete!' : ' Full training complete!';
+        setTrainingStatus(`${trainMode}${seedInfo}`);
+        setTrainingResult({ ...data, seedData, isQuickTrain });
       } else {
         setTrainingStatus(`Training failed: ${data.error || 'Unknown error'}`);
         setTrainingResult(data);
@@ -288,7 +374,13 @@ export default function AdminSettings({ onRequestsChange }: AdminSettingsProps) 
       setTrainingResult({ error: String(err) });
     } finally {
       setIsTraining(false);
+      setIsPaused(false);
     }
+  };
+
+  const pauseTraining = () => {
+    setIsPaused(true);
+    setTrainingStatus('Cancelling training...');
   };
 
   const getRoleColor = (role: string) => {
@@ -346,17 +438,30 @@ export default function AdminSettings({ onRequestsChange }: AdminSettingsProps) 
         <p style={{ color: '#666', marginBottom: '0.5rem' }}>
           Train the face recognition AI on confirmed face tags to improve accuracy and performance.
         </p>
-        <p style={{ color: '#666', fontSize: '0.9rem', marginBottom: '1rem', fontStyle: 'italic' }}>
+        <p style={{ color: '#666', fontSize: '0.9rem', marginBottom: '0.5rem', fontStyle: 'italic' }}>
           Uses intelligent sampling: people with many photos are sampled across their timeline to capture aging and appearance changes.
         </p>
-        <button 
-          className="btn btn-primary"
-          onClick={trainFaces}
-          disabled={isTraining}
-          style={{ marginBottom: trainingStatus ? '1rem' : 0 }}
-        >
-          {isTraining ? '⏳ Training...' : '🚀 Train Now'}
-        </button>
+        <p style={{ color: '#007bff', fontSize: '0.9rem', marginBottom: '1rem', fontWeight: '500' }}>
+          💡 Tip: First training run processes up to 5 photos per person for quick baseline. Click again for full training!
+        </p>
+        <div style={{ display: 'flex', gap: '0.5rem', marginBottom: trainingStatus ? '1rem' : 0 }}>
+          <button 
+            className="btn btn-primary"
+            onClick={trainFaces}
+            disabled={isTraining}
+          >
+            {isTraining ? '⏳ Training...' : '🚀 Train Now'}
+          </button>
+          {isTraining && !isPaused && (
+            <button 
+              className="btn btn-danger"
+              onClick={pauseTraining}
+              style={{ background: '#dc3545' }}
+            >
+              ⏸ Cancel
+            </button>
+          )}
+        </div>
         
         {trainingStatus && (
           <div style={{ 
@@ -375,7 +480,20 @@ export default function AdminSettings({ onRequestsChange }: AdminSettingsProps) 
             </div>
             {trainingResult?.success && trainingResult.details && (
               <div style={{ marginTop: '0.75rem', fontSize: '0.9rem' }}>
-                <strong>Results:</strong>
+                {trainingResult.seedData && trainingResult.seedData.photosProcessed > 0 && (
+                  <div style={{ marginBottom: '0.75rem', padding: '0.5rem', background: '#e7f3ff', borderRadius: '4px' }}>
+                    <strong>Seeding from existing tags:</strong>
+                    <ul style={{ marginTop: '0.25rem', marginBottom: 0, paddingLeft: '1.5rem' }}>
+                      <li>Photos processed: {trainingResult.seedData.photosProcessed}</li>
+                      <li>Faces detected: {trainingResult.seedData.facesDetected}</li>
+                      <li>Faces matched: {trainingResult.seedData.facesMatched}</li>
+                      {trainingResult.seedData.facesUnmatched > 0 && (
+                        <li style={{ color: '#856404' }}>Unmatched faces: {trainingResult.seedData.facesUnmatched}</li>
+                      )}
+                    </ul>
+                  </div>
+                )}
+                <strong>Training results:</strong>
                 <ul style={{ marginTop: '0.5rem', marginBottom: 0, paddingLeft: '1.5rem' }}>
                   <li>Persons updated: {trainingResult.personsUpdated}</li>
                   {trainingResult.details.slice(0, 5).map((detail: any, idx: number) => (

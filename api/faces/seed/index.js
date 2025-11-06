@@ -1,21 +1,22 @@
 const { checkAuthorization } = require('../shared/auth');
 
 /**
- * Face Training Proxy Endpoint
+ * Face Seeding Proxy Endpoint
  * 
- * Proxies training requests to the Python Function App.
+ * Seeds face encodings from existing manually-tagged photos.
+ * This processes photos in NamePhoto table that haven't been processed yet.
  * Requires Admin role.
  * 
- * POST /api/faces/train - Train all persons or specific person
+ * POST /api/faces/seed
  * Body (optional): { 
- *   "personId": 123,      // Train specific person
- *   "quickTrain": true    // Use minimal samples (5) for baseline training
+ *   "limit": 100,          // Max photos to process per run
+ *   "maxPerPerson": 5      // Max photos per person (for baseline training)
  * }
  */
 module.exports = async function (context, req) {
-  context.log('Face training proxy processing request');
+  context.log('Face seeding proxy processing request');
 
-  // Check authorization - requires Admin role for manual training
+  // Check authorization - requires Admin role
   const { authorized, user, error } = await checkAuthorization(context, 'Admin');
   if (!authorized) {
     context.res = {
@@ -29,7 +30,7 @@ module.exports = async function (context, req) {
     const pythonFunctionUrl = process.env.PYTHON_FUNCTION_APP_URL || 'https://familyalbum-faces-api.azurewebsites.net';
     
     // Forward request to Python function
-    const response = await fetch(`${pythonFunctionUrl}/api/faces/train`, {
+    const response = await fetch(`${pythonFunctionUrl}/api/faces/seed`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
@@ -45,12 +46,12 @@ module.exports = async function (context, req) {
     };
 
   } catch (err) {
-    context.log.error('Error in face training proxy:', err);
+    context.log.error('Error in face seeding proxy:', err);
     context.res = {
       status: 500,
       body: {
         success: false,
-        error: err.message || 'Error processing training request'
+        error: err.message || 'Error processing seeding request'
       }
     };
   }
