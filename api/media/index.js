@@ -136,7 +136,7 @@ module.exports = async function (context, req) {
     
     // Extract filename from URL path: /api/media/{filename}
     // Filename can contain forward slashes (e.g., Events/Birthday/photo.jpg)
-    // Support additional trailing segments like /tags or /tags/{id}
+    // Support additional trailing segments like /tags, /tags/{id}, or /faces
     let filename = null;
     if (req.url) {
         context.log('RAW URL:', req.url);
@@ -144,14 +144,14 @@ module.exports = async function (context, req) {
         const pathOnly = req.url.split('?')[0];
         context.log('PATH ONLY:', pathOnly);
         
-        // Simple approach: remove /api/media/ prefix and /tags suffix
+        // Simple approach: remove /api/media/ prefix and /tags or /faces suffix
         if (pathOnly.startsWith('/api/media/')) {
             let tempPath = pathOnly.substring('/api/media/'.length);
             context.log('AFTER REMOVING PREFIX:', tempPath);
             
-            // Remove /tags or /tags/{id} from the end
-            tempPath = tempPath.replace(/\/tags(?:\/\d+)?$/, '');
-            context.log('AFTER REMOVING /tags SUFFIX:', tempPath);
+            // Remove /tags, /tags/{id}, or /faces from the end
+            tempPath = tempPath.replace(/\/(?:tags(?:\/\d+)?|faces)$/, '');
+            context.log('AFTER REMOVING SUFFIX:', tempPath);
             
             filename = decodeURIComponent(tempPath);
             // Normalize all backslashes to forward slashes
@@ -163,10 +163,10 @@ module.exports = async function (context, req) {
     // Fallback to route params if URL parsing didn't work
     if (!filename && req.params && req.params.filename) {
         let paramFilename = req.params.filename;
-        // Remove /tags or /tags/{id} from the end
-        paramFilename = paramFilename.replace(/\/tags(?:\/\d+)?$/, '');
+        // Remove /tags, /tags/{id}, or /faces from the end
+        paramFilename = paramFilename.replace(/\/(?:tags(?:\/\d+)?|faces)$/, '');
         filename = decodeURIComponent(paramFilename);
-        context.log('FILENAME FROM PARAMS (after stripping tags):', filename);
+        context.log('FILENAME FROM PARAMS (after stripping suffix):', filename);
         if (filename === '' || filename === '/') {
             filename = null;
         }
@@ -938,6 +938,57 @@ module.exports = async function (context, req) {
             };
             context.log('Media list response sent successfully');
             return;
+        }
+
+        // GET /api/media/{filename}/faces - Get face detections for an image
+        if (method === 'GET' && filename && req.url && req.url.includes('/faces')) {
+            context.log('Getting face detections for:', filename);
+            
+            try {
+                const facesQuery = `
+                    SELECT 
+                        f.FaceID,
+                        f.PersonID,
+                        ne.NName as SuggestedPersonName,
+                        f.BoundingBox,
+                        f.Confidence,
+                        f.Distance,
+                        f.IsConfirmed,
+                        f.IsRejected,
+                        f.CreatedDate
+                    FROM dbo.FaceEncodings f
+                    LEFT JOIN dbo.NameEvent ne ON f.PersonID = ne.NameID
+                    WHERE f.PFileName = @filename
+                    ORDER BY f.Confidence DESC
+                `;
+                
+                const faces = await query(facesQuery, { filename });
+                
+                // Parse bounding boxes from JSON
+                faces.forEach(face => {
+                    if (face.BoundingBox) {
+                        try {
+                            face.BoundingBox = JSON.parse(face.BoundingBox);
+                        } catch (e) {
+                            context.log.warn('Failed to parse bounding box:', e);
+                        }
+                    }
+                });
+                
+                context.res = {
+                    status: 200,
+                    headers: { 'Content-Type': 'application/json' },
+                    body: { success: true, faces }
+                };
+                return;
+            } catch (error) {
+                context.log.error('Failed to get face detections:', error);
+                context.res = {
+                    status: 500,
+                    body: { error: 'Failed to get face detections' }
+                };
+                return;
+            }
         }
 
         // POST /api/media/{filename}/tags - Tag a person in a photo

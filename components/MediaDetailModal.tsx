@@ -79,11 +79,28 @@ export default function MediaDetailModal({
   const [creatingEvent, setCreatingEvent] = useState(false);
   const [selectedPersonDetail, setSelectedPersonDetail] = useState<{ ID: number; neName: string; neRelation?: string } | null>(null);
 
+  // Face detection state
+  const [detectedFaces, setDetectedFaces] = useState<Array<{
+    FaceID: number;
+    PersonID: number;
+    SuggestedPersonName: string;
+    Confidence: number;
+    BoundingBox: { top: number; right: number; bottom: number; left: number };
+  }> | null>(null);
+  const [loadingFaces, setLoadingFaces] = useState(false);
+
   useEffect(() => {
     if (editing && allEvents.length === 0) {
       fetchEvents();
     }
   }, [editing]);
+
+  // Load face detection suggestions when modal opens (for images only)
+  useEffect(() => {
+    if (media.PType === 1) { // Images only
+      loadFaceDetections();
+    }
+  }, [media.PFileName]);
 
   useEffect(() => {
     if (showPeopleSelector && allPeople.length === 0) {
@@ -141,6 +158,94 @@ export default function MediaDetailModal({
   setAllEvents(normalizeEvents((await import('../lib/api')).sampleEvents()));
     } finally {
       setLoadingEvents(false);
+    }
+  };
+
+  const loadFaceDetections = async () => {
+    try {
+      setLoadingFaces(true);
+      
+      // Query database for face detections for this image
+      const normalizedPath = media.PFileName.replace(/\\/g, '/');
+      const encodedPath = normalizedPath.split('/').map(encodeURIComponent).join('/');
+      
+      const res = await fetch(`/api/media/${encodedPath}/faces`);
+      
+      if (res.ok) {
+        const data = await res.json();
+        if (data.faces && data.faces.length > 0) {
+          // Only show unconfirmed suggestions
+          const unconfirmedFaces = data.faces.filter((f: any) => 
+            !f.IsConfirmed && !f.IsRejected && f.PersonID
+          );
+          setDetectedFaces(unconfirmedFaces.length > 0 ? unconfirmedFaces : null);
+        } else {
+          setDetectedFaces(null);
+        }
+      } else {
+        setDetectedFaces(null);
+      }
+    } catch (error) {
+      console.error('Failed to load face detections:', error);
+      setDetectedFaces(null);
+    } finally {
+      setLoadingFaces(false);
+    }
+  };
+
+  const handleConfirmFaceSuggestion = async (faceId: number, personId: number) => {
+    try {
+      const res = await fetch('/api/faces/review', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'confirm',
+          faceId,
+          personId
+        })
+      });
+      
+      if (res.ok) {
+        // Remove from suggestions
+        setDetectedFaces(prev => 
+          prev ? prev.filter(f => f.FaceID !== faceId) : null
+        );
+        
+        // Reload media details to show updated tags
+        if (onUpdate) {
+          const normalizedPath = media.PFileName.replace(/\\/g, '/');
+          const encodedPath = normalizedPath.split('/').map(encodeURIComponent).join('/');
+          const mediaRes = await fetch(`/api/media/${encodedPath}`);
+          if (mediaRes.ok) {
+            const updatedMedia = await mediaRes.json();
+            onUpdate(updatedMedia);
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Failed to confirm face suggestion:', error);
+    }
+  };
+
+  const handleRejectFaceSuggestion = async (faceId: number) => {
+    try {
+      const res = await fetch('/api/faces/review', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'reject',
+          faceId
+        })
+      });
+      
+      if (res.ok) {
+        // Remove from suggestions
+        setDetectedFaces(prev => 
+          prev ? prev.filter(f => f.FaceID !== faceId) : null
+        );
+      }
+    } catch (error) {
+      console.error('Failed to reject face suggestion:', error);
     }
   };
 
@@ -961,6 +1066,77 @@ export default function MediaDetailModal({
                 <p>{media.Event?.neName || 'Not set'}</p>
               )}
             </div>
+
+            {/* Face Detection Suggestions */}
+            {detectedFaces && detectedFaces.length > 0 && (
+              <div className="form-group" style={{
+                backgroundColor: '#fff3cd',
+                border: '2px solid #ffc107',
+                borderRadius: '6px',
+                padding: '1rem',
+                marginBottom: '1rem'
+              }}>
+                <label style={{ color: '#856404', fontWeight: 'bold' }}>
+                  🤖 Suggested Face Tags ({detectedFaces.length})
+                </label>
+                <p style={{ fontSize: '0.85rem', color: '#856404', marginBottom: '0.75rem' }}>
+                  AI has detected faces in this photo. Review and confirm the suggestions below:
+                </p>
+                {detectedFaces.map((face) => (
+                  <div key={face.FaceID} style={{
+                    backgroundColor: 'white',
+                    border: '1px solid #ffc107',
+                    borderRadius: '4px',
+                    padding: '0.75rem',
+                    marginBottom: '0.5rem',
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center'
+                  }}>
+                    <div>
+                      <strong>{face.SuggestedPersonName}</strong>
+                      <span style={{ 
+                        marginLeft: '0.5rem', 
+                        fontSize: '0.85rem', 
+                        color: '#666' 
+                      }}>
+                        ({(face.Confidence * 100).toFixed(0)}% confident)
+                      </span>
+                    </div>
+                    <div style={{ display: 'flex', gap: '0.5rem' }}>
+                      <button
+                        onClick={() => handleConfirmFaceSuggestion(face.FaceID, face.PersonID)}
+                        style={{
+                          backgroundColor: '#28a745',
+                          color: 'white',
+                          border: 'none',
+                          borderRadius: '4px',
+                          padding: '0.4rem 0.8rem',
+                          cursor: 'pointer',
+                          fontSize: '0.85rem'
+                        }}
+                      >
+                        ✓ Confirm
+                      </button>
+                      <button
+                        onClick={() => handleRejectFaceSuggestion(face.FaceID)}
+                        style={{
+                          backgroundColor: '#dc3545',
+                          color: 'white',
+                          border: 'none',
+                          borderRadius: '4px',
+                          padding: '0.4rem 0.8rem',
+                          cursor: 'pointer',
+                          fontSize: '0.85rem'
+                        }}
+                      >
+                        ✗ Reject
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
 
             <div className="form-group">
               <label>Tagged People:</label>
