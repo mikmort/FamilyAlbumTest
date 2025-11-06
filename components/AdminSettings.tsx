@@ -41,6 +41,11 @@ export default function AdminSettings({ onRequestsChange }: AdminSettingsProps) 
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [requestRoles, setRequestRoles] = useState<RequestRoleSelection>({});
   
+  // Face training state
+  const [isTraining, setIsTraining] = useState(false);
+  const [trainingStatus, setTrainingStatus] = useState<string>('');
+  const [trainingResult, setTrainingResult] = useState<any>(null);
+  
   // Add user form state
   const [newEmail, setNewEmail] = useState('');
   const [newRole, setNewRole] = useState<'Admin' | 'Full' | 'Read'>('Read');
@@ -255,6 +260,37 @@ export default function AdminSettings({ onRequestsChange }: AdminSettingsProps) 
     }
   };
 
+  const trainFaces = async () => {
+    setIsTraining(true);
+    setTrainingStatus('Starting face recognition training...');
+    setTrainingResult(null);
+
+    try {
+      setTrainingStatus('Processing face encodings and building profiles...');
+      
+      const response = await fetch('/api/faces/train', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+      });
+
+      const data = await response.json();
+      
+      if (data.success) {
+        setTrainingStatus('Training completed successfully!');
+        setTrainingResult(data);
+      } else {
+        setTrainingStatus(`Training failed: ${data.error || 'Unknown error'}`);
+        setTrainingResult(data);
+      }
+    } catch (err) {
+      console.error('Error training faces:', err);
+      setTrainingStatus(`Error: ${err instanceof Error ? err.message : 'Unknown error'}`);
+      setTrainingResult({ error: String(err) });
+    } finally {
+      setIsTraining(false);
+    }
+  };
+
   const getRoleColor = (role: string) => {
     switch (role) {
       case 'Admin': return '#dc3545';
@@ -302,6 +338,58 @@ export default function AdminSettings({ onRequestsChange }: AdminSettingsProps) 
       <div className="manager-header">
         <h1>🔐 User Management</h1>
         <p className="manager-subtitle">Manage user permissions and access</p>
+      </div>
+
+      {/* Face Recognition Training Section */}
+      <div className="card" style={{ marginBottom: '2rem', background: '#f0f8ff', borderColor: '#007bff' }}>
+        <h2 style={{ marginTop: 0 }}>🧠 Face Recognition Training</h2>
+        <p style={{ color: '#666', marginBottom: '1rem' }}>
+          Train the face recognition AI on confirmed face tags to improve accuracy and performance.
+        </p>
+        <button 
+          className="btn btn-primary"
+          onClick={trainFaces}
+          disabled={isTraining}
+          style={{ marginBottom: trainingStatus ? '1rem' : 0 }}
+        >
+          {isTraining ? '⏳ Training...' : '🚀 Train Now'}
+        </button>
+        
+        {trainingStatus && (
+          <div style={{ 
+            padding: '1rem', 
+            background: 'white', 
+            borderRadius: '8px', 
+            border: '1px solid #ddd',
+            marginTop: '1rem'
+          }}>
+            <div style={{ 
+              fontSize: '0.95rem', 
+              color: trainingResult?.success ? '#28a745' : '#666',
+              fontWeight: '500'
+            }}>
+              {trainingStatus}
+            </div>
+            {trainingResult?.success && trainingResult.details && (
+              <div style={{ marginTop: '0.75rem', fontSize: '0.9rem' }}>
+                <strong>Results:</strong>
+                <ul style={{ marginTop: '0.5rem', marginBottom: 0, paddingLeft: '1.5rem' }}>
+                  <li>Persons updated: {trainingResult.personsUpdated}</li>
+                  {trainingResult.details.slice(0, 5).map((detail: any, idx: number) => (
+                    <li key={idx}>
+                      {detail.personName}: {detail.facesUsed} face{detail.facesUsed !== 1 ? 's' : ''} processed
+                    </li>
+                  ))}
+                  {trainingResult.details.length > 5 && (
+                    <li style={{ color: '#666', fontStyle: 'italic' }}>
+                      ... and {trainingResult.details.length - 5} more
+                    </li>
+                  )}
+                </ul>
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Pending Requests Section */}
