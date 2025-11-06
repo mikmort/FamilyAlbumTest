@@ -1424,13 +1424,64 @@ module.exports = async function (context, req) {
                 params.year = year || null;
             }
 
+            // Handle event updates
+            let eventChanged = false;
             if (eventID !== undefined) {
-                // Note: eventID is stored in PPeopleList column (legacy design)
-                // For now, we'll skip event updates - would need schema change
-                context.log('Event update not yet implemented');
+                context.log('Processing event update:', { currentEventID: eventID });
+                
+                // Get current event for this photo (events have neType='E')
+                const currentEventQuery = `
+                    SELECT np.npID
+                    FROM dbo.NamePhoto np
+                    INNER JOIN dbo.NameEvent ne ON np.npID = ne.ID
+                    WHERE np.npFileName = @filename AND ne.neType = 'E'
+                `;
+                const currentEventResult = await query(currentEventQuery, { filename: dbFileName });
+                const currentEventID = currentEventResult.length > 0 ? currentEventResult[0].npID : null;
+                
+                context.log('Current event ID:', currentEventID, 'New event ID:', eventID);
+
+                // If event changed, update NamePhoto table
+                if (currentEventID !== eventID) {
+                    eventChanged = true;
+                    
+                    // Remove old event if exists
+                    if (currentEventID) {
+                        const deleteEventQuery = `
+                            DELETE FROM dbo.NamePhoto
+                            WHERE npFileName = @filename AND npID = @eventID
+                        `;
+                        await execute(deleteEventQuery, { filename: dbFileName, eventID: currentEventID });
+                        context.log('Removed old event:', currentEventID);
+                    }
+                    
+                    // Add new event if provided
+                    if (eventID) {
+                        // Verify the event exists and is type 'E'
+                        const eventCheckQuery = `
+                            SELECT ID FROM dbo.NameEvent WHERE ID = @eventID AND neType = 'E'
+                        `;
+                        const eventCheck = await query(eventCheckQuery, { eventID });
+                        
+                        if (eventCheck.length === 0) {
+                            context.res = {
+                                status: 400,
+                                body: { error: 'Invalid event ID' }
+                            };
+                            return;
+                        }
+                        
+                        const insertEventQuery = `
+                            INSERT INTO dbo.NamePhoto (npID, npFileName)
+                            VALUES (@eventID, @filename)
+                        `;
+                        await execute(insertEventQuery, { eventID, filename: dbFileName });
+                        context.log('Added new event:', eventID);
+                    }
+                }
             }
 
-            if (updates.length === 0) {
+            if (updates.length === 0 && !eventChanged) {
                 context.res = {
                     status: 400,
                     body: { error: 'No fields to update' }
@@ -1438,18 +1489,20 @@ module.exports = async function (context, req) {
                 return;
             }
 
-            updates.push('PLastModifiedDate = GETDATE()');
+            if (updates.length > 0) {
+                updates.push('PLastModifiedDate = GETDATE()');
 
-            const updateQuery = `
-                UPDATE dbo.Pictures
-                SET ${updates.join(', ')}
-                WHERE PFileName = @filename
-            `;
+                const updateQuery = `
+                    UPDATE dbo.Pictures
+                    SET ${updates.join(', ')}
+                    WHERE PFileName = @filename
+                `;
 
-            context.log('Executing update query:', updateQuery);
-            context.log('With params:', params);
-
-            await execute(updateQuery, params);
+                context.log('Executing update query:', updateQuery);
+                context.log('With params:', params);
+                
+                await execute(updateQuery, params);
+            }
 
             // Fetch updated record to return
             const selectQuery = `
