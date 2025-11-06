@@ -228,3 +228,41 @@ def check_authorization(req, required_role='Read'):
     except Exception as e:
         logging.error(f"Authorization check failed: {str(e)}")
         return (False, None, f"Authorization error: {str(e)}")
+
+def get_blob_with_sas(filename, expiry_hours=1):
+    """
+    Get blob URL with SAS token for temporary access
+    
+    Args:
+        filename: Name of the file in blob storage
+        expiry_hours: Hours until SAS token expires (default: 1)
+        
+    Returns:
+        str: Full URL with SAS token for Azure Face API to access
+    """
+    connection_string = os.environ.get('AZURE_STORAGE_CONNECTION_STRING')
+    container_name = os.environ.get('BLOB_CONTAINER_NAME', 'family-album-media')
+    
+    if not connection_string:
+        raise Exception('AZURE_STORAGE_CONNECTION_STRING environment variable not set')
+    
+    try:
+        blob_service_client = BlobServiceClient.from_connection_string(connection_string)
+        
+        # Generate SAS token for read access
+        sas_token = generate_blob_sas(
+            account_name=blob_service_client.account_name,
+            container_name=container_name,
+            blob_name=filename,
+            account_key=blob_service_client.credential.account_key,
+            permission=BlobSasPermissions(read=True),
+            expiry=datetime.utcnow() + timedelta(hours=expiry_hours)
+        )
+        
+        # Construct full URL with SAS token
+        blob_url = f"https://{blob_service_client.account_name}.blob.core.windows.net/{container_name}/{filename}?{sas_token}"
+        
+        return blob_url
+    except Exception as e:
+        logging.error(f"Failed to generate SAS URL for {filename}: {str(e)}")
+        raise
