@@ -97,13 +97,13 @@ export default function ManageEvents() {
         if (editingId == null) return
         setError(null)
         try {
-            const payload: any = { name: editName }
+            const payload: any = { id: editingId, name: editName }
             if (editDesc) payload.relation = editDesc
 
-            console.log('🔍 Updating event:', { id: editingId, payload });
+            console.log('🔍 Updating event:', payload);
 
-            // PUT to /api/events/{id}
-            const res = await fetch(`/api/events/${editingId}`, {
+            // PUT to /api/events (with ID in body, like people API)
+            const res = await fetch(`/api/events`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(payload),

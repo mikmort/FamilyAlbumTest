@@ -147,13 +147,23 @@ module.exports = async function (context, req) {
             return;
         }
 
-        // PUT /api/events/[id] - Update event
-        if (method === 'PUT' && id) {
-            const { name, neName, relation, neRelation } = req.body;
+        // PUT /api/events/[id] or PUT /api/events - Update event
+        if (method === 'PUT') {
+            // Accept ID from URL path or request body (for compatibility)
+            const { name, neName, relation, neRelation, id: bodyId } = req.body;
+            const eventId = id || bodyId;
             const eventName = name || neName;
             const eventRelation = relation || neRelation;
 
-            context.log(`📝 Updating event ${id}: name="${eventName}", relation="${eventRelation}"`);
+            context.log(`📝 Updating event ${eventId}: name="${eventName}", relation="${eventRelation}"`);
+
+            if (!eventId) {
+                context.res = {
+                    status: 400,
+                    body: { error: 'Event ID is required' }
+                };
+                return;
+            }
 
             if (!eventName || !eventName.trim()) {
                 context.res = {
@@ -167,10 +177,10 @@ module.exports = async function (context, req) {
             const existingQuery = `
                 SELECT ID FROM dbo.NameEvent WHERE ID = @id AND neType = 'E'
             `;
-            const existing = await query(existingQuery, { id: parseInt(id) });
+            const existing = await query(existingQuery, { id: parseInt(eventId) });
 
             if (existing.length === 0) {
-                context.log(`❌ Event ${id} not found`);
+                context.log(`❌ Event ${eventId} not found`);
                 context.res = {
                     status: 404,
                     body: { error: 'Event not found' }
@@ -188,18 +198,18 @@ module.exports = async function (context, req) {
             `;
 
             await execute(updateQuery, {
-                id: parseInt(id),
+                id: parseInt(eventId),
                 name: eventName.trim(),
                 relation: eventRelation || null
             });
 
-            context.log(`✅ Event ${id} updated successfully`);
+            context.log(`✅ Event ${eventId} updated successfully`);
 
             // Fetch updated event
             const updatedEvent = await query(
                 `SELECT ID, neName, neRelation, neType, neDateLastModified, neCount 
                  FROM dbo.NameEvent WHERE ID = @id`,
-                { id: parseInt(id) }
+                { id: parseInt(eventId) }
             );
 
             context.res = {
