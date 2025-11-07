@@ -152,14 +152,22 @@ module.exports = async function (context, req) {
             INNER JOIN dbo.Pictures p ON pp.PFileName = p.PFileName
             WHERE pp.PersonID = @personId
           ),
+          PhotosWithBuckets AS (
+            SELECT 
+              PFileName,
+              PersonID,
+              PhotoDate,
+              NTILE(@sampleSize) OVER (ORDER BY PhotoDate) as TimeBucket
+            FROM PhotosWithDates
+          ),
           DistributedSamples AS (
             SELECT 
               PFileName,
               PersonID,
               PhotoDate,
-              NTILE(@sampleSize) OVER (ORDER BY PhotoDate) as TimeBucket,
-              ROW_NUMBER() OVER (PARTITION BY NTILE(@sampleSize) OVER (ORDER BY PhotoDate) ORDER BY PhotoDate) as BucketRank
-            FROM PhotosWithDates
+              TimeBucket,
+              ROW_NUMBER() OVER (PARTITION BY TimeBucket ORDER BY PhotoDate) as BucketRank
+            FROM PhotosWithBuckets
           )
           SELECT PFileName, PersonID
           FROM DistributedSamples
