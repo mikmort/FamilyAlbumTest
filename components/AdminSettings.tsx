@@ -60,13 +60,12 @@ export default function AdminSettings({ onRequestsChange }: AdminSettingsProps) 
     checkForIncompleteSession();
   }, []);
 
-  const checkForIncompleteSession = async () => {
+  const checkForIncompleteSession = () => {
     try {
-      const response = await fetch('/api/faces/training-progress');
-      const data = await response.json();
-      
-      if (data.success && data.incompleteSession) {
-        setIncompleteSession(data.incompleteSession);
+      const checkpointStr = localStorage.getItem('faceTrainingCheckpoint');
+      if (checkpointStr) {
+        const checkpoint = JSON.parse(checkpointStr);
+        setIncompleteSession(checkpoint);
       }
     } catch (err) {
       console.error('Error checking for incomplete session:', err);
@@ -281,10 +280,10 @@ export default function AdminSettings({ onRequestsChange }: AdminSettingsProps) 
   // trainAzureFaces function removed - requires Microsoft Limited Access approval
   // See docs/AZURE_FACE_API_RESTRICTIONS.md for details
   
-  const trainFaces = async () => {
+  const trainFaces = async (resumeFromCheckpoint: boolean = false) => {
     setIsTraining(true);
     setIsPaused(false);
-    setTrainingStatus('Initializing face recognition...');
+    setTrainingStatus(resumeFromCheckpoint ? 'Resuming from checkpoint...' : 'Initializing face recognition...');
     setTrainingResult(null);
 
     try {
@@ -300,7 +299,22 @@ export default function AdminSettings({ onRequestsChange }: AdminSettingsProps) 
         return;
       }
 
-      // Step 2: Check if baseline training has been done
+      // Step 2: Check for existing checkpoint or training status
+      let processedPhotos = new Set<string>();
+      let checkpointData: any = null;
+      
+      if (resumeFromCheckpoint) {
+        const checkpoint = localStorage.getItem('faceTrainingCheckpoint');
+        if (checkpoint) {
+          checkpointData = JSON.parse(checkpoint);
+          processedPhotos = new Set(checkpointData.processedPhotos || []);
+          setTrainingStatus(`Resuming from checkpoint: ${processedPhotos.size} photos already processed...`);
+        }
+      } else {
+        // Clear any old checkpoint when starting fresh
+        localStorage.removeItem('faceTrainingCheckpoint');
+      }
+
       setTrainingStatus('Checking for existing training data...');
       
       const checkResponse = await fetch('/api/check-training-status', {
@@ -311,8 +325,8 @@ export default function AdminSettings({ onRequestsChange }: AdminSettingsProps) 
       const checkData = await checkResponse.json();
       const hasBaselineTraining = checkData.success && checkData.trainedPersons > 0;
       
-      const isQuickTrain = !hasBaselineTraining;
-      const maxPerPerson = isQuickTrain ? 5 : undefined; // Baseline: 5 photos per person
+      const isQuickTrain = !hasBaselineTraining && !resumeFromCheckpoint;
+      const maxPerPerson = (checkpointData?.maxPerPerson) || (isQuickTrain ? 5 : undefined);
       
       if (isPaused) {
         setTrainingStatus('Training cancelled by user');
@@ -322,9 +336,11 @@ export default function AdminSettings({ onRequestsChange }: AdminSettingsProps) 
 
       // Step 3: Get photos with manual tags
       setTrainingStatus(
-        isQuickTrain 
-          ? 'Fetching tagged photos (up to 5 per person)...'
-          : 'Fetching all tagged photos...'
+        resumeFromCheckpoint
+          ? 'Fetching remaining photos to process...'
+          : isQuickTrain 
+            ? 'Fetching tagged photos (up to 5 per person)...'
+            : 'Fetching all tagged photos...'
       );
       
       // Query for photos with manual tags using dedicated endpoint
@@ -335,11 +351,30 @@ export default function AdminSettings({ onRequestsChange }: AdminSettingsProps) 
       }
       
       const photosData = await photosResponse.json();
-      const photos = photosData.photos || [];
+      let photos = photosData.photos || [];
+      
+      // Filter out already processed photos if resuming
+      if (resumeFromCheckpoint && processedPhotos.size > 0) {
+        photos = photos.filter((p: any) => !processedPhotos.has(p.PFileName));
+        setTrainingStatus(`${photos.length} photos remaining to process...`);
+      }
       
       if (photos.length === 0) {
-        setTrainingStatus('No manually tagged photos found. Please add some tags first!');
-        setTrainingResult({ success: false, error: 'No tagged photos' });
+        if (resumeFromCheckpoint && processedPhotos.size > 0) {
+          setTrainingStatus('✓ All photos already processed!');
+          setTrainingResult({ 
+            success: true,
+            personsUpdated: checkpointData?.totalPeople || 0,
+            facesAdded: checkpointData?.successCount || 0,
+            photosProcessed: checkpointData?.totalPhotos || 0,
+            errors: checkpointData?.errorCount || 0,
+            isQuickTrain: checkpointData?.isQuickTrain || false
+          });
+          localStorage.removeItem('faceTrainingCheckpoint');
+        } else {
+          setTrainingStatus('No manually tagged photos found. Please add some tags first!');
+          setTrainingResult({ success: false, error: 'No tagged photos' });
+        }
         setIsTraining(false);
         return;
       }
@@ -354,15 +389,19 @@ export default function AdminSettings({ onRequestsChange }: AdminSettingsProps) 
         photosByPerson[personId].push(photo);
       });
 
-      const totalPhotos = photos.length;
+      const totalPhotos = photosData.photos?.length || photos.length;
       const totalPeople = Object.keys(photosByPerson).length;
+      const alreadyProcessed = resumeFromCheckpoint ? processedPhotos.size : 0;
 
-      setTrainingStatus(`Processing ${totalPhotos} photos for ${totalPeople} people...`);
+      setTrainingStatus(
+        `Processing ${photos.length} photos for ${totalPeople} people...` +
+        (alreadyProcessed > 0 ? ` (${alreadyProcessed} already done)` : '')
+      );
 
       // Step 4: Process each photo and generate embeddings
-      let processedCount = 0;
-      let successCount = 0;
-      let errorCount = 0;
+      let processedCount = alreadyProcessed;
+      let successCount = checkpointData?.successCount || 0;
+      let errorCount = checkpointData?.errorCount || 0;
 
       for (const photo of photos) {
         if (isPaused) {
@@ -406,6 +445,7 @@ export default function AdminSettings({ onRequestsChange }: AdminSettingsProps) 
 
           if (addResponse.ok) {
             successCount++;
+            processedPhotos.add(photo.PFileName);
           } else {
             errorCount++;
             console.error(`Failed to save embedding for ${photo.PFileName}`);
@@ -416,6 +456,21 @@ export default function AdminSettings({ onRequestsChange }: AdminSettingsProps) 
           console.error(`Error processing ${photo.PFileName}:`, error);
         }
 
+        // Save checkpoint every 10 photos
+        if (processedCount % 10 === 0) {
+          const checkpoint = {
+            processedPhotos: Array.from(processedPhotos),
+            successCount,
+            errorCount,
+            totalPhotos,
+            totalPeople,
+            maxPerPerson,
+            isQuickTrain,
+            timestamp: new Date().toISOString()
+          };
+          localStorage.setItem('faceTrainingCheckpoint', JSON.stringify(checkpoint));
+        }
+
         // Update progress every 5 photos
         if (processedCount % 5 === 0 || processedCount === totalPhotos) {
           setTrainingStatus(
@@ -424,7 +479,10 @@ export default function AdminSettings({ onRequestsChange }: AdminSettingsProps) 
         }
       }
 
-      // Training complete
+      // Training complete - clear checkpoint
+      localStorage.removeItem('faceTrainingCheckpoint');
+      setIncompleteSession(null);
+      
       if (successCount > 0) {
         const trainMode = isQuickTrain ? 'Baseline training' : 'Full training';
         setTrainingStatus(
@@ -524,6 +582,45 @@ export default function AdminSettings({ onRequestsChange }: AdminSettingsProps) 
         <p style={{ color: '#007bff', fontSize: '0.9rem', marginBottom: '1rem', fontWeight: '500' }}>
           💡 Tip: First training run processes up to 5 photos per person for quick baseline. Click again for full training!
         </p>
+        
+        {/* Checkpoint Resume Banner */}
+        {incompleteSession && !isTraining && (
+          <div style={{
+            padding: '1rem',
+            background: '#fff3cd',
+            border: '1px solid #ffc107',
+            borderRadius: '8px',
+            marginBottom: '1rem'
+          }}>
+            <div style={{ fontWeight: '600', color: '#856404', marginBottom: '0.5rem' }}>
+              ⚠️ Incomplete Training Session Found
+            </div>
+            <div style={{ fontSize: '0.9rem', color: '#856404', marginBottom: '0.75rem' }}>
+              Progress: {incompleteSession.processedPhotos?.length || 0} of {incompleteSession.totalPhotos} photos processed
+              {incompleteSession.totalPeople && ` (${incompleteSession.totalPeople} people)`}
+            </div>
+            <div style={{ display: 'flex', gap: '0.5rem' }}>
+              <button 
+                className="btn btn-primary"
+                onClick={() => trainFaces(true)}
+                style={{ fontSize: '0.9rem' }}
+              >
+                ▶️ Resume Training
+              </button>
+              <button 
+                className="btn"
+                onClick={() => {
+                  localStorage.removeItem('faceTrainingCheckpoint');
+                  setIncompleteSession(null);
+                }}
+                style={{ fontSize: '0.9rem', background: '#6c757d', color: 'white' }}
+              >
+                🗑️ Clear & Start Over
+              </button>
+            </div>
+          </div>
+        )}
+        
         <div style={{ display: 'flex', gap: '0.5rem', marginBottom: trainingStatus ? '1rem' : 0 }}>
           <button 
             className="btn btn-primary"
