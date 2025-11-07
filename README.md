@@ -20,6 +20,7 @@ A comprehensive family photo and video management web application built with Nex
 
 - **Media Management**: Upload, organize, and manage family photos and videos
 - **People Tagging**: Tag people in photos and videos with relationships
+- **Face Recognition**: Browser-based face recognition using face-api.js (no cloud approval needed)
 - **Nickname Search**: Search for people using common nicknames (e.g., "Mike" finds "Michael")
 - **Event Management**: Associate media with family events (weddings, reunions, etc.)
 - **Advanced Filtering**: Browse photos by people (OR/AND logic), events, or untagged media
@@ -35,6 +36,10 @@ A comprehensive family photo and video management web application built with Nex
 - **Database**: Azure SQL Database (Serverless tier for cost savings)
 - **Storage**: Azure Blob Storage for media files and thumbnails
 - **Hosting**: Azure Static Web Apps (free tier available)
+- **Face Recognition**: face-api.js with TensorFlow.js (browser-based, privacy-friendly)
+
+> ⚠️ **Note**: Azure Face API PersonGroups require Microsoft Limited Access approval.
+> See [docs/AZURE_FACE_API_RESTRICTIONS.md](docs/AZURE_FACE_API_RESTRICTIONS.md) for details.
 
 ## Prerequisites
 

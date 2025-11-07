@@ -13,14 +13,16 @@ try {
         Remove-Item deploy.zip -Force
     }
     
-    # Compress all files except .venv and __pycache__
-    $excludeFiles = @('.venv', '__pycache__', '*.pyc', 'local.settings.json', 'deploy.zip')
-    $files = Get-ChildItem -Recurse | Where-Object { 
-        $item = $_
-        -not ($excludeFiles | Where-Object { $item.FullName -like "*$_*" })
+    # Get all files except those we want to exclude
+    $filesToInclude = Get-ChildItem -Recurse | Where-Object { 
+        $_.FullName -notmatch '\.venv\\' -and 
+        $_.FullName -notmatch '__pycache__' -and 
+        $_.Extension -ne '.pyc' -and
+        $_.Name -ne 'local.settings.json' -and
+        $_.Name -ne 'deploy.zip'
     }
     
-    Compress-Archive -Path * -DestinationPath deploy.zip -Force -Exclude $excludeFiles
+    Compress-Archive -Path $filesToInclude.FullName -DestinationPath deploy.zip -Force
     
     Write-Host "Deployment package created: deploy.zip" -ForegroundColor Green
     
