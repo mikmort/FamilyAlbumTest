@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { loadFaceModels, detectFaceWithEmbedding, loadImage, areModelsLoaded } from '../lib/faceRecognition';
 
 interface User {
   ID: number;
@@ -264,11 +265,23 @@ export default function AdminSettings({ onRequestsChange }: AdminSettingsProps) 
   const trainFaces = async () => {
     setIsTraining(true);
     setIsPaused(false);
-    setTrainingStatus('Checking training status...');
+    setTrainingStatus('Initializing face recognition...');
     setTrainingResult(null);
 
     try {
-      // Check if baseline training has been done (query AzureFacePersons to see if any exist)
+      // Step 1: Load face-api.js models (client-side)
+      if (!areModelsLoaded()) {
+        setTrainingStatus('Loading face recognition models (first time only, ~6MB)...');
+        await loadFaceModels();
+      }
+      
+      if (isPaused) {
+        setTrainingStatus('Training cancelled by user');
+        setIsTraining(false);
+        return;
+      }
+
+      // Step 2: Check if baseline training has been done
       setTrainingStatus('Checking for existing training data...');
       
       const checkResponse = await fetch('/api/check-training-status', {
@@ -280,94 +293,154 @@ export default function AdminSettings({ onRequestsChange }: AdminSettingsProps) 
       const hasBaselineTraining = checkData.success && checkData.trainedPersons > 0;
       
       const isQuickTrain = !hasBaselineTraining;
-      const maxPerPerson = isQuickTrain ? 5 : undefined; // Baseline: 5 photos per person, Full: use algorithm
+      const maxPerPerson = isQuickTrain ? 5 : undefined; // Baseline: 5 photos per person
       
       if (isPaused) {
         setTrainingStatus('Training cancelled by user');
         setIsTraining(false);
         return;
       }
-      
-      // Step 1: Seed face encodings from existing manual tags
+
+      // Step 3: Get photos with manual tags
       setTrainingStatus(
         isQuickTrain 
-          ? 'Processing tagged photos (up to 5 per person) for baseline training...'
-          : 'Processing any new manually-tagged photos...'
+          ? 'Fetching tagged photos (up to 5 per person)...'
+          : 'Fetching all tagged photos...'
       );
       
-      const seedResponse = await fetch('https://familyalbum-faces-api.azurewebsites.net/api/faces/seed', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          limit: isQuickTrain ? 100 : 50, // More aggressive on first run
-          maxPerPerson: maxPerPerson 
-        })
-      });
-
-      if (isPaused) {
-        setTrainingStatus('Training cancelled by user');
+      // Query for photos with manual tags
+      const photosResponse = await fetch('/api/media?hasManualTags=true');
+      if (!photosResponse.ok) {
+        throw new Error('Failed to fetch tagged photos');
+      }
+      
+      const photosData = await photosResponse.json();
+      let photos = photosData.media || [];
+      
+      if (photos.length === 0) {
+        setTrainingStatus('No manually tagged photos found. Please add some tags first!');
+        setTrainingResult({ success: false, error: 'No tagged photos' });
         setIsTraining(false);
         return;
       }
 
-      const seedData = await seedResponse.json();
-      
-      if (seedData.success && seedData.photosProcessed > 0) {
+      // Group photos by person and apply maxPerPerson limit
+      const photosByPerson: { [personId: number]: any[] } = {};
+      photos.forEach((photo: any) => {
+        // Assuming each photo has peopleIds array
+        if (photo.people && Array.isArray(photo.people)) {
+          photo.people.forEach((person: any) => {
+            const personId = person.ID || person.personId;
+            if (!photosByPerson[personId]) {
+              photosByPerson[personId] = [];
+            }
+            if (!maxPerPerson || photosByPerson[personId].length < maxPerPerson) {
+              photosByPerson[personId].push({
+                ...photo,
+                personId: personId,
+                personName: person.Name || person.personName
+              });
+            }
+          });
+        }
+      });
+
+      const totalPhotos = Object.values(photosByPerson).reduce((sum, arr) => sum + arr.length, 0);
+      const totalPeople = Object.keys(photosByPerson).length;
+
+      setTrainingStatus(`Processing ${totalPhotos} photos for ${totalPeople} people...`);
+
+      // Step 4: Process each photo and generate embeddings
+      let processedCount = 0;
+      let successCount = 0;
+      let errorCount = 0;
+
+      for (const [personId, personPhotos] of Object.entries(photosByPerson)) {
+        if (isPaused) {
+          setTrainingStatus('Training cancelled by user');
+          setIsTraining(false);
+          return;
+        }
+
+        for (const photo of personPhotos) {
+          try {
+            processedCount++;
+            setTrainingStatus(
+              `Processing ${photo.personName}: ${processedCount}/${totalPhotos} photos...`
+            );
+
+            // Load image with SAS token
+            const imageUrl = photo.url || photo.thumbnailUrl;
+            const img = await loadImage(imageUrl);
+
+            // Detect face and generate embedding
+            const faceResult = await detectFaceWithEmbedding(img);
+
+            if (!faceResult) {
+              console.warn(`No face detected in ${photo.PFileName} for ${photo.personName}`);
+              errorCount++;
+              continue;
+            }
+
+            // Convert Float32Array to regular array for JSON
+            const embeddingArray = Array.from(faceResult.descriptor);
+
+            // Send embedding to server
+            const addResponse = await fetch('/api/faces/add-embedding', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                personId: photo.personId,
+                photoFileName: photo.PFileName,
+                embedding: embeddingArray
+              })
+            });
+
+            if (addResponse.ok) {
+              successCount++;
+            } else {
+              errorCount++;
+              console.error(`Failed to save embedding for ${photo.PFileName}`);
+            }
+
+          } catch (error) {
+            errorCount++;
+            console.error(`Error processing ${photo.PFileName}:`, error);
+          }
+
+          // Update progress every 5 photos
+          if (processedCount % 5 === 0 || processedCount === totalPhotos) {
+            setTrainingStatus(
+              `Processed ${processedCount}/${totalPhotos} photos (${successCount} successful, ${errorCount} failed)`
+            );
+          }
+        }
+      }
+
+      // Training complete
+      if (successCount > 0) {
+        const trainMode = isQuickTrain ? 'Baseline training' : 'Full training';
         setTrainingStatus(
-          `Seeded ${seedData.facesMatched} faces from ${seedData.photosProcessed} tagged photos. ` +
-          `Now training face recognition models...`
+          `✓ ${trainMode} complete! ` +
+          `Processed ${successCount} faces for ${totalPeople} people.`
         );
-      } else if (seedData.success) {
-        setTrainingStatus(
+        setTrainingResult({ 
+          success: true, 
+          personsUpdated: totalPeople,
+          facesAdded: successCount,
+          photosProcessed: totalPhotos,
+          errors: errorCount,
           isQuickTrain
-            ? 'No tagged photos found. Add some manual tags first!'
-            : 'All tagged photos already processed. Training face recognition models...'
-        );
+        });
       } else {
-        setTrainingStatus(`Seeding completed with warnings. Training face recognition models...`);
+        setTrainingStatus('Training failed: No faces could be processed');
+        setTrainingResult({ 
+          success: false, 
+          error: 'No faces detected',
+          errors: errorCount 
+        });
       }
-      
-      // Brief pause to show seeding results
-      await new Promise(resolve => setTimeout(resolve, 1500));
-      
-      if (isPaused) {
-        setTrainingStatus('Training cancelled by user');
-        setIsTraining(false);
-        return;
-      }
-      
-      // Step 2: Train on the confirmed encodings
-      setTrainingStatus(
-        isQuickTrain
-          ? 'Training baseline AI models (5 photos per person)...'
-          : 'Training full AI models with smart sampling...'
-      );
-      
-      const response = await fetch('https://familyalbum-faces-api.azurewebsites.net/api/faces/train', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ quickTrain: isQuickTrain })
-      });
 
-      const data = await response.json();
-      
-      if (isPaused) {
-        setTrainingStatus('Training cancelled by user');
-        setIsTraining(false);
-        return;
-      }
-      
-      if (data.success) {
-        const seedInfo = seedData.photosProcessed > 0 
-          ? ` (seeded ${seedData.facesMatched} faces from existing tags)`
-          : '';
-        const trainMode = isQuickTrain ? ' Baseline training complete!' : ' Full training complete!';
-        setTrainingStatus(`${trainMode}${seedInfo}`);
-        setTrainingResult({ ...data, seedData, isQuickTrain });
-      } else {
-        setTrainingStatus(`Training failed: ${data.error || 'Unknown error'}`);
-        setTrainingResult(data);
-      }
     } catch (err) {
       console.error('Error training faces:', err);
       setTrainingStatus(`Error: ${err instanceof Error ? err.message : 'Unknown error'}`);

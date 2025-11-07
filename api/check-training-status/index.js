@@ -5,10 +5,10 @@ const { query } = require('../shared/db');
  * Check Training Status Endpoint
  * 
  * Checks if baseline training has been completed by counting
- * how many people have been added to Azure Face API.
+ * how many people have face embeddings stored in the database.
  * Requires Admin role.
  * 
- * GET /api/faces/check-training-status
+ * GET /api/check-training-status
  * 
  * Returns: {
  *   "success": true,
@@ -38,11 +38,10 @@ module.exports = async function (context, req) {
   }
 
   try {
-    // Count how many people have been added to Azure Face API
+    // Count how many people have face embeddings stored
     const result = await query(
       `SELECT COUNT(DISTINCT PersonID) as TrainedCount
-       FROM dbo.AzureFacePersons
-       WHERE AzurePersonID IS NOT NULL`
+       FROM dbo.FaceEmbeddings`
     );
 
     const trainedPersons = result[0]?.TrainedCount || 0;

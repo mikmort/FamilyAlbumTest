@@ -3,6 +3,7 @@ Shared Face API client utility for Azure Cognitive Services Face API
 """
 import os
 import time
+import logging
 from azure.cognitiveservices.vision.face import FaceClient
 from msrest.authentication import CognitiveServicesCredentials
 
@@ -39,17 +40,21 @@ def ensure_person_group_exists(face_client, person_group_id=PERSON_GROUP_ID):
     try:
         # Check if group exists
         face_client.person_group.get(person_group_id)
+        logging.info(f"PersonGroup '{person_group_id}' already exists")
         return True
     except Exception:
         # Group doesn't exist, create it
         try:
+            logging.info(f"Creating PersonGroup '{person_group_id}'")
             face_client.person_group.create(
                 person_group_id=person_group_id,
-                name='Family Album Faces',
-                recognition_model='recognition_04'  # Latest model
+                name='Family Album Faces'
+                # recognition_model parameter removed - use API default
             )
+            logging.info(f"PersonGroup '{person_group_id}' created successfully")
             return True
         except Exception as e:
+            logging.error(f"Failed to create PersonGroup: {str(e)}")
             raise Exception(f'Failed to create PersonGroup: {str(e)}')
 
 def wait_for_training(face_client, person_group_id=PERSON_GROUP_ID, timeout=300):

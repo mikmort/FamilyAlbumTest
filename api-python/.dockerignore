@@ -1,0 +1,35 @@
+# Docker deployment files
+Dockerfile
+.dockerignore
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+.venv/
+
+# Azure Functions
+local.settings.json
+.python_packages/
+.vscode/
+.funcignore
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Git
+.git/
+.gitignore
+
+# Documentation
+*.md
+docs/
+
+# Test files
+**/test_*.py
+tests/
