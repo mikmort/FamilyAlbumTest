@@ -1025,10 +1025,13 @@ export default function MediaDetailModal({
                     color: '#6c757d'
                   }}>
                     <p style={{ fontSize: '1.2rem', marginBottom: '1rem' }}>
-                      ⚠️ This video format cannot be played in your browser
+                      ⚠️ This video cannot be played in your browser
                     </p>
-                    <p style={{ marginBottom: '1.5rem' }}>
-                      MOV files often use codecs (like H.265/HEVC) that aren't supported in web browsers.
+                    <p style={{ marginBottom: '0.5rem' }}>
+                      There was an error loading the video file.
+                    </p>
+                    <p style={{ marginBottom: '1.5rem', fontSize: '0.9rem', color: '#868e96' }}>
+                      File: {media.PFileName}
                     </p>
                     <button
                       onClick={handleDownload}
@@ -1068,7 +1071,13 @@ export default function MediaDetailModal({
                       onClick={() => setIsFullScreen(true)}
                       style={{ cursor: 'pointer', width: '100%' }}
                       onError={(e) => {
-                        console.error('Video playback error:', e);
+                        console.error('Video playback error for:', media.PFileName);
+                        console.error('Video URL:', media.PBlobUrl);
+                        console.error('Error event:', e);
+                        if (videoRef.current?.error) {
+                          console.error('Video error code:', videoRef.current.error.code);
+                          console.error('Video error message:', videoRef.current.error.message);
+                        }
                         setVideoError(true);
                       }}
                       onLoadedMetadata={() => {
