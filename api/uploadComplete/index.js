@@ -126,15 +126,20 @@ module.exports = async function (context, req) {
                         .videoCodec('libx264')
                         .audioCodec('aac')
                         .audioBitrate('128k')
+                        .audioChannels(2)
+                        .audioFrequency(44100)
+                        .videoBitrate('2000k')
+                        .size('?x720')  // Scale to 720p height, maintain aspect ratio
+                        .fps(30)
                         .outputFormat('mp4')
                         .outputOptions([
-                            '-preset fast',
+                            '-preset medium',
                             '-crf 23',
                             '-movflags +faststart',
-                            '-pix_fmt yuv420p',  // Ensure browser compatibility
-                            '-profile:v main',  // Main profile instead of baseline (better compatibility with modern browsers)
-                            '-level 4.0',  // Level 4.0 for better device support
-                            '-max_muxing_queue_size 1024'  // Prevent muxing queue overflow
+                            '-pix_fmt yuv420p',
+                            '-profile:v high',
+                            '-level 4.1',
+                            '-strict experimental'
                         ])
                         .on('start', (cmd) => {
                             context.log('FFmpeg command:', cmd);
