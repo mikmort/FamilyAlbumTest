@@ -5,8 +5,11 @@ const { getBlobSasUrl } = require('../../shared/storage');
 /**
  * Get Tagged Photos Endpoint
  * 
- * Returns all photos that have manual person tags (from PPeopleList field in Pictures table).
- * PPeopleList is the source of truth for photo tagging.
+ * Returns all photos that have manual person tags from both NamePhoto table and PPeopleList field.
+ * Queries both sources to handle cases where tags exist in either location:
+ * - NamePhoto table: preferred source of truth for who appears in photos
+ * - PPeopleList field: fallback for photos not yet in NamePhoto table
+ * 
  * Used by face training to get photos with known people for creating embeddings.
  * 
  * GET /api/faces/tagged-photos?maxPerPerson=5
@@ -51,14 +54,23 @@ module.exports = async function (context, req) {
   try {
     const maxPerPerson = req.query.maxPerPerson ? parseInt(req.query.maxPerPerson) : null;
 
-    // Query for photos with people tags from PPeopleList field
-    // PPeopleList is the source of truth for photo tagging
+    // Query for photos with people tags from both NamePhoto table and PPeopleList field
+    // Both sources are checked to handle cases where tags exist in either location
     let sqlQuery;
     let params = {};
 
-    // Common CTE for parsing PPeopleList and joining with NameEvent
+    // Common CTE that combines tags from both NamePhoto table and PPeopleList field
     const photoPersonPairsCTE = `
       WITH PhotoPersonPairs AS (
+        -- Get tags from NamePhoto table (preferred source of truth)
+        SELECT 
+          np.npFileName as PFileName,
+          np.npID as PersonID
+        FROM dbo.NamePhoto np
+        
+        UNION
+        
+        -- Also get tags from PPeopleList field (fallback for photos not in NamePhoto)
         SELECT 
           p.PFileName,
           CAST(value AS INT) as PersonID
