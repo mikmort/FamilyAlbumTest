@@ -342,9 +342,12 @@ export default function AdminSettings({ onRequestsChange }: AdminSettingsProps) 
       );
       
       // Query for photos with manual tags using smart sampling
-      const photosResponse = await fetch(`/api/faces-tagged-photos?smartSample=true`);
+      // Temporarily use legacy mode to test if basic flow works
+      const photosResponse = await fetch(`/api/faces-tagged-photos?maxPerPerson=10`);
       if (!photosResponse.ok) {
-        throw new Error('Failed to fetch tagged photos');
+        const errorText = await photosResponse.text();
+        console.error('Failed to fetch tagged photos:', photosResponse.status, errorText);
+        throw new Error(`Failed to fetch tagged photos: ${photosResponse.status} - ${errorText.substring(0, 200)}`);
       }
       
       const photosData = await photosResponse.json();
