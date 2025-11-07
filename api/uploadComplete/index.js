@@ -107,6 +107,10 @@ module.exports = async function (context, req) {
             context.log(`⚠️ Detected AVI file uploaded as MP4: ${fileName}. Converting...`);
             
             try {
+                const os = require('os');
+                const path = require('path');
+                const fs = require('fs').promises;
+                
                 // Download the AVI blob
                 const downloadResponse = await blockBlobClient.download();
                 const chunks = [];
@@ -116,62 +120,70 @@ module.exports = async function (context, req) {
                 const aviBuffer = Buffer.concat(chunks);
                 context.log(`Downloaded AVI file (${aviBuffer.length} bytes)`);
 
-                // Convert AVI to MP4 using FFmpeg
-                const mp4Buffer = await new Promise((resolve, reject) => {
-                    const inputStream = Readable.from(aviBuffer);
-                    const chunks = [];
-
-                    ffmpeg(inputStream)
-                        .inputFormat('avi')
-                        .videoCodec('libx264')
-                        .audioCodec('aac')
-                        .audioBitrate('128k')
-                        .audioChannels(2)
-                        .audioFrequency(44100)
-                        .videoBitrate('2000k')
-                        .size('?x720')  // Scale to 720p height, maintain aspect ratio
-                        .fps(30)
-                        .outputFormat('mp4')
-                        .outputOptions([
-                            '-preset medium',
-                            '-crf 23',
-                            '-movflags +faststart',
-                            '-pix_fmt yuv420p',
-                            '-profile:v high',
-                            '-level 4.1',
-                            '-strict experimental'
-                        ])
-                        .on('start', (cmd) => {
-                            context.log('FFmpeg command:', cmd);
-                        })
-                        .on('progress', (progress) => {
-                            if (progress.percent) {
-                                context.log(`Conversion progress: ${Math.round(progress.percent)}%`);
-                            }
-                        })
-                        .on('error', (err) => {
-                            context.log.error('FFmpeg error:', err);
-                            reject(err);
-                        })
-                        .on('end', () => {
-                            context.log('✓ AVI to MP4 conversion complete');
-                            resolve(Buffer.concat(chunks));
-                        })
-                        .pipe()
-                        .on('data', (chunk) => {
-                            chunks.push(chunk);
-                        });
-                });
-
-                // Upload the converted MP4 back to blob storage (overwrite)
-                await blockBlobClient.uploadData(mp4Buffer, {
-                    blobHTTPHeaders: {
-                        blobContentType: 'video/mp4'
-                    }
-                });
+                // Use temporary files for more reliable conversion
+                const tempDir = os.tmpdir();
+                const inputPath = path.join(tempDir, `input_${Date.now()}.avi`);
+                const outputPath = path.join(tempDir, `output_${Date.now()}.mp4`);
                 
-                context.log(`✓ Uploaded converted MP4: ${fileName} (${mp4Buffer.length} bytes)`);
-                mediaType = 2; // Video
+                try {
+                    // Write AVI to temp file
+                    await fs.writeFile(inputPath, aviBuffer);
+                    context.log(`Wrote temp AVI file: ${inputPath}`);
+
+                    // Convert AVI to MP4 using FFmpeg with temp files
+                    await new Promise((resolve, reject) => {
+                        ffmpeg(inputPath)
+                            .videoCodec('libx264')
+                            .audioCodec('aac')
+                            .outputOptions([
+                                '-movflags +faststart',
+                                '-pix_fmt yuv420p',
+                                '-preset fast',
+                                '-crf 23'
+                            ])
+                            .on('start', (cmd) => {
+                                context.log('FFmpeg command:', cmd);
+                            })
+                            .on('progress', (progress) => {
+                                if (progress.percent) {
+                                    context.log(`Conversion progress: ${Math.round(progress.percent)}%`);
+                                }
+                            })
+                            .on('error', (err) => {
+                                context.log.error('FFmpeg error:', err);
+                                reject(err);
+                            })
+                            .on('end', () => {
+                                context.log('✓ AVI to MP4 conversion complete');
+                                resolve();
+                            })
+                            .save(outputPath);
+                    });
+
+                    // Read converted MP4
+                    const mp4Buffer = await fs.readFile(outputPath);
+                    context.log(`Read converted MP4: ${mp4Buffer.length} bytes`);
+
+                    // Upload the converted MP4 back to blob storage (overwrite)
+                    await blockBlobClient.uploadData(mp4Buffer, {
+                        blobHTTPHeaders: {
+                            blobContentType: 'video/mp4'
+                        }
+                    });
+                    
+                    context.log(`✓ Uploaded converted MP4: ${fileName} (${mp4Buffer.length} bytes)`);
+                    mediaType = 2; // Video
+                    
+                } finally {
+                    // Clean up temp files
+                    try {
+                        await fs.unlink(inputPath).catch(() => {});
+                        await fs.unlink(outputPath).catch(() => {});
+                        context.log('Cleaned up temp files');
+                    } catch (cleanupErr) {
+                        context.log.warn('Failed to clean up temp files:', cleanupErr);
+                    }
+                }
                 
             } catch (conversionErr) {
                 context.log.error('AVI conversion failed:', conversionErr);
