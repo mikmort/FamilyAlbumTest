@@ -103,11 +103,50 @@ function generateUploadSasUrl(blobName, expiresInMinutes = 60) {
   return `${blockBlobClient.url}?${sasToken}`;
 }
 
+/**
+ * Generate a SAS URL for reading a blob from browser
+ * @param {string} containerName - The container name
+ * @param {string} blobName - The name/path of the blob to read
+ * @param {number} expiresInMinutes - How long the SAS token should be valid (default: 60 minutes)
+ * @returns {string} SAS URL that allows reading this specific blob
+ */
+function getBlobSasUrl(container, blobName, expiresInMinutes = 60) {
+  const serviceClient = getBlobServiceClient();
+  const containerClient = serviceClient.getContainerClient(container);
+  const blockBlobClient = containerClient.getBlockBlobClient(blobName);
+  
+  // Create a SAS token that expires in the specified minutes
+  const startsOn = new Date();
+  const expiresOn = new Date(startsOn.getTime() + expiresInMinutes * 60 * 1000);
+  
+  // Create shared key credential
+  const sharedKeyCredential = new StorageSharedKeyCredential(accountName, accountKey);
+  
+  // Define permissions (read only)
+  const permissions = BlobSASPermissions.parse("r"); // read
+  
+  // Generate SAS token
+  const sasToken = generateBlobSASQueryParameters(
+    {
+      containerName: container,
+      blobName: blobName,
+      permissions: permissions,
+      startsOn: startsOn,
+      expiresOn: expiresOn,
+    },
+    sharedKeyCredential
+  ).toString();
+  
+  // Return full URL with SAS token
+  return `${blockBlobClient.url}?${sasToken}`;
+}
+
 module.exports = { 
   uploadBlob, 
   downloadBlob, 
   deleteBlob, 
   blobExists, 
   getContainerClient,
-  generateUploadSasUrl 
+  generateUploadSasUrl,
+  getBlobSasUrl
 };
