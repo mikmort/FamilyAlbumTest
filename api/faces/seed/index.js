@@ -10,7 +10,8 @@ const { checkAuthorization } = require('../shared/auth');
  * POST /api/faces/seed
  * Body (optional): { 
  *   "limit": 100,          // Max photos to process per run
- *   "maxPerPerson": 5      // Max photos per person (for baseline training)
+ *   "maxPerPerson": 5,     // Max photos per person (for baseline training)
+ *   "resume": true         // Resume from incomplete session if one exists
  * }
  */
 module.exports = async function (context, req) {

@@ -47,6 +47,7 @@ export default function AdminSettings({ onRequestsChange }: AdminSettingsProps) 
   const [isPaused, setIsPaused] = useState(false);
   const [trainingStatus, setTrainingStatus] = useState<string>('');
   const [trainingResult, setTrainingResult] = useState<any>(null);
+  const [incompleteSession, setIncompleteSession] = useState<any>(null);
   
   // Add user form state
   const [newEmail, setNewEmail] = useState('');
@@ -56,7 +57,22 @@ export default function AdminSettings({ onRequestsChange }: AdminSettingsProps) 
   useEffect(() => {
     fetchUsers();
     fetchPendingRequests();
+    checkForIncompleteSession();
   }, []);
+
+  const checkForIncompleteSession = async () => {
+    try {
+      const response = await fetch('/api/faces/training-progress');
+      const data = await response.json();
+      
+      if (data.success && data.incompleteSession) {
+        setIncompleteSession(data.incompleteSession);
+      }
+    } catch (err) {
+      console.error('Error checking for incomplete session:', err);
+    }
+  };
+
 
   const fetchUsers = async () => {
     try {
@@ -259,6 +275,128 @@ export default function AdminSettings({ onRequestsChange }: AdminSettingsProps) 
       fetchPendingRequests();
       alert('Error denying request');
       console.error(err);
+    }
+  };
+
+  const trainAzureFaces = async (resume: boolean = false) => {
+    setIsTraining(true);
+    setIsPaused(false);
+    setTrainingStatus(resume ? 'Resuming training from checkpoint...' : 'Initializing Azure Face API training...');
+    setTrainingResult(null);
+
+    try {
+      // Step 1: Check if baseline training has been done (if not resuming)
+      let isQuickTrain = false;
+      let maxPerPerson: number | undefined = undefined;
+      
+      if (!resume) {
+        setTrainingStatus('Checking for existing training data...');
+        
+        const checkResponse = await fetch('/api/check-training-status', {
+          method: 'GET',
+          headers: { 'Content-Type': 'application/json' }
+        });
+        
+        const checkData = await checkResponse.json();
+        const hasBaselineTraining = checkData.success && checkData.trainedPersons > 0;
+        
+        isQuickTrain = !hasBaselineTraining;
+        maxPerPerson = isQuickTrain ? 5 : undefined;
+      }
+      
+      if (isPaused) {
+        setTrainingStatus('Training cancelled by user');
+        setIsTraining(false);
+        return;
+      }
+
+      // Step 2: Seed faces from tagged photos
+      setTrainingStatus(
+        resume 
+          ? 'Resuming face seeding from previous checkpoint...'
+          : isQuickTrain 
+            ? 'Seeding baseline faces (up to 5 per person)...'
+            : 'Seeding all tagged faces...'
+      );
+      
+      const seedBody: any = { 
+        limit: 100,
+        resume: resume
+      };
+      
+      if (!resume && maxPerPerson) {
+        seedBody.maxPerPerson = maxPerPerson;
+      }
+      
+      const seedResponse = await fetch('/api/faces/seed', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(seedBody)
+      });
+      
+      if (!seedResponse.ok) {
+        throw new Error('Face seeding failed');
+      }
+      
+      const seedData = await seedResponse.json();
+      
+      if (!seedData.success) {
+        throw new Error(seedData.error || 'Face seeding failed');
+      }
+      
+      if (isPaused) {
+        setTrainingStatus('Training cancelled by user');
+        setIsTraining(false);
+        return;
+      }
+
+      // Step 3: Train the PersonGroup
+      setTrainingStatus('Training Azure Face API model...');
+      
+      const trainResponse = await fetch('/api/faces/train', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({})
+      });
+      
+      if (!trainResponse.ok) {
+        throw new Error('Face training failed');
+      }
+      
+      const trainData = await trainResponse.json();
+      
+      if (!trainData.success) {
+        throw new Error(trainData.error || 'Face training failed');
+      }
+
+      // Training complete
+      const trainMode = resume ? 'Resumed training' : isQuickTrain ? 'Baseline training' : 'Full training';
+      setTrainingStatus(
+        `✓ ${trainMode} complete! ` +
+        `Added ${seedData.facesAdded} faces for ${seedData.totalPersons} people.`
+      );
+      setTrainingResult({ 
+        success: true, 
+        personsUpdated: seedData.totalPersons,
+        facesAdded: seedData.facesAdded,
+        photosProcessed: seedData.photosProcessed,
+        errors: seedData.errors,
+        isQuickTrain: !resume && isQuickTrain,
+        isResume: resume
+      });
+      
+      // Clear incomplete session if we were resuming
+      if (resume) {
+        setIncompleteSession(null);
+      }
+
+    } catch (err) {
+      console.error('Error training Azure faces:', err);
+      setTrainingStatus(`Error: ${err instanceof Error ? err.message : 'Unknown error'}`);
+      setTrainingResult({ error: String(err) });
+    } finally {
+      setIsTraining(false);
+      setIsPaused(false);
     }
   };
 
@@ -493,6 +631,42 @@ export default function AdminSettings({ onRequestsChange }: AdminSettingsProps) 
         <p className="manager-subtitle">Manage user permissions and access</p>
       </div>
 
+      {/* Incomplete Training Session Banner */}
+      {incompleteSession && !isTraining && (
+        <div style={{
+          background: '#fff3cd',
+          border: '1px solid #ffc107',
+          borderRadius: '8px',
+          padding: '1rem',
+          marginBottom: '1.5rem'
+        }}>
+          <h3 style={{ margin: '0 0 0.5rem 0', color: '#856404' }}>
+            ⚠️ Incomplete Training Session Found
+          </h3>
+          <p style={{ margin: '0 0 0.5rem 0', color: '#856404' }}>
+            A previous training session was interrupted. Progress: {incompleteSession.processedPhotos}/{incompleteSession.totalPhotos} photos 
+            ({incompleteSession.percentComplete}%) across {incompleteSession.processedPersons}/{incompleteSession.totalPersons} people.
+          </p>
+          <button 
+            className="btn btn-primary"
+            onClick={() => trainAzureFaces(true)}
+            style={{ marginRight: '0.5rem' }}
+          >
+            ↻ Resume Training
+          </button>
+          <button 
+            className="btn btn-secondary"
+            onClick={() => {
+              if (confirm('Are you sure you want to start over? This will discard the incomplete session.')) {
+                setIncompleteSession(null);
+              }
+            }}
+          >
+            🗑️ Start Over
+          </button>
+        </div>
+      )}
+
       {/* Face Recognition Training Section */}
       <div className="card" style={{ marginBottom: '2rem', background: '#f0f8ff', borderColor: '#007bff' }}>
         <h2 style={{ marginTop: 0 }}>🧠 Face Recognition Training</h2>
@@ -508,7 +682,7 @@ export default function AdminSettings({ onRequestsChange }: AdminSettingsProps) 
         <div style={{ display: 'flex', gap: '0.5rem', marginBottom: trainingStatus ? '1rem' : 0 }}>
           <button 
             className="btn btn-primary"
-            onClick={trainFaces}
+            onClick={() => trainAzureFaces(false)}
             disabled={isTraining}
           >
             {isTraining ? '⏳ Training...' : '🚀 Train Now'}
