@@ -1067,6 +1067,7 @@ export default function MediaDetailModal({
                       ref={videoRef}
                       controls 
                       autoPlay
+                      preload="metadata"
                       src={media.PBlobUrl}
                       onClick={() => setIsFullScreen(true)}
                       style={{ cursor: 'pointer', width: '100%' }}
