@@ -543,8 +543,9 @@ module.exports = async function (context, req) {
                 
                 context.log(`Downloaded ${buffer.length} bytes for ${blobPath}`);
                 
-                // Determine content type
-                const contentType = downloadResponse.contentType || getContentType(blobPath);
+                // Determine content type - prioritize file extension over blob metadata
+                // (blob metadata may be wrong for converted files)
+                const contentType = getContentType(blobPath);
                 
                 // For video files, add Accept-Ranges header to support seeking
                 const isVideo = contentType && contentType.startsWith('video/');
