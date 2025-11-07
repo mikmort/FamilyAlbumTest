@@ -325,8 +325,8 @@ export default function AdminSettings({ onRequestsChange }: AdminSettingsProps) 
       const checkData = await checkResponse.json();
       const hasBaselineTraining = checkData.success && checkData.trainedPersons > 0;
       
-      const isQuickTrain = !hasBaselineTraining && !resumeFromCheckpoint;
-      const maxPerPerson = (checkpointData?.maxPerPerson) || (isQuickTrain ? 5 : undefined);
+      // Always use smart sampling (distributed across timeline, logarithmic scaling)
+      const smartSample = true;
       
       if (isPaused) {
         setTrainingStatus('Training cancelled by user');
@@ -334,18 +334,15 @@ export default function AdminSettings({ onRequestsChange }: AdminSettingsProps) 
         return;
       }
 
-      // Step 3: Get photos with manual tags
+      // Step 3: Get photos with manual tags using smart sampling
       setTrainingStatus(
         resumeFromCheckpoint
           ? 'Fetching remaining photos to process...'
-          : isQuickTrain 
-            ? 'Fetching tagged photos (up to 5 per person)...'
-            : 'Fetching all tagged photos...'
+          : 'Fetching tagged photos with intelligent sampling...'
       );
       
-      // Query for photos with manual tags using dedicated endpoint
-      const queryParams = maxPerPerson ? `?maxPerPerson=${maxPerPerson}` : '';
-      const photosResponse = await fetch(`/api/faces-tagged-photos${queryParams}`);
+      // Query for photos with manual tags using smart sampling
+      const photosResponse = await fetch(`/api/faces-tagged-photos?smartSample=true`);
       if (!photosResponse.ok) {
         throw new Error('Failed to fetch tagged photos');
       }
@@ -367,8 +364,7 @@ export default function AdminSettings({ onRequestsChange }: AdminSettingsProps) 
             personsUpdated: checkpointData?.totalPeople || 0,
             facesAdded: checkpointData?.successCount || 0,
             photosProcessed: checkpointData?.totalPhotos || 0,
-            errors: checkpointData?.errorCount || 0,
-            isQuickTrain: checkpointData?.isQuickTrain || false
+            errors: checkpointData?.errorCount || 0
           });
           localStorage.removeItem('faceTrainingCheckpoint');
         } else {
@@ -485,8 +481,6 @@ export default function AdminSettings({ onRequestsChange }: AdminSettingsProps) 
             errorCount,
             totalPhotos,
             totalPeople,
-            maxPerPerson,
-            isQuickTrain,
             timestamp: new Date().toISOString()
           };
           localStorage.setItem('faceTrainingCheckpoint', JSON.stringify(checkpoint));
@@ -498,9 +492,8 @@ export default function AdminSettings({ onRequestsChange }: AdminSettingsProps) 
       setIncompleteSession(null);
       
       if (successCount > 0) {
-        const trainMode = isQuickTrain ? 'Baseline training' : 'Full training';
         setTrainingStatus(
-          `✓ ${trainMode} complete! ` +
+          `✓ Training complete! ` +
           `Processed ${successCount} faces for ${totalPeople} people.`
         );
         setTrainingResult({ 
@@ -508,8 +501,7 @@ export default function AdminSettings({ onRequestsChange }: AdminSettingsProps) 
           personsUpdated: totalPeople,
           facesAdded: successCount,
           photosProcessed: totalPhotos,
-          errors: errorCount,
-          isQuickTrain
+          errors: errorCount
         });
       } else {
         setTrainingStatus('Training failed: No faces could be processed');
@@ -591,10 +583,10 @@ export default function AdminSettings({ onRequestsChange }: AdminSettingsProps) 
           Train the face recognition AI on confirmed face tags to improve accuracy and performance.
         </p>
         <p style={{ color: '#666', fontSize: '0.9rem', marginBottom: '0.5rem', fontStyle: 'italic' }}>
-          Uses intelligent sampling: people with many photos are sampled across their timeline to capture aging and appearance changes.
+          Uses intelligent sampling: samples are distributed across each person's timeline to capture aging and appearance changes.
         </p>
         <p style={{ color: '#007bff', fontSize: '0.9rem', marginBottom: '1rem', fontWeight: '500' }}>
-          💡 Tip: First training run processes up to 5 photos per person for quick baseline. Click again for full training!
+          💡 Smart sampling: 5-10 photos for people with few photos, up to 60 photos for those with thousands. Logarithmic scaling ensures efficiency!
         </p>
         
         {/* Checkpoint Resume Banner */}

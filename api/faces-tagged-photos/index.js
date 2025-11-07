@@ -3,30 +3,47 @@ const { query } = require('../shared/db');
 const { getBlobSasUrl } = require('../shared/storage');
 
 /**
+ * Calculate smart sample size based on total photos for a person
+ * Uses logarithmic scaling to balance coverage and efficiency:
+ * - 1-10 photos: all photos (100%)
+ * - 20 photos: 10 (50%)
+ * - 50 photos: 15 (30%)
+ * - 100 photos: 20 (20%)
+ * - 500 photos: 35 (7%)
+ * - 1000 photos: 45 (4.5%)
+ * - 5000+ photos: 60 (1-2%)
+ */
+function calculateSampleSize(totalPhotos) {
+  if (totalPhotos <= 10) return totalPhotos;
+  if (totalPhotos <= 20) return 10;
+  
+  // Logarithmic scaling: min(5 + 15 * log10(total/10), 60)
+  const scaledSize = Math.floor(5 + 15 * Math.log10(totalPhotos / 10));
+  return Math.min(scaledSize, 60); // Cap at 60 photos per person
+}
+
+/**
  * Get Tagged Photos Endpoint
  * 
- * Returns all photos that have manual person tags from both NamePhoto table and PPeopleList field.
- * Queries both sources to handle cases where tags exist in either location:
+ * Returns photos with manual person tags, using intelligent sampling:
+ * - Distributes samples across photo timeline (using dates)
+ * - Uses logarithmic scaling based on total photos per person
+ * - Minimum 5 photos, scales up to 60 for people with thousands of photos
+ * 
+ * Sources:
  * - NamePhoto table: preferred source of truth for who appears in photos
  * - PPeopleList field: fallback for photos not yet in NamePhoto table
  * 
- * Used by face training to get photos with known people for creating embeddings.
- * 
- * GET /api/faces/tagged-photos?maxPerPerson=5
+ * GET /api/faces/tagged-photos?smartSample=true
  * 
  * Query params:
- *   maxPerPerson (optional): Limit photos per person (for baseline training)
+ *   smartSample (optional): Use intelligent sampling (default: true)
+ *   maxPerPerson (optional): Override with fixed limit per person
  * 
  * Returns: {
  *   "success": true,
- *   "photos": [
- *     {
- *       "PFileName": "photo.jpg",
- *       "PersonID": 123,
- *       "PersonName": "John Doe",
- *       "url": "https://...blob.core.windows.net/..."
- *     }
- *   ]
+ *   "photos": [...],
+ *   "samplingStats": { personId: { total: X, sampled: Y }, ... }
  * }
  */
 module.exports = async function (context, req) {
@@ -52,12 +69,8 @@ module.exports = async function (context, req) {
   }
 
   try {
+    const smartSample = req.query.smartSample !== 'false'; // Default true
     const maxPerPerson = req.query.maxPerPerson ? parseInt(req.query.maxPerPerson) : null;
-
-    // Query for photos with people tags from both NamePhoto table and PPeopleList field
-    // Both sources are checked to handle cases where tags exist in either location
-    let sqlQuery;
-    let params = {};
 
     // Common CTE that combines tags from both NamePhoto table and PPeopleList field
     const photoPersonPairsCTE = `
@@ -82,8 +95,124 @@ module.exports = async function (context, req) {
           AND TRY_CAST(value AS INT) IS NOT NULL
       )`;
 
-    if (maxPerPerson) {
-      // Use ROW_NUMBER to limit photos per person
+    let sqlQuery;
+    let params = {};
+
+    if (smartSample && !maxPerPerson) {
+      // Step 1: Get counts per person to calculate sample sizes
+      const countQuery = `
+        ${photoPersonPairsCTE}
+        SELECT 
+          ne.ID as PersonID,
+          ne.neName as PersonName,
+          COUNT(DISTINCT pp.PFileName) as TotalPhotos
+        FROM PhotoPersonPairs pp
+        INNER JOIN dbo.NameEvent ne ON pp.PersonID = ne.ID
+        WHERE ne.neType = 'N' -- Only people, not events
+        GROUP BY ne.ID, ne.neName
+        ORDER BY ne.neName
+      `;
+      
+      const counts = await query(countQuery);
+      
+      if (!counts || counts.length === 0) {
+        context.res = {
+          status: 200,
+          body: {
+            success: true,
+            photos: [],
+            message: 'No tagged photos found'
+          }
+        };
+        return;
+      }
+
+      // Step 2: For each person, calculate sample size and get distributed samples
+      const allPhotos = [];
+      const samplingStats = {};
+
+      for (const personCount of counts) {
+        const sampleSize = calculateSampleSize(personCount.TotalPhotos);
+        samplingStats[personCount.PersonID] = {
+          name: personCount.PersonName,
+          total: personCount.TotalPhotos,
+          sampled: sampleSize
+        };
+
+        // Get photos distributed across timeline using NTILE
+        // NTILE divides photos into N buckets by date, then we take 1 from each bucket
+        const sampleQuery = `
+          ${photoPersonPairsCTE},
+          PhotosWithDates AS (
+            SELECT 
+              pp.PFileName,
+              pp.PersonID,
+              COALESCE(p.PDateTaken, p.PDateCreated, p.PDateModified, '1900-01-01') as PhotoDate
+            FROM PhotoPersonPairs pp
+            INNER JOIN dbo.Pictures p ON pp.PFileName = p.PFileName
+            WHERE pp.PersonID = @personId
+          ),
+          DistributedSamples AS (
+            SELECT 
+              PFileName,
+              PersonID,
+              PhotoDate,
+              NTILE(@sampleSize) OVER (ORDER BY PhotoDate) as TimeBucket,
+              ROW_NUMBER() OVER (PARTITION BY NTILE(@sampleSize) OVER (ORDER BY PhotoDate) ORDER BY PhotoDate) as BucketRank
+            FROM PhotosWithDates
+          )
+          SELECT PFileName, PersonID
+          FROM DistributedSamples
+          WHERE BucketRank = 1
+          ORDER BY PhotoDate
+        `;
+
+        const personPhotos = await query(sampleQuery, {
+          personId: personCount.PersonID,
+          sampleSize: sampleSize
+        });
+
+        // Add person name to each photo
+        personPhotos.forEach(photo => {
+          photo.PersonName = personCount.PersonName;
+          allPhotos.push(photo);
+        });
+      }
+
+      context.log(`Smart sampling: ${allPhotos.length} photos from ${counts.length} people`);
+      
+      // Generate SAS URLs
+      const photosWithUrls = await Promise.all(allPhotos.map(async (photo) => {
+        try {
+          const sasUrl = await getBlobSasUrl('family-album-media', photo.PFileName);
+          return {
+            PFileName: photo.PFileName,
+            PersonID: photo.PersonID,
+            PersonName: photo.PersonName,
+            url: sasUrl
+          };
+        } catch (err) {
+          context.log.error(`Error generating SAS URL for ${photo.PFileName}:`, err);
+          return null;
+        }
+      }));
+
+      const validPhotos = photosWithUrls.filter(p => p !== null);
+
+      context.res = {
+        status: 200,
+        body: {
+          success: true,
+          photos: validPhotos,
+          totalCount: validPhotos.length,
+          samplingStats: samplingStats,
+          smartSample: true
+        }
+      };
+      return;
+
+    } else if (maxPerPerson) {
+      // Fixed limit per person (legacy mode)
       sqlQuery = `
         ${photoPersonPairsCTE},
         RankedPhotos AS (
@@ -103,7 +232,7 @@ module.exports = async function (context, req) {
       `;
       params.maxPerPerson = maxPerPerson;
     } else {
-      // Get all tagged photos
+      // Get all tagged photos (no sampling)
       sqlQuery = `
         ${photoPersonPairsCTE}
         SELECT 
@@ -117,6 +246,7 @@ module.exports = async function (context, req) {
       `;
     }
 
+    // Execute query for fixed limit or all photos modes
     const results = await query(sqlQuery, params);
 
     if (!results || results.length === 0) {
@@ -158,7 +288,8 @@ module.exports = async function (context, req) {
         success: true,
         photos: validPhotos,
         totalCount: validPhotos.length,
-        maxPerPerson: maxPerPerson || null
+        maxPerPerson: maxPerPerson || null,
+        smartSample: false
       }
     };
 
