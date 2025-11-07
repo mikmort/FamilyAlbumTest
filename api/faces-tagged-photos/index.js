@@ -1,6 +1,6 @@
-const { checkAuthorization } = require('../../shared/auth');
-const { query } = require('../../shared/db');
-const { getBlobSasUrl } = require('../../shared/storage');
+const { checkAuthorization } = require('../shared/auth');
+const { query } = require('../shared/db');
+const { getBlobSasUrl } = require('../shared/storage');
 
 /**
  * Get Tagged Photos Endpoint

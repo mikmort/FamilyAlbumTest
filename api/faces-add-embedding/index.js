@@ -1,5 +1,5 @@
-const { checkAuthorization } = require('../../shared/auth');
-const { query } = require('../../shared/db');
+const { checkAuthorization } = require('../shared/auth');
+const { query } = require('../shared/db');
 
 /**
  * Add Face Embedding Endpoint
