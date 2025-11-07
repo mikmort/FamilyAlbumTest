@@ -118,26 +118,31 @@ module.exports = async function (context, req) {
                 const path = require('path');
                 const fs = require('fs').promises;
                 
-                // Download the AVI blob
+                // Determine input file extension based on content type
+                let inputExt = '.avi';
+                if (contentType.includes('quicktime')) inputExt = '.mov';
+                else if (contentType.includes('mpeg')) inputExt = '.mpg';
+                
+                // Download the video blob
                 const downloadResponse = await blockBlobClient.download();
                 const chunks = [];
                 for await (const chunk of downloadResponse.readableStreamBody) {
                     chunks.push(chunk);
                 }
-                const aviBuffer = Buffer.concat(chunks);
-                context.log(`Downloaded AVI file (${aviBuffer.length} bytes)`);
+                const videoBuffer = Buffer.concat(chunks);
+                context.log(`Downloaded ${sourceFormat} file (${videoBuffer.length} bytes)`);
 
                 // Use temporary files for more reliable conversion
                 const tempDir = os.tmpdir();
-                const inputPath = path.join(tempDir, `input_${Date.now()}.avi`);
+                const inputPath = path.join(tempDir, `input_${Date.now()}${inputExt}`);
                 const outputPath = path.join(tempDir, `output_${Date.now()}.mp4`);
                 
                 try {
-                    // Write AVI to temp file
-                    await fs.writeFile(inputPath, aviBuffer);
-                    context.log(`Wrote temp AVI file: ${inputPath}`);
+                    // Write video to temp file with correct extension
+                    await fs.writeFile(inputPath, videoBuffer);
+                    context.log(`Wrote temp ${sourceFormat} file: ${inputPath}`);
 
-                    // Convert AVI to MP4 using FFmpeg with temp files
+                    // Convert to MP4 using FFmpeg with temp files
                     await new Promise((resolve, reject) => {
                         ffmpeg(inputPath)
                             .videoCodec('libx264')
@@ -161,7 +166,7 @@ module.exports = async function (context, req) {
                                 reject(err);
                             })
                             .on('end', () => {
-                                context.log('✓ AVI to MP4 conversion complete');
+                                context.log(`✓ ${sourceFormat} to MP4 conversion complete`);
                                 resolve();
                             })
                             .save(outputPath);
