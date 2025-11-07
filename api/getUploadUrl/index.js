@@ -86,13 +86,15 @@ module.exports = async function (context, req) {
 
         context.log('Requested filename:', fileName);
 
-        // Convert AVI files to MP4 (change extension before generating SAS URL)
+        // Convert AVI, MOV, and MPG files to MP4 (change extension before generating SAS URL)
         const lowerFileName = fileName.toLowerCase();
-        if (lowerFileName.endsWith('.avi')) {
+        if (lowerFileName.endsWith('.avi') || lowerFileName.endsWith('.mov') || 
+            lowerFileName.endsWith('.mpg') || lowerFileName.endsWith('.mpeg')) {
             const lastDotIndex = fileName.lastIndexOf('.');
             if (lastDotIndex !== -1) {
+                const originalName = fileName;
                 fileName = fileName.substring(0, lastDotIndex) + '.mp4';
-                context.log(`AVI file detected. Changed extension: ${req.query.fileName} -> ${fileName}`);
+                context.log(`Video file detected. Changed extension: ${originalName} -> ${fileName}`);
             }
         }
 

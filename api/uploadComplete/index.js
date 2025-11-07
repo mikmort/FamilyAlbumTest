@@ -96,15 +96,22 @@ module.exports = async function (context, req) {
         const blobUrl = blockBlobClient.url;
         let mediaType = contentType?.startsWith('image/') ? 1 : 2;
 
-        // Check if this is an AVI file that needs conversion to MP4
-        // This happens when user uploads .AVI but we changed extension to .mp4 in getUploadUrl
-        const isAviConversion = fileName.toLowerCase().endsWith('.mp4') && 
+        // Check if this is a video file that needs conversion to MP4
+        // This happens when user uploads .AVI, .MOV, or .MPG but we changed extension to .mp4 in getUploadUrl
+        const needsConversion = fileName.toLowerCase().endsWith('.mp4') && 
                                 (contentType === 'video/x-msvideo' || 
                                  contentType === 'video/avi' || 
-                                 contentType === 'video/msvideo');
+                                 contentType === 'video/msvideo' ||
+                                 contentType === 'video/quicktime' ||
+                                 contentType === 'video/mpeg' ||
+                                 contentType === 'video/x-mpeg');
 
-        if (isAviConversion) {
-            context.log(`⚠️ Detected AVI file uploaded as MP4: ${fileName}. Converting...`);
+        if (needsConversion) {
+            const sourceFormat = contentType.includes('msvideo') || contentType.includes('avi') ? 'AVI' :
+                               contentType.includes('quicktime') ? 'MOV' :
+                               contentType.includes('mpeg') ? 'MPG' : 'video';
+            
+            context.log(`⚠️ Detected ${sourceFormat} file uploaded as MP4: ${fileName}. Converting...`);
             
             try {
                 const os = require('os');
