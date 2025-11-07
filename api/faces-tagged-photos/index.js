@@ -139,39 +139,26 @@ module.exports = async function (context, req) {
           sampled: sampleSize
         };
 
-        // Get photos distributed across timeline using NTILE
-        // NTILE divides photos into N buckets by date, then we take 1 from each bucket
+        // Get photos distributed across timeline
+        // Use a simpler approach: calculate bucket size and take one photo per bucket
         const sampleQuery = `
           ${photoPersonPairsCTE},
           PhotosWithDates AS (
             SELECT 
               pp.PFileName,
               pp.PersonID,
-              COALESCE(p.PDateTaken, p.PDateCreated, p.PDateModified, '1900-01-01') as PhotoDate
+              COALESCE(p.PDateTaken, p.PDateCreated, p.PDateModified, '1900-01-01') as PhotoDate,
+              ROW_NUMBER() OVER (ORDER BY COALESCE(p.PDateTaken, p.PDateCreated, p.PDateModified, '1900-01-01')) as RowNum
             FROM PhotoPersonPairs pp
             INNER JOIN dbo.Pictures p ON pp.PFileName = p.PFileName
             WHERE pp.PersonID = @personId
           ),
-          PhotosWithBuckets AS (
-            SELECT 
-              PFileName,
-              PersonID,
-              PhotoDate,
-              NTILE(@sampleSize) OVER (ORDER BY PhotoDate) as TimeBucket
-            FROM PhotosWithDates
-          ),
-          DistributedSamples AS (
-            SELECT 
-              PFileName,
-              PersonID,
-              PhotoDate,
-              TimeBucket,
-              ROW_NUMBER() OVER (PARTITION BY TimeBucket ORDER BY PhotoDate) as BucketRank
-            FROM PhotosWithBuckets
+          TotalCount AS (
+            SELECT COUNT(*) as Total FROM PhotosWithDates
           )
-          SELECT PFileName, PersonID
-          FROM DistributedSamples
-          WHERE BucketRank = 1
+          SELECT TOP (@sampleSize) PFileName, PersonID
+          FROM PhotosWithDates, TotalCount
+          WHERE (RowNum - 1) % (CASE WHEN Total < @sampleSize THEN 1 ELSE Total / @sampleSize END) = 0
           ORDER BY PhotoDate
         `;
 
