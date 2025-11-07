@@ -335,7 +335,8 @@ export default function AdminSettings({ onRequestsChange }: AdminSettingsProps) 
       });
       
       if (!seedResponse.ok) {
-        throw new Error('Face seeding failed');
+        const errorText = await seedResponse.text();
+        throw new Error(`Face seeding failed (${seedResponse.status}): ${errorText}`);
       }
       
       const seedData = await seedResponse.json();
@@ -682,7 +683,7 @@ export default function AdminSettings({ onRequestsChange }: AdminSettingsProps) 
         <div style={{ display: 'flex', gap: '0.5rem', marginBottom: trainingStatus ? '1rem' : 0 }}>
           <button 
             className="btn btn-primary"
-            onClick={() => trainAzureFaces(false)}
+            onClick={() => trainFaces()}
             disabled={isTraining}
           >
             {isTraining ? '⏳ Training...' : '🚀 Train Now'}
