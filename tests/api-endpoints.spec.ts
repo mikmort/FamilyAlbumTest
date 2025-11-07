@@ -5,6 +5,14 @@ import { test, expect } from '@playwright/test';
  * Tests verify that API endpoints respond correctly with dev mode enabled
  */
 
+// Type definitions for API responses
+interface TaggedPhoto {
+  PersonID: number;
+  PFileName: string;
+  PersonName: string;
+  url: string;
+}
+
 test.describe('API Endpoints', () => {
   test('should get auth status in dev mode', async ({ request }) => {
     const response = await request.get('/api/auth-status');
@@ -84,5 +92,54 @@ test.describe('API Authorization', () => {
     // This test will pass in dev mode but documents the expected production behavior
     const response = await request.get('/api/auth-status');
     expect(response.status()).toBeLessThan(500);
+  });
+});
+
+test.describe('Face Recognition API', () => {
+  test('should get tagged photos endpoint', async ({ request }) => {
+    const response = await request.get('/api/faces/tagged-photos');
+    
+    // Should return 200 with success flag
+    expect(response.ok()).toBeTruthy();
+    const data = await response.json();
+    
+    expect(data).toHaveProperty('success');
+    expect(data.success).toBe(true);
+    expect(data).toHaveProperty('photos');
+    expect(Array.isArray(data.photos)).toBe(true);
+    
+    // If photos exist, verify they have the right structure
+    if (data.photos.length > 0) {
+      const photo = data.photos[0];
+      expect(photo).toHaveProperty('PFileName');
+      expect(photo).toHaveProperty('PersonID');
+      expect(photo).toHaveProperty('PersonName');
+      expect(photo).toHaveProperty('url');
+    }
+  });
+
+  test('should support maxPerPerson parameter', async ({ request }) => {
+    const response = await request.get('/api/faces/tagged-photos?maxPerPerson=2');
+    
+    expect(response.ok()).toBeTruthy();
+    const data = await response.json();
+    
+    expect(data).toHaveProperty('success');
+    expect(data.success).toBe(true);
+    expect(data).toHaveProperty('maxPerPerson');
+    expect(data.maxPerPerson).toBe(2);
+    
+    // Verify that no person has more than maxPerPerson photos
+    if (data.photos.length > 0) {
+      const photosPerPerson: { [key: number]: number } = {};
+      data.photos.forEach((photo: TaggedPhoto) => {
+        photosPerPerson[photo.PersonID] = (photosPerPerson[photo.PersonID] || 0) + 1;
+      });
+      
+      // Each person should have at most 2 photos
+      Object.values(photosPerPerson).forEach(count => {
+        expect(count).toBeLessThanOrEqual(2);
+      });
+    }
   });
 });
