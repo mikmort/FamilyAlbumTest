@@ -308,14 +308,15 @@ export default function AdminSettings({ onRequestsChange }: AdminSettingsProps) 
           : 'Fetching all tagged photos...'
       );
       
-      // Query for photos with manual tags
-      const photosResponse = await fetch('/api/media?hasManualTags=true');
+      // Query for photos with manual tags using dedicated endpoint
+      const queryParams = maxPerPerson ? `?maxPerPerson=${maxPerPerson}` : '';
+      const photosResponse = await fetch(`/api/faces/tagged-photos${queryParams}`);
       if (!photosResponse.ok) {
         throw new Error('Failed to fetch tagged photos');
       }
       
       const photosData = await photosResponse.json();
-      let photos = photosData.media || [];
+      const photos = photosData.photos || [];
       
       if (photos.length === 0) {
         setTrainingStatus('No manually tagged photos found. Please add some tags first!');
@@ -324,28 +325,17 @@ export default function AdminSettings({ onRequestsChange }: AdminSettingsProps) 
         return;
       }
 
-      // Group photos by person and apply maxPerPerson limit
+      // Group photos by person for progress tracking
       const photosByPerson: { [personId: number]: any[] } = {};
       photos.forEach((photo: any) => {
-        // Assuming each photo has peopleIds array
-        if (photo.people && Array.isArray(photo.people)) {
-          photo.people.forEach((person: any) => {
-            const personId = person.ID || person.personId;
-            if (!photosByPerson[personId]) {
-              photosByPerson[personId] = [];
-            }
-            if (!maxPerPerson || photosByPerson[personId].length < maxPerPerson) {
-              photosByPerson[personId].push({
-                ...photo,
-                personId: personId,
-                personName: person.Name || person.personName
-              });
-            }
-          });
+        const personId = photo.PersonID;
+        if (!photosByPerson[personId]) {
+          photosByPerson[personId] = [];
         }
+        photosByPerson[personId].push(photo);
       });
 
-      const totalPhotos = Object.values(photosByPerson).reduce((sum, arr) => sum + arr.length, 0);
+      const totalPhotos = photos.length;
       const totalPeople = Object.keys(photosByPerson).length;
 
       setTrainingStatus(`Processing ${totalPhotos} photos for ${totalPeople} people...`);
@@ -355,65 +345,63 @@ export default function AdminSettings({ onRequestsChange }: AdminSettingsProps) 
       let successCount = 0;
       let errorCount = 0;
 
-      for (const [personId, personPhotos] of Object.entries(photosByPerson)) {
+      for (const photo of photos) {
         if (isPaused) {
           setTrainingStatus('Training cancelled by user');
           setIsTraining(false);
           return;
         }
 
-        for (const photo of personPhotos) {
-          try {
-            processedCount++;
-            setTrainingStatus(
-              `Processing ${photo.personName}: ${processedCount}/${totalPhotos} photos...`
-            );
+        try {
+          processedCount++;
+          setTrainingStatus(
+            `Processing ${photo.PersonName}: ${processedCount}/${totalPhotos} photos...`
+          );
 
-            // Load image with SAS token
-            const imageUrl = photo.url || photo.thumbnailUrl;
-            const img = await loadImage(imageUrl);
+          // Load image with SAS token
+          const imageUrl = photo.url;
+          const img = await loadImage(imageUrl);
 
-            // Detect face and generate embedding
-            const faceResult = await detectFaceWithEmbedding(img);
+          // Detect face and generate embedding
+          const faceResult = await detectFaceWithEmbedding(img);
 
-            if (!faceResult) {
-              console.warn(`No face detected in ${photo.PFileName} for ${photo.personName}`);
-              errorCount++;
-              continue;
-            }
-
-            // Convert Float32Array to regular array for JSON
-            const embeddingArray = Array.from(faceResult.descriptor);
-
-            // Send embedding to server
-            const addResponse = await fetch('/api/faces/add-embedding', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                personId: photo.personId,
-                photoFileName: photo.PFileName,
-                embedding: embeddingArray
-              })
-            });
-
-            if (addResponse.ok) {
-              successCount++;
-            } else {
-              errorCount++;
-              console.error(`Failed to save embedding for ${photo.PFileName}`);
-            }
-
-          } catch (error) {
+          if (!faceResult) {
+            console.warn(`No face detected in ${photo.PFileName} for ${photo.PersonName}`);
             errorCount++;
-            console.error(`Error processing ${photo.PFileName}:`, error);
+            continue;
           }
 
-          // Update progress every 5 photos
-          if (processedCount % 5 === 0 || processedCount === totalPhotos) {
-            setTrainingStatus(
-              `Processed ${processedCount}/${totalPhotos} photos (${successCount} successful, ${errorCount} failed)`
-            );
+          // Convert Float32Array to regular array for JSON
+          const embeddingArray = Array.from(faceResult.descriptor);
+
+          // Send embedding to server
+          const addResponse = await fetch('/api/faces/add-embedding', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              personId: photo.PersonID,
+              photoFileName: photo.PFileName,
+              embedding: embeddingArray
+            })
+          });
+
+          if (addResponse.ok) {
+            successCount++;
+          } else {
+            errorCount++;
+            console.error(`Failed to save embedding for ${photo.PFileName}`);
           }
+
+        } catch (error) {
+          errorCount++;
+          console.error(`Error processing ${photo.PFileName}:`, error);
+        }
+
+        // Update progress every 5 photos
+        if (processedCount % 5 === 0 || processedCount === totalPhotos) {
+          setTrainingStatus(
+            `Processed ${processedCount}/${totalPhotos} photos (${successCount} successful, ${errorCount} failed)`
+          );
         }
       }
 
