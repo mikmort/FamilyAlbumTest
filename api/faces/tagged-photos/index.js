@@ -56,19 +56,23 @@ module.exports = async function (context, req) {
     let sqlQuery;
     let params = {};
 
+    // Common CTE for parsing PPeopleList and joining with NameEvent
+    const photoPersonPairsCTE = `
+      WITH PhotoPersonPairs AS (
+        SELECT 
+          p.PFileName,
+          CAST(value AS INT) as PersonID
+        FROM dbo.Pictures p
+        CROSS APPLY STRING_SPLIT(p.PPeopleList, ',')
+        WHERE p.PPeopleList IS NOT NULL 
+          AND p.PPeopleList != ''
+          AND TRY_CAST(value AS INT) IS NOT NULL
+      )`;
+
     if (maxPerPerson) {
       // Use ROW_NUMBER to limit photos per person
       sqlQuery = `
-        WITH PhotoPersonPairs AS (
-          SELECT 
-            p.PFileName,
-            CAST(value AS INT) as PersonID
-          FROM dbo.Pictures p
-          CROSS APPLY STRING_SPLIT(p.PPeopleList, ',')
-          WHERE p.PPeopleList IS NOT NULL 
-            AND p.PPeopleList != ''
-            AND TRY_CAST(value AS INT) IS NOT NULL
-        ),
+        ${photoPersonPairsCTE},
         RankedPhotos AS (
           SELECT 
             pp.PFileName as PFileName,
@@ -88,16 +92,7 @@ module.exports = async function (context, req) {
     } else {
       // Get all tagged photos
       sqlQuery = `
-        WITH PhotoPersonPairs AS (
-          SELECT 
-            p.PFileName,
-            CAST(value AS INT) as PersonID
-          FROM dbo.Pictures p
-          CROSS APPLY STRING_SPLIT(p.PPeopleList, ',')
-          WHERE p.PPeopleList IS NOT NULL 
-            AND p.PPeopleList != ''
-            AND TRY_CAST(value AS INT) IS NOT NULL
-        )
+        ${photoPersonPairsCTE}
         SELECT 
           pp.PFileName as PFileName,
           ne.ID as PersonID,

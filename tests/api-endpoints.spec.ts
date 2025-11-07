@@ -124,7 +124,7 @@ test.describe('Face Recognition API', () => {
     // Verify that no person has more than maxPerPerson photos
     if (data.photos.length > 0) {
       const photosPerPerson: { [key: number]: number } = {};
-      data.photos.forEach((photo: any) => {
+      data.photos.forEach((photo: { PersonID: number; PFileName: string; PersonName: string; url: string }) => {
         photosPerPerson[photo.PersonID] = (photosPerPerson[photo.PersonID] || 0) + 1;
       });
       
