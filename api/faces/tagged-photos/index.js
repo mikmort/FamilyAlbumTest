@@ -73,11 +73,12 @@ module.exports = async function (context, req) {
         -- Also get tags from PPeopleList field (fallback for photos not in NamePhoto)
         SELECT 
           p.PFileName,
-          CAST(value AS INT) as PersonID
+          TRY_CAST(value AS INT) as PersonID
         FROM dbo.Pictures p
         CROSS APPLY STRING_SPLIT(p.PPeopleList, ',')
         WHERE p.PPeopleList IS NOT NULL 
           AND p.PPeopleList != ''
+          AND LTRIM(RTRIM(value)) != ''
           AND TRY_CAST(value AS INT) IS NOT NULL
       )`;
 

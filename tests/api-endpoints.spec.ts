@@ -5,6 +5,14 @@ import { test, expect } from '@playwright/test';
  * Tests verify that API endpoints respond correctly with dev mode enabled
  */
 
+// Type definitions for API responses
+interface TaggedPhoto {
+  PersonID: number;
+  PFileName: string;
+  PersonName: string;
+  url: string;
+}
+
 test.describe('API Endpoints', () => {
   test('should get auth status in dev mode', async ({ request }) => {
     const response = await request.get('/api/auth-status');
@@ -124,7 +132,7 @@ test.describe('Face Recognition API', () => {
     // Verify that no person has more than maxPerPerson photos
     if (data.photos.length > 0) {
       const photosPerPerson: { [key: number]: number } = {};
-      data.photos.forEach((photo: { PersonID: number; PFileName: string; PersonName: string; url: string }) => {
+      data.photos.forEach((photo: TaggedPhoto) => {
         photosPerPerson[photo.PersonID] = (photosPerPerson[photo.PersonID] || 0) + 1;
       });
       
