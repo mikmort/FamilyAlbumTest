@@ -310,7 +310,7 @@ export default function AdminSettings({ onRequestsChange }: AdminSettingsProps) 
       
       // Query for photos with manual tags using dedicated endpoint
       const queryParams = maxPerPerson ? `?maxPerPerson=${maxPerPerson}` : '';
-      const photosResponse = await fetch(`/api/faces/tagged-photos${queryParams}`);
+      const photosResponse = await fetch(`/api/faces-tagged-photos${queryParams}`);
       if (!photosResponse.ok) {
         throw new Error('Failed to fetch tagged photos');
       }
@@ -375,7 +375,7 @@ export default function AdminSettings({ onRequestsChange }: AdminSettingsProps) 
           const embeddingArray = Array.from(faceResult.descriptor);
 
           // Send embedding to server
-          const addResponse = await fetch('/api/faces/add-embedding', {
+          const addResponse = await fetch('/api/faces-add-embedding', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
