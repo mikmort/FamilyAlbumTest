@@ -295,7 +295,7 @@ export default function AdminSettings({ onRequestsChange }: AdminSettingsProps) 
           : 'Processing any new manually-tagged photos...'
       );
       
-      const seedResponse = await fetch('/api/faces/seed', {
+      const seedResponse = await fetch('https://familyalbum-faces-api.azurewebsites.net/api/faces-seed', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
@@ -343,7 +343,7 @@ export default function AdminSettings({ onRequestsChange }: AdminSettingsProps) 
           : 'Training full AI models with smart sampling...'
       );
       
-      const response = await fetch('/api/faces/train', {
+      const response = await fetch('https://familyalbum-faces-api.azurewebsites.net/api/faces-train', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ quickTrain: isQuickTrain })
