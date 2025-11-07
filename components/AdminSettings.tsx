@@ -389,7 +389,8 @@ export default function AdminSettings({ onRequestsChange }: AdminSettingsProps) 
         photosByPerson[personId].push(photo);
       });
 
-      const totalPhotos = photosData.photos?.length || photos.length;
+      // Use the actual filtered photos count for accurate progress tracking
+      const totalPhotos = photos.length;
       const totalPeople = Object.keys(photosByPerson).length;
       const alreadyProcessed = resumeFromCheckpoint ? processedPhotos.size : 0;
 
@@ -402,6 +403,12 @@ export default function AdminSettings({ onRequestsChange }: AdminSettingsProps) 
       let processedCount = alreadyProcessed;
       let successCount = checkpointData?.successCount || 0;
       let errorCount = checkpointData?.errorCount || 0;
+      
+      // Track current person for better progress display
+      let currentPersonId: number | null = null;
+      let currentPersonPhotoNum = 0;
+      let currentPersonTotalPhotos = 0;
+      let completedPeople = 0;
 
       for (const photo of photos) {
         if (isPaused) {
@@ -412,8 +419,22 @@ export default function AdminSettings({ onRequestsChange }: AdminSettingsProps) 
 
         try {
           processedCount++;
+          
+          // Track person progress
+          if (currentPersonId !== photo.PersonID) {
+            if (currentPersonId !== null) {
+              completedPeople++;
+            }
+            currentPersonId = photo.PersonID;
+            currentPersonPhotoNum = 0;
+            currentPersonTotalPhotos = photosByPerson[photo.PersonID].length;
+          }
+          currentPersonPhotoNum++;
+          
           setTrainingStatus(
-            `Processing ${photo.PersonName}: ${processedCount}/${totalPhotos} photos...`
+            `[${completedPeople + 1}/${totalPeople} people] ${photo.PersonName}: ` +
+            `photo ${currentPersonPhotoNum}/${currentPersonTotalPhotos} ` +
+            `(${processedCount}/${totalPhotos} total)`
           );
 
           // Load image with SAS token
@@ -469,13 +490,6 @@ export default function AdminSettings({ onRequestsChange }: AdminSettingsProps) 
             timestamp: new Date().toISOString()
           };
           localStorage.setItem('faceTrainingCheckpoint', JSON.stringify(checkpoint));
-        }
-
-        // Update progress every 5 photos
-        if (processedCount % 5 === 0 || processedCount === totalPhotos) {
-          setTrainingStatus(
-            `Processed ${processedCount}/${totalPhotos} photos (${successCount} successful, ${errorCount} failed)`
-          );
         }
       }
 
