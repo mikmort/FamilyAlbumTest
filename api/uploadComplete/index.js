@@ -129,7 +129,10 @@ module.exports = async function (context, req) {
                         .outputOptions([
                             '-preset fast',
                             '-crf 23',
-                            '-movflags +faststart'
+                            '-movflags +faststart',
+                            '-pix_fmt yuv420p',  // Ensure browser compatibility
+                            '-profile:v baseline',  // Use baseline profile for max compatibility
+                            '-level 3.0'  // Compatible with most browsers
                         ])
                         .on('start', (cmd) => {
                             context.log('FFmpeg command:', cmd);
