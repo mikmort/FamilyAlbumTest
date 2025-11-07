@@ -125,14 +125,16 @@ module.exports = async function (context, req) {
                         .inputFormat('avi')
                         .videoCodec('libx264')
                         .audioCodec('aac')
+                        .audioBitrate('128k')
                         .outputFormat('mp4')
                         .outputOptions([
                             '-preset fast',
                             '-crf 23',
                             '-movflags +faststart',
                             '-pix_fmt yuv420p',  // Ensure browser compatibility
-                            '-profile:v baseline',  // Use baseline profile for max compatibility
-                            '-level 3.0'  // Compatible with most browsers
+                            '-profile:v main',  // Main profile instead of baseline (better compatibility with modern browsers)
+                            '-level 4.0',  // Level 4.0 for better device support
+                            '-max_muxing_queue_size 1024'  // Prevent muxing queue overflow
                         ])
                         .on('start', (cmd) => {
                             context.log('FFmpeg command:', cmd);
