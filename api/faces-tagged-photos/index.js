@@ -147,8 +147,18 @@ module.exports = async function (context, req) {
             SELECT 
               pp.PFileName,
               pp.PersonID,
-              COALESCE(p.PDateTaken, p.PDateCreated, p.PDateModified, '1900-01-01') as PhotoDate,
-              ROW_NUMBER() OVER (ORDER BY COALESCE(p.PDateTaken, p.PDateCreated, p.PDateModified, '1900-01-01')) as RowNum
+              COALESCE(
+                p.PDateEntered,
+                DATEFROMPARTS(ISNULL(p.PYear, 2000), ISNULL(p.PMonth, 1), 1),
+                p.PLastModifiedDate,
+                '1900-01-01'
+              ) as PhotoDate,
+              ROW_NUMBER() OVER (ORDER BY COALESCE(
+                p.PDateEntered,
+                DATEFROMPARTS(ISNULL(p.PYear, 2000), ISNULL(p.PMonth, 1), 1),
+                p.PLastModifiedDate,
+                '1900-01-01'
+              )) as RowNum
             FROM PhotoPersonPairs pp
             INNER JOIN dbo.Pictures p ON pp.PFileName = p.PFileName
             WHERE pp.PersonID = @personId
