@@ -5,7 +5,8 @@ const { getBlobSasUrl } = require('../../shared/storage');
 /**
  * Get Tagged Photos Endpoint
  * 
- * Returns all photos that have manual person tags (from NamePhoto table).
+ * Returns all photos that have manual person tags (from PPeopleList field in Pictures table).
+ * PPeopleList is the source of truth for photo tagging.
  * Used by face training to get photos with known people for creating embeddings.
  * 
  * GET /api/faces/tagged-photos?maxPerPerson=5
@@ -50,21 +51,32 @@ module.exports = async function (context, req) {
   try {
     const maxPerPerson = req.query.maxPerPerson ? parseInt(req.query.maxPerPerson) : null;
 
-    // Query for photos with people tags, with optional limit per person
+    // Query for photos with people tags from PPeopleList field
+    // PPeopleList is the source of truth for photo tagging
     let sqlQuery;
     let params = {};
 
     if (maxPerPerson) {
       // Use ROW_NUMBER to limit photos per person
       sqlQuery = `
-        WITH RankedPhotos AS (
+        WITH PhotoPersonPairs AS (
           SELECT 
-            np.npFileName as PFileName,
+            p.PFileName,
+            CAST(value AS INT) as PersonID
+          FROM dbo.Pictures p
+          CROSS APPLY STRING_SPLIT(p.PPeopleList, ',')
+          WHERE p.PPeopleList IS NOT NULL 
+            AND p.PPeopleList != ''
+            AND TRY_CAST(value AS INT) IS NOT NULL
+        ),
+        RankedPhotos AS (
+          SELECT 
+            pp.PFileName as PFileName,
             ne.ID as PersonID,
             ne.neName as PersonName,
-            ROW_NUMBER() OVER (PARTITION BY ne.ID ORDER BY np.npFileName) as RowNum
-          FROM dbo.NamePhoto np
-          INNER JOIN dbo.NameEvent ne ON np.npID = ne.ID
+            ROW_NUMBER() OVER (PARTITION BY ne.ID ORDER BY pp.PFileName) as RowNum
+          FROM PhotoPersonPairs pp
+          INNER JOIN dbo.NameEvent ne ON pp.PersonID = ne.ID
           WHERE ne.neType = 'N' -- Only people, not events
         )
         SELECT PFileName, PersonID, PersonName
@@ -76,14 +88,24 @@ module.exports = async function (context, req) {
     } else {
       // Get all tagged photos
       sqlQuery = `
+        WITH PhotoPersonPairs AS (
+          SELECT 
+            p.PFileName,
+            CAST(value AS INT) as PersonID
+          FROM dbo.Pictures p
+          CROSS APPLY STRING_SPLIT(p.PPeopleList, ',')
+          WHERE p.PPeopleList IS NOT NULL 
+            AND p.PPeopleList != ''
+            AND TRY_CAST(value AS INT) IS NOT NULL
+        )
         SELECT 
-          np.npFileName as PFileName,
+          pp.PFileName as PFileName,
           ne.ID as PersonID,
           ne.neName as PersonName
-        FROM dbo.NamePhoto np
-        INNER JOIN dbo.NameEvent ne ON np.npID = ne.ID
+        FROM PhotoPersonPairs pp
+        INNER JOIN dbo.NameEvent ne ON pp.PersonID = ne.ID
         WHERE ne.neType = 'N' -- Only people, not events
-        ORDER BY ne.neName, np.npFileName
+        ORDER BY ne.neName, pp.PFileName
       `;
     }
 
