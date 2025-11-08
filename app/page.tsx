@@ -13,7 +13,7 @@ import ProcessNewFiles from '@/components/ProcessNewFiles';
 import UploadMedia from '@/components/UploadMedia';
 import AdminSettings from '@/components/AdminSettings';
 import AccessRequest from '@/components/AccessRequest';
-import NewMediaPage from './new-media/page';
+import NewMediaView from '@/components/NewMediaView';
 import { Person, Event, MediaItem } from '../lib/types';
 
 interface AuthStatus {
@@ -312,7 +312,7 @@ export default function Home() {
             <button className="btn btn-secondary mb-2" onClick={() => setView('select')}>
               ← Back
             </button>
-            <NewMediaPage 
+            <NewMediaView 
               onMediaClick={handleMediaClick}
               onMediaFullscreen={handleMediaFullscreen}
             />

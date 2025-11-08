@@ -3,12 +3,12 @@
 import { useState, useEffect } from 'react';
 import { MediaItem } from '@/lib/types';
 
-interface NewMediaPageProps {
+interface NewMediaViewProps {
   onMediaClick?: (media: MediaItem, allMedia: MediaItem[]) => void;
   onMediaFullscreen?: (media: MediaItem, allMedia: MediaItem[]) => void;
 }
 
-export default function NewMediaPage({ onMediaClick, onMediaFullscreen }: NewMediaPageProps) {
+export default function NewMediaView({ onMediaClick, onMediaFullscreen }: NewMediaViewProps) {
   const [newMedia, setNewMedia] = useState<MediaItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
