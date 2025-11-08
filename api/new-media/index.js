@@ -69,13 +69,99 @@ module.exports = async function (context, req) {
             
             context.log(`Found ${newMedia.length} new media items`);
             
+            // Build event and people lookups (same logic as main media API)
+            const eventLookup = {};
+            
+            if (newMedia.length > 0) {
+                // Collect all numeric IDs from PPeopleList to query NameEvent
+                const candidateIds = new Set();
+                newMedia.forEach(item => {
+                    if (item.PPeopleList) {
+                        const tokens = item.PPeopleList.split(',').map(s => s.trim()).filter(Boolean);
+                        tokens.forEach(tok => {
+                            if (/^\d+$/.test(tok)) {
+                                candidateIds.add(parseInt(tok, 10));
+                            }
+                        });
+                    }
+                });
+                
+                // Query NameEvent for all candidate IDs
+                if (candidateIds.size > 0) {
+                    const ids = Array.from(candidateIds);
+                    const placeholders = ids.map((_, i) => `@id${i}`).join(',');
+                    const eventQuery = `SELECT ID, neName, neRelation, neType FROM dbo.NameEvent WHERE ID IN (${placeholders})`;
+                    const eventParams = {};
+                    ids.forEach((id, i) => { eventParams[`id${i}`] = id; });
+                    
+                    const eventRows = await query(eventQuery, eventParams);
+                    context.log(`Fetched ${eventRows.length} NameEvent records for PPeopleList IDs`);
+                    eventRows.forEach(r => {
+                        eventLookup[r.ID] = { ID: r.ID, neName: r.neName, neType: r.neType, neRelation: r.neRelation };
+                    });
+                }
+            }
+            
+            // Transform results to include TaggedPeople and Event
+            const transformedMedia = newMedia.map(item => {
+                let blobPath = (item.PFileName || '').replace(/\\/g, '/').replace(/\/\//g, '/');
+                blobPath = blobPath.split('/').map(s => s.trim()).join('/');
+                
+                // Determine event from PPeopleList
+                let eventForItem = null;
+                if (item.PPeopleList) {
+                    const tokens = item.PPeopleList.split(',').map(s => s.trim()).filter(Boolean);
+                    const numericIds = tokens.filter(tok => /^\d+$/.test(tok)).map(tok => parseInt(tok));
+                    for (const id of numericIds) {
+                        const lookup = eventLookup[id];
+                        if (lookup && lookup.neType === 'E') {
+                            eventForItem = { ID: lookup.ID, neName: lookup.neName };
+                            break;
+                        }
+                    }
+                }
+                
+                // Build TaggedPeople from PPeopleList (only people, not events)
+                let orderedTagged = [];
+                if (item.PPeopleList) {
+                    const tokens = item.PPeopleList.split(',').map(s => s.trim()).filter(Boolean);
+                    for (const tok of tokens) {
+                        if (/^\d+$/.test(tok)) {
+                            const id = parseInt(tok, 10);
+                            const lookup = eventLookup[id];
+                            if (lookup && lookup.neType === 'N') {
+                                orderedTagged.push({
+                                    ID: lookup.ID,
+                                    neName: lookup.neName,
+                                    neRelation: lookup.neRelation
+                                });
+                            }
+                        }
+                    }
+                }
+                
+                // Build URLs
+                const encodedBlobPath = blobPath.split('/').map(encodeURIComponent).join('/');
+                const thumbnailUrl = item.PThumbnailUrl 
+                    ? item.PThumbnailUrl 
+                    : `/api/media/${encodedBlobPath}?thumbnail=true`;
+                
+                return {
+                    ...item,
+                    PBlobUrl: `/api/media/${encodedBlobPath}`,
+                    PThumbnailUrl: thumbnailUrl,
+                    TaggedPeople: orderedTagged,
+                    Event: eventForItem
+                };
+            });
+            
             context.res = {
                 status: 200,
                 headers: { 'Content-Type': 'application/json' },
                 body: {
-                    count: newMedia.length,
+                    count: transformedMedia.length,
                     lastViewedTime,
-                    media: newMedia
+                    media: transformedMedia
                 }
             };
             
