@@ -34,6 +34,7 @@ export default function NewMediaView({ onMediaClick, onMediaFullscreen }: NewMed
       setLastViewedTime(data.lastViewedTime);
       
       console.log(`Loaded ${data.count} new media items`);
+      console.log('New media items:', data.media);
     } catch (err) {
       console.error('Error loading new media:', err);
       setError(err instanceof Error ? err.message : 'Failed to load new media');
@@ -66,6 +67,17 @@ export default function NewMediaView({ onMediaClick, onMediaFullscreen }: NewMed
   const handleMediaClick = (filename: string) => {
     // Find the media item and call the callback
     const mediaItem = newMedia.find(m => m.PFileName === filename);
+    console.log('NewMediaView handleMediaClick:', {
+      filename,
+      found: !!mediaItem,
+      mediaItem: mediaItem ? {
+        PFileName: mediaItem.PFileName,
+        PBlobUrl: mediaItem.PBlobUrl,
+        PType: mediaItem.PType,
+        TaggedPeople: mediaItem.TaggedPeople,
+        Event: mediaItem.Event
+      } : null
+    });
     if (mediaItem && onMediaClick) {
       onMediaClick(mediaItem, newMedia);
     }
@@ -74,6 +86,15 @@ export default function NewMediaView({ onMediaClick, onMediaFullscreen }: NewMed
   const handleMediaFullscreen = (filename: string) => {
     // Find the media item and call the callback
     const mediaItem = newMedia.find(m => m.PFileName === filename);
+    console.log('NewMediaView handleMediaFullscreen:', {
+      filename,
+      found: !!mediaItem,
+      mediaItem: mediaItem ? {
+        PFileName: mediaItem.PFileName,
+        PBlobUrl: mediaItem.PBlobUrl,
+        PType: mediaItem.PType
+      } : null
+    });
     if (mediaItem && onMediaFullscreen) {
       onMediaFullscreen(mediaItem, newMedia);
     }

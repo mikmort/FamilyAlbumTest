@@ -107,6 +107,10 @@ module.exports = async function (context, req) {
                 let blobPath = (item.PFileName || '').replace(/\\/g, '/').replace(/\/\//g, '/');
                 blobPath = blobPath.split('/').map(s => s.trim()).join('/');
                 
+                context.log(`Transforming media item: ${item.PFileName}`);
+                context.log(`  Blob path: ${blobPath}`);
+                context.log(`  PType: ${item.PType}`);
+                
                 // Determine event from PPeopleList
                 let eventForItem = null;
                 if (item.PPeopleList) {
@@ -146,9 +150,15 @@ module.exports = async function (context, req) {
                     ? item.PThumbnailUrl 
                     : `/api/media/${encodedBlobPath}?thumbnail=true`;
                 
+                const blobUrl = `/api/media/${encodedBlobPath}`;
+                
+                context.log(`  Encoded blob path: ${encodedBlobPath}`);
+                context.log(`  Final PBlobUrl: ${blobUrl}`);
+                context.log(`  Final PThumbnailUrl: ${thumbnailUrl}`);
+                
                 return {
                     ...item,
-                    PBlobUrl: `/api/media/${encodedBlobPath}`,
+                    PBlobUrl: blobUrl,
                     PThumbnailUrl: thumbnailUrl,
                     TaggedPeople: orderedTagged,
                     Event: eventForItem
