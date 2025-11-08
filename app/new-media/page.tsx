@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import ThumbnailGallery from '@/components/ThumbnailGallery';
 import { MediaItem } from '@/lib/types';
 
 export default function NewMediaPage() {
@@ -61,9 +60,9 @@ export default function NewMediaPage() {
     }
   };
 
-  const handleMediaClick = (media: MediaItem, allMedia: MediaItem[]) => {
-    // Navigate to gallery with this media item selected
-    router.push(`/gallery?file=${encodeURIComponent(media.PFileName)}`);
+  const handleMediaClick = (filename: string) => {
+    // Navigate to main gallery view
+    router.push(`/?file=${encodeURIComponent(filename)}`);
   };
 
   const handleBack = () => {
@@ -159,10 +158,52 @@ export default function NewMediaPage() {
           </button>
         </div>
       ) : (
-        <ThumbnailGallery
-          media={newMedia}
-          onMediaClick={handleMediaClick}
-        />
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))',
+          gap: '16px',
+          padding: '20px 0'
+        }}>
+          {newMedia.map((item) => (
+            <div
+              key={item.PFileName}
+              onClick={() => handleMediaClick(item.PFileName)}
+              style={{
+                cursor: 'pointer',
+                borderRadius: '8px',
+                overflow: 'hidden',
+                boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+                transition: 'transform 0.2s',
+                background: '#fff'
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.transform = 'scale(1.05)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.transform = 'scale(1)';
+              }}
+            >
+              <img
+                src={`/api/media/${item.PFileName}?thumb=true`}
+                alt={item.PDescription || item.PFileName}
+                style={{
+                  width: '100%',
+                  height: '200px',
+                  objectFit: 'cover'
+                }}
+              />
+              <div style={{ padding: '8px' }}>
+                <p style={{ 
+                  fontSize: '0.85rem', 
+                  color: '#666',
+                  margin: 0 
+                }}>
+                  {new Date(item.PDateCreated).toLocaleDateString()}
+                </p>
+              </div>
+            </div>
+          ))}
+        </div>
       )}
     </div>
   );
