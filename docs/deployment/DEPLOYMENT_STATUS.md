@@ -15,9 +15,9 @@
 - `api/faces/training-progress/function.json` (new)
 - `api/faces/seed/index.js` (modified)
 - `components/AdminSettings.tsx` (modified)
-- `DEPLOYMENT_CHECKLIST_TRAINING.md` (new)
-- `FACE_TRAINING_PROGRESS.md` (new)
-- `TRAINING_PROGRESS_SUMMARY.md` (new)
+- `docs/deployment/DEPLOYMENT_CHECKLIST_TRAINING.md` (new)
+- `docs/features/FACE_TRAINING_PROGRESS.md` (new)
+- `docs/features/TRAINING_PROGRESS_SUMMARY.md` (new)
 
 ### 2. Database Schema Deployed
 - **Script**: `database/face-training-progress-schema.sql`
@@ -193,7 +193,7 @@ If something doesn't work:
 1. Check GitHub Actions logs for deployment errors
 2. Check Azure Function logs for runtime errors
 3. Query database to verify schema is correct
-4. See troubleshooting guide in `FACE_TRAINING_PROGRESS.md`
+4. See troubleshooting guide in `../features/FACE_TRAINING_PROGRESS.md`
 
 ## 🎉 Deployment Complete!
 

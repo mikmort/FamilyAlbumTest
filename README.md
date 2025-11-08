@@ -76,7 +76,7 @@ See [QUICKSTART.md](QUICKSTART.md) for a complete step-by-step guide.
 Additional documentation in the `docs/` folder:
 - [docs/AZURE_SETUP.md](docs/AZURE_SETUP.md) - Azure resources configuration
 - [docs/BICEP_SETUP.md](docs/BICEP_SETUP.md) - Infrastructure as Code setup
-- [docs/SETUP_CHECKLIST.md](docs/SETUP_CHECKLIST.md) - Complete checklist
+- [docs/setup/SETUP_CHECKLIST.md](docs/setup/SETUP_CHECKLIST.md) - Complete checklist
 
 ## Local Development Setup
 

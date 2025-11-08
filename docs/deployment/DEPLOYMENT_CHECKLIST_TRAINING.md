@@ -2,8 +2,8 @@
 
 ## Pre-Deployment
 
-- [ ] Review changes in `TRAINING_PROGRESS_SUMMARY.md`
-- [ ] Review technical details in `FACE_TRAINING_PROGRESS.md`
+- [ ] Review changes in `../features/TRAINING_PROGRESS_SUMMARY.md`
+- [ ] Review technical details in `../features/FACE_TRAINING_PROGRESS.md`
 - [ ] Backup current database (especially PersonEncodings if testing baseline)
 
 ## Database Deployment
@@ -163,8 +163,8 @@ If issues occur:
 
 ## Support
 
-- Documentation: `FACE_TRAINING_PROGRESS.md`
-- Summary: `TRAINING_PROGRESS_SUMMARY.md`
+- Documentation: `../features/FACE_TRAINING_PROGRESS.md`
+- Summary: `../features/TRAINING_PROGRESS_SUMMARY.md`
 - Database schema: `database/face-training-progress-schema.sql`
 - Python code: `api-python/faces-seed/__init__.py`
 - UI code: `components/AdminSettings.tsx`
