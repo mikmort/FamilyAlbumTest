@@ -73,9 +73,9 @@ export default function NewMediaPage() {
     }
   };
 
-  const handleMediaClick = (filename: string) => {
+  const handleMediaClick = (media: MediaItem, allMedia: MediaItem[]) => {
     // Navigate to gallery with this media item selected
-    router.push(`/gallery?file=${encodeURIComponent(filename)}`);
+    router.push(`/gallery?file=${encodeURIComponent(media.PFileName)}`);
   };
 
   const handleBack = () => {
