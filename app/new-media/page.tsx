@@ -3,19 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import ThumbnailGallery from '@/components/ThumbnailGallery';
-
-interface MediaItem {
-  PFileName: string;
-  PMediaType: number;
-  PDateTaken: string;
-  PDateModified: string;
-  PDateCreated: string;
-  PPeopleList: string;
-  PNameCount: number;
-  PDescription: string;
-  PWidth: number;
-  PHeight: number;
-}
+import { MediaItem } from '@/lib/types';
 
 export default function NewMediaPage() {
   const router = useRouter();
