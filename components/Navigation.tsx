@@ -6,8 +6,10 @@ interface NavigationProps {
   onSelectPeople: () => void;
   onProcessFiles: () => void;
   onUploadMedia: () => void;
+  onNewMedia: () => void;
   onAdminSettings?: () => void;
   pendingCount?: number;
+  newMediaCount?: number;
 }
 
 export default function Navigation({
@@ -16,12 +18,41 @@ export default function Navigation({
   onSelectPeople,
   onProcessFiles,
   onUploadMedia,
+  onNewMedia,
   onAdminSettings,
   pendingCount = 0,
+  newMediaCount = 0,
 }: NavigationProps) {
   return (
     <nav className="nav-menu">
       <button onClick={onSelectPeople}>Select People</button>
+      <button 
+        onClick={onNewMedia}
+        style={{ position: 'relative' }}
+      >
+        ✨ New Media
+        {newMediaCount > 0 && (
+          <span style={{
+            position: 'absolute',
+            top: '-8px',
+            right: '-8px',
+            background: '#28a745',
+            color: '#fff',
+            borderRadius: '50%',
+            width: '24px',
+            height: '24px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            fontSize: '0.75rem',
+            fontWeight: 'bold',
+            border: '2px solid white',
+            boxShadow: '0 2px 4px rgba(0,0,0,0.2)'
+          }}>
+            {newMediaCount}
+          </span>
+        )}
+      </button>
       <button onClick={onManagePeople}>Manage People</button>
       <button onClick={onManageEvents}>Manage Events</button>
       <button onClick={onUploadMedia}>Upload Media</button>

@@ -132,6 +132,15 @@ module.exports = async function (context, req) {
                 const videoBuffer = Buffer.concat(chunks);
                 context.log(`Downloaded ${sourceFormat} file (${videoBuffer.length} bytes)`);
 
+                // Check file size - warn if over 100MB, reject if over 500MB
+                const sizeMB = videoBuffer.length / (1024 * 1024);
+                if (sizeMB > 500) {
+                    throw new Error(`File too large for conversion: ${sizeMB.toFixed(1)}MB. Maximum size is 500MB.`);
+                }
+                if (sizeMB > 100) {
+                    context.log.warn(`⚠️ Large file detected: ${sizeMB.toFixed(1)}MB. Conversion may take several minutes.`);
+                }
+
                 // Use temporary files for more reliable conversion
                 const tempDir = os.tmpdir();
                 const inputPath = path.join(tempDir, `input_${Date.now()}${inputExt}`);

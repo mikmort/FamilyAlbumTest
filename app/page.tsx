@@ -13,6 +13,7 @@ import ProcessNewFiles from '@/components/ProcessNewFiles';
 import UploadMedia from '@/components/UploadMedia';
 import AdminSettings from '@/components/AdminSettings';
 import AccessRequest from '@/components/AccessRequest';
+import NewMediaPage from './new-media/page';
 import { Person, Event, MediaItem } from '../lib/types';
 
 interface AuthStatus {
@@ -30,9 +31,10 @@ interface AuthStatus {
 }
 
 export default function Home() {
-  const [view, setView] = useState<'select' | 'gallery' | 'manage-people' | 'manage-events' | 'process-files' | 'upload-media' | 'admin-settings'>('select');
+  const [view, setView] = useState<'select' | 'gallery' | 'manage-people' | 'manage-events' | 'process-files' | 'upload-media' | 'admin-settings' | 'new-media'>('select');
   const [authStatus, setAuthStatus] = useState<AuthStatus | null>(null);
   const [loadingAuth, setLoadingAuth] = useState(true);
+  const [newMediaCount, setNewMediaCount] = useState(0);
   const [selectedPeople, setSelectedPeople] = useState<number[]>([]);
   const [selectedEvent, setSelectedEvent] = useState<number | null>(null);
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
@@ -46,6 +48,13 @@ export default function Home() {
   useEffect(() => {
     checkAuthStatus();
   }, []);
+
+  // Load new media count when authenticated
+  useEffect(() => {
+    if (authStatus?.authenticated && authStatus?.authorized) {
+      loadNewMediaCount();
+    }
+  }, [authStatus]);
 
   const checkAuthStatus = async () => {
     try {
@@ -66,6 +75,18 @@ export default function Home() {
       console.error('Error checking auth status:', err);
     } finally {
       setLoadingAuth(false);
+    }
+  };
+
+  const loadNewMediaCount = async () => {
+    try {
+      const response = await fetch('/api/new-media');
+      if (response.ok) {
+        const data = await response.json();
+        setNewMediaCount(data.count || 0);
+      }
+    } catch (err) {
+      console.error('Error loading new media count:', err);
     }
   };
 
@@ -163,8 +184,10 @@ export default function Home() {
           onSelectPeople={() => setView('select')}
           onProcessFiles={() => setView('process-files')}
           onUploadMedia={() => setView('upload-media')}
+          onNewMedia={() => setView('new-media')}
           onAdminSettings={isAdmin ? () => setView('admin-settings') : undefined}
           pendingCount={authStatus?.pendingCount || 0}
+          newMediaCount={newMediaCount}
         />
         <UserInfo />
       </div>
@@ -247,6 +270,15 @@ export default function Home() {
               ← Back
             </button>
             <UploadMedia onProcessFiles={() => setView('process-files')} />
+          </>
+        )}
+
+        {view === 'new-media' && (
+          <>
+            <button className="btn btn-secondary mb-2" onClick={() => setView('select')}>
+              ← Back
+            </button>
+            <NewMediaPage />
           </>
         )}
 
