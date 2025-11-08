@@ -301,6 +301,15 @@ module.exports = async function (context, req) {
             const directory = pathParts.slice(0, -1).join('/');
             const filenamePart = pathParts[pathParts.length - 1];
             
+            // Try with spaces encoded in directory path (e.g., "Events/ES BnotMitzvah" -> "Events/ES%20BnotMitzvah")
+            if (directory && directory.includes(' ')) {
+                const dirWithEncodedSpaces = directory.replace(/ /g, '%20');
+                const pathWithEncodedDirSpaces = dirWithEncodedSpaces + '/' + filenamePart;
+                if (!pathsToTry.includes(pathWithEncodedDirSpaces)) {
+                    pathsToTry.push(pathWithEncodedDirSpaces);
+                }
+            }
+            
             // Try with entire path encoded (directory AND filename)
             const fullyEncodedPath = pathParts.map(part => 
                 encodeURIComponent(part).replace(/'/g, '%27')
@@ -571,6 +580,35 @@ module.exports = async function (context, req) {
                 // Download the requested range
                 const downloadResponse = await blobClient.download(start, end - start + 1);
                 
+                // For videos, especially large ones, stream directly instead of buffering
+                // This prevents memory issues and timeouts
+                if (isVideo && !thumbnail) {
+                    context.log(`Streaming video directly (${start}-${end}/${fileSize})`);
+                    
+                    // Build response headers
+                    const headers = {
+                        'Content-Type': contentType,
+                        'Content-Disposition': `inline; filename="${blobPath.split('/').pop()}"`,
+                        'Cache-Control': 'public, max-age=31536000',
+                        'Content-Length': (end - start + 1).toString(),
+                        'Accept-Ranges': 'bytes'
+                    };
+                    
+                    if (isRangeRequest) {
+                        headers['Content-Range'] = `bytes ${start}-${end}/${fileSize}`;
+                    }
+                    
+                    // Stream the response directly
+                    context.res = {
+                        status: isRangeRequest ? 206 : 200,
+                        headers: headers,
+                        body: downloadResponse.readableStreamBody,
+                        isRaw: true
+                    };
+                    return;
+                }
+                
+                // For images and thumbnails, buffer the entire content
                 // Convert stream to buffer
                 const chunks = [];
                 for await (const chunk of downloadResponse.readableStreamBody) {
