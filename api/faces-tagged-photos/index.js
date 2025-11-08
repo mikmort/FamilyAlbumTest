@@ -143,21 +143,26 @@ module.exports = async function (context, req) {
         // Use a simpler approach: calculate bucket size and take one photo per bucket
         const sampleQuery = `
           WITH ${photoPersonPairsCTE},
+          PhotoCounts AS (
+            -- First count how many people are in each photo
+            SELECT PFileName, COUNT(*) as PeopleCount
+            FROM PhotoPersonPairs
+            GROUP BY PFileName
+          ),
           PhotosWithDates AS (
             SELECT 
               pp.PFileName,
               pp.PersonID,
+              pc.PeopleCount,
               COALESCE(
                 p.PDateEntered,
                 DATEFROMPARTS(ISNULL(p.PYear, 2000), ISNULL(p.PMonth, 1), 1),
                 p.PLastModifiedDate,
                 '1900-01-01'
               ) as PhotoDate,
-              -- Count number of people tagged in this photo (for prioritizing solo/couple photos)
-              (SELECT COUNT(*) FROM PhotoPersonPairs pp2 WHERE pp2.PFileName = pp.PFileName) as PeopleCount,
               ROW_NUMBER() OVER (ORDER BY 
                 -- First prioritize by people count (fewer people = better training data)
-                (SELECT COUNT(*) FROM PhotoPersonPairs pp2 WHERE pp2.PFileName = pp.PFileName),
+                pc.PeopleCount,
                 -- Then by date for distribution
                 COALESCE(
                   p.PDateEntered,
@@ -168,8 +173,9 @@ module.exports = async function (context, req) {
               ) as RowNum
             FROM PhotoPersonPairs pp
             INNER JOIN dbo.Pictures p ON pp.PFileName = p.PFileName
+            INNER JOIN PhotoCounts pc ON pp.PFileName = pc.PFileName
             WHERE pp.PersonID = @personId
-              AND (SELECT COUNT(*) FROM PhotoPersonPairs pp2 WHERE pp2.PFileName = pp.PFileName) <= 3  -- Skip group photos
+              AND pc.PeopleCount <= 3  -- Skip group photos
           ),
           TotalCount AS (
             SELECT COUNT(*) as Total FROM PhotosWithDates
@@ -228,16 +234,23 @@ module.exports = async function (context, req) {
       // Fixed limit per person (legacy mode) - prioritize photos with fewer people
       sqlQuery = `
         WITH ${photoPersonPairsCTE},
+        PhotoCounts AS (
+          -- Count how many people are in each photo
+          SELECT PFileName, COUNT(*) as PeopleCount
+          FROM PhotoPersonPairs
+          GROUP BY PFileName
+        ),
         PhotosWithPeopleCount AS (
           SELECT 
             pp.PFileName as PFileName,
             ne.ID as PersonID,
             ne.neName as PersonName,
-            (SELECT COUNT(*) FROM PhotoPersonPairs pp2 WHERE pp2.PFileName = pp.PFileName) as PeopleCount
+            pc.PeopleCount
           FROM PhotoPersonPairs pp
           INNER JOIN dbo.NameEvent ne ON pp.PersonID = ne.ID
+          INNER JOIN PhotoCounts pc ON pp.PFileName = pc.PFileName
           WHERE ne.neType = 'N' -- Only people, not events
-            AND (SELECT COUNT(*) FROM PhotoPersonPairs pp2 WHERE pp2.PFileName = pp.PFileName) <= 3  -- Skip group photos
+            AND pc.PeopleCount <= 3  -- Skip group photos
         ),
         RankedPhotos AS (
           SELECT 
@@ -258,16 +271,23 @@ module.exports = async function (context, req) {
       // Get all tagged photos (no sampling) - but still prioritize photos with fewer people
       sqlQuery = `
         WITH ${photoPersonPairsCTE},
+        PhotoCounts AS (
+          -- Count how many people are in each photo
+          SELECT PFileName, COUNT(*) as PeopleCount
+          FROM PhotoPersonPairs
+          GROUP BY PFileName
+        ),
         PhotosWithPeopleCount AS (
           SELECT 
             pp.PFileName as PFileName,
             ne.ID as PersonID,
             ne.neName as PersonName,
-            (SELECT COUNT(*) FROM PhotoPersonPairs pp2 WHERE pp2.PFileName = pp.PFileName) as PeopleCount
+            pc.PeopleCount
           FROM PhotoPersonPairs pp
           INNER JOIN dbo.NameEvent ne ON pp.PersonID = ne.ID
+          INNER JOIN PhotoCounts pc ON pp.PFileName = pc.PFileName
           WHERE ne.neType = 'N' -- Only people, not events
-            AND (SELECT COUNT(*) FROM PhotoPersonPairs pp2 WHERE pp2.PFileName = pp.PFileName) <= 3  -- Skip group photos
+            AND pc.PeopleCount <= 3  -- Skip group photos
         )
         SELECT PFileName, PersonID, PersonName, PeopleCount
         FROM PhotosWithPeopleCount
