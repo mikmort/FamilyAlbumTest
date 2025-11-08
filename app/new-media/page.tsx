@@ -198,7 +198,7 @@ export default function NewMediaPage() {
                   color: '#666',
                   margin: 0 
                 }}>
-                  {new Date(item.PDateCreated).toLocaleDateString()}
+                  {new Date(item.PDateEntered).toLocaleDateString()}
                 </p>
               </div>
             </div>

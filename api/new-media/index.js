@@ -45,18 +45,22 @@ module.exports = async function (context, req) {
             const newMediaQuery = `
                 SELECT 
                     p.PFileName,
-                    p.PMediaType,
-                    p.PDateTaken,
-                    p.PDateModified,
-                    p.PDateCreated,
+                    p.PFileDirectory,
+                    p.PDescription,
+                    p.PHeight,
+                    p.PWidth,
+                    p.PMonth,
+                    p.PYear,
                     p.PPeopleList,
                     p.PNameCount,
-                    p.PDescription,
-                    p.PWidth,
-                    p.PHeight
+                    p.PType,
+                    p.PTime,
+                    p.PDateEntered,
+                    p.PLastModifiedDate,
+                    p.PReviewed
                 FROM dbo.Pictures p
-                WHERE p.PDateCreated > @lastViewedTime
-                ORDER BY p.PDateCreated DESC
+                WHERE p.PDateEntered > @lastViewedTime
+                ORDER BY p.PDateEntered DESC
             `;
             
             const newMedia = await query(newMediaQuery, { lastViewedTime });
