@@ -27,6 +27,8 @@ export default function MediaDetailModal({
   const [imageError, setImageError] = useState(false);
   const [showNavigationArrows, setShowNavigationArrows] = useState(false);
   const [isLoadingMedia, setIsLoadingMedia] = useState(false);
+  const [videoRetryCount, setVideoRetryCount] = useState(0);
+  const [isVideoBuffering, setIsVideoBuffering] = useState(false);
   
   const [description, setDescription] = useState(media.PDescription || '');
   const [month, setMonth] = useState<number | ''>(media.PMonth || '');
@@ -100,6 +102,8 @@ export default function MediaDetailModal({
     setIsLoadingMedia(false);
     setVideoError(false);
     setImageError(false);
+    setVideoRetryCount(0);
+    setIsVideoBuffering(false);
     setDescription(media.PDescription || '');
     setMonth(media.PMonth || '');
     setYear(media.PYear || '');
@@ -481,6 +485,22 @@ export default function MediaDetailModal({
     }
   };
 
+  const handleRetryVideo = useCallback(() => {
+    console.log('Retrying video load, attempt:', videoRetryCount + 1);
+    setVideoError(false);
+    setIsLoadingMedia(true);
+    setIsVideoBuffering(true);
+    setVideoRetryCount(prev => prev + 1);
+    
+    // Force video reload by updating src with cache-busting parameter
+    if (videoRef.current) {
+      const currentSrc = media.PBlobUrl;
+      const separator = currentSrc.includes('?') ? '&' : '?';
+      videoRef.current.src = `${currentSrc}${separator}_retry=${Date.now()}`;
+      videoRef.current.load();
+    }
+  }, [media.PBlobUrl, videoRetryCount]);
+
   const handleDownload = async () => {
     try {
       // Fetch the blob URL
@@ -790,8 +810,22 @@ export default function MediaDetailModal({
               controls 
               src={media.PBlobUrl}
               className="fullscreen-video"
-              autoPlay
+              preload="auto"
               onLoadedData={() => setIsLoadingMedia(false)}
+              onCanPlayThrough={() => {
+                setIsLoadingMedia(false);
+                // Auto-play in fullscreen only after video has buffered enough
+                const videoElement = document.querySelector('.fullscreen-video') as HTMLVideoElement;
+                if (videoElement && videoElement.paused) {
+                  videoElement.play().catch(err => {
+                    console.log('Auto-play prevented by browser:', err);
+                  });
+                }
+              }}
+              onLoadStart={() => setIsVideoBuffering(true)}
+              onCanPlay={() => setIsVideoBuffering(false)}
+              onWaiting={() => setIsVideoBuffering(true)}
+              onPlaying={() => setIsVideoBuffering(false)}
               key={media.PFileName}
             >
               Your browser does not support the video tag.
@@ -1033,6 +1067,23 @@ export default function MediaDetailModal({
                     <p style={{ marginBottom: '1.5rem', fontSize: '0.9rem', color: '#868e96' }}>
                       File: {media.PFileName}
                     </p>
+                    {videoRetryCount < 3 && (
+                      <button
+                        onClick={handleRetryVideo}
+                        style={{
+                          padding: '12px 24px',
+                          backgroundColor: '#28a745',
+                          color: 'white',
+                          border: 'none',
+                          borderRadius: '4px',
+                          cursor: 'pointer',
+                          fontSize: '1rem',
+                          marginRight: '0.5rem'
+                        }}
+                      >
+                        ↻ Retry Loading Video
+                      </button>
+                    )}
                     <button
                       onClick={handleDownload}
                       style={{
@@ -1047,6 +1098,11 @@ export default function MediaDetailModal({
                     >
                       ⬇️ Download Video to Play Locally
                     </button>
+                    {videoRetryCount > 0 && (
+                      <p style={{ marginTop: '1rem', fontSize: '0.85rem', color: '#868e96' }}>
+                        Retry attempts: {videoRetryCount}
+                      </p>
+                    )}
                   </div>
                 ) : isLoadingMedia ? (
                   <div style={{
@@ -1066,8 +1122,7 @@ export default function MediaDetailModal({
                     <video 
                       ref={videoRef}
                       controls 
-                      autoPlay
-                      preload="metadata"
+                      preload="auto"
                       src={media.PBlobUrl}
                       onClick={() => setIsFullScreen(true)}
                       style={{ cursor: 'pointer', width: '100%' }}
@@ -1080,18 +1135,69 @@ export default function MediaDetailModal({
                           console.error('Video error message:', videoRef.current.error.message);
                         }
                         setVideoError(true);
+                        setIsVideoBuffering(false);
+                      }}
+                      onLoadStart={() => {
+                        console.log('Video load started for:', media.PFileName);
+                        setIsVideoBuffering(true);
                       }}
                       onLoadedMetadata={() => {
-                        setIsLoadingMedia(false);
+                        console.log('Video metadata loaded for:', media.PFileName);
                         // Check if video duration is valid
                         if (videoRef.current && (isNaN(videoRef.current.duration) || videoRef.current.duration === 0)) {
                           console.warn('Video has invalid duration, may not be playable');
                         }
                       }}
+                      onCanPlay={() => {
+                        console.log('Video can start playing:', media.PFileName);
+                        setIsVideoBuffering(false);
+                      }}
+                      onCanPlayThrough={() => {
+                        console.log('Video can play through without buffering:', media.PFileName);
+                        setIsLoadingMedia(false);
+                        setIsVideoBuffering(false);
+                        // Auto-play only after video has buffered enough
+                        if (videoRef.current && videoRef.current.paused) {
+                          videoRef.current.play().catch(err => {
+                            console.log('Auto-play prevented by browser:', err);
+                          });
+                        }
+                      }}
+                      onWaiting={() => {
+                        console.log('Video is buffering...');
+                        setIsVideoBuffering(true);
+                      }}
+                      onPlaying={() => {
+                        console.log('Video started playing');
+                        setIsVideoBuffering(false);
+                      }}
+                      onStalled={() => {
+                        console.warn('Video download stalled');
+                      }}
+                      onSuspend={() => {
+                        console.log('Video download suspended');
+                      }}
                       key={media.PFileName}
                     >
                       Your browser does not support the video tag.
                     </video>
+                    {isVideoBuffering && (
+                      <div style={{
+                        position: 'absolute',
+                        top: '50%',
+                        left: '50%',
+                        transform: 'translate(-50%, -50%)',
+                        backgroundColor: 'rgba(0, 0, 0, 0.7)',
+                        color: 'white',
+                        padding: '1rem 2rem',
+                        borderRadius: '8px',
+                        fontSize: '1.1rem',
+                        pointerEvents: 'none',
+                        zIndex: 1
+                      }}>
+                        Buffering video...
+                      </div>
+                    )}
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
