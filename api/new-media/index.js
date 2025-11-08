@@ -44,22 +44,7 @@ module.exports = async function (context, req) {
             // Get media uploaded after last viewed time
             const newMediaQuery = `
                 SELECT 
-                    p.PFileName,
-                    p.PFileDirectory,
-                    p.PDescription,
-                    p.PHeight,
-                    p.PWidth,
-                    p.PMonth,
-                    p.PYear,
-                    p.PPeopleList,
-                    p.PNameCount,
-                    p.PType,
-                    p.PTime,
-                    p.PDateEntered,
-                    p.PLastModifiedDate,
-                    p.PReviewed,
-                    p.PBlobUrl,
-                    p.PThumbnailUrl
+                    p.*
                 FROM dbo.Pictures p
                 WHERE p.PDateEntered > @lastViewedTime
                 ORDER BY p.PDateEntered DESC
