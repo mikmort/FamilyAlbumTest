@@ -312,7 +312,10 @@ export default function Home() {
             <button className="btn btn-secondary mb-2" onClick={() => setView('select')}>
               ← Back
             </button>
-            <NewMediaPage />
+            <NewMediaPage 
+              onMediaClick={handleMediaClick}
+              onMediaFullscreen={handleMediaFullscreen}
+            />
           </>
         )}
 

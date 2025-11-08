@@ -1,11 +1,14 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
 import { MediaItem } from '@/lib/types';
 
-export default function NewMediaPage() {
-  const router = useRouter();
+interface NewMediaPageProps {
+  onMediaClick?: (media: MediaItem, allMedia: MediaItem[]) => void;
+  onMediaFullscreen?: (media: MediaItem, allMedia: MediaItem[]) => void;
+}
+
+export default function NewMediaPage({ onMediaClick, onMediaFullscreen }: NewMediaPageProps) {
   const [newMedia, setNewMedia] = useState<MediaItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -61,17 +64,19 @@ export default function NewMediaPage() {
   };
 
   const handleMediaClick = (filename: string) => {
-    // Navigate to main gallery view
-    router.push(`/?file=${encodeURIComponent(filename)}`);
+    // Find the media item and call the callback
+    const mediaItem = newMedia.find(m => m.PFileName === filename);
+    if (mediaItem && onMediaClick) {
+      onMediaClick(mediaItem, newMedia);
+    }
   };
 
   const handleMediaFullscreen = (filename: string) => {
-    // Open media in fullscreen mode (right-click)
-    router.push(`/?file=${encodeURIComponent(filename)}&fullscreen=true`);
-  };
-
-  const handleBack = () => {
-    router.push('/');
+    // Find the media item and call the callback
+    const mediaItem = newMedia.find(m => m.PFileName === filename);
+    if (mediaItem && onMediaFullscreen) {
+      onMediaFullscreen(mediaItem, newMedia);
+    }
   };
 
   if (loading) {
@@ -96,9 +101,9 @@ export default function NewMediaPage() {
         }}>
           <strong>Error:</strong> {error}
         </div>
-        <button onClick={handleBack} style={{ marginTop: '20px' }}>
-          Back to Home
-        </button>
+        <p style={{ marginTop: '20px', color: '#666' }}>
+          Use the Back button above to return to the gallery.
+        </p>
       </div>
     );
   }
@@ -129,9 +134,6 @@ export default function NewMediaPage() {
               Mark All as Viewed
             </button>
           )}
-          <button onClick={handleBack}>
-            Back to Home
-          </button>
         </div>
       </div>
 
@@ -155,12 +157,6 @@ export default function NewMediaPage() {
         }}>
           <h2>🎉 You're all caught up!</h2>
           <p>No new media since your last visit.</p>
-          <button 
-            onClick={handleBack}
-            style={{ marginTop: '20px' }}
-          >
-            Go to Gallery
-          </button>
         </div>
       ) : (
         <div style={{

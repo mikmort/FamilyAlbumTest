@@ -57,7 +57,9 @@ module.exports = async function (context, req) {
                     p.PTime,
                     p.PDateEntered,
                     p.PLastModifiedDate,
-                    p.PReviewed
+                    p.PReviewed,
+                    p.PBlobUrl,
+                    p.PThumbnailUrl
                 FROM dbo.Pictures p
                 WHERE p.PDateEntered > @lastViewedTime
                 ORDER BY p.PDateEntered DESC
