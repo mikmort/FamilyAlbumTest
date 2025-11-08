@@ -531,8 +531,45 @@ module.exports = async function (context, req) {
                 
                 context.log(`Attempting to download blob: "${blobPath}"`);
                 
-                // Download the blob to a buffer instead of streaming
-                const downloadResponse = await blobClient.download();
+                // Get blob properties first to get the size
+                const properties = await blobClient.getProperties();
+                const fileSize = properties.contentLength;
+                
+                // Determine content type - prioritize file extension over blob metadata
+                const contentType = getContentType(blobPath);
+                const isVideo = contentType && contentType.startsWith('video/');
+                
+                // Parse Range header for video streaming support
+                const rangeHeader = req.headers['range'] || req.headers['Range'];
+                let start = 0;
+                let end = fileSize - 1;
+                let isRangeRequest = false;
+                
+                if (rangeHeader && isVideo) {
+                    isRangeRequest = true;
+                    const ranges = rangeHeader.replace(/bytes=/, '').split('-');
+                    start = parseInt(ranges[0], 10);
+                    end = ranges[1] ? parseInt(ranges[1], 10) : fileSize - 1;
+                    
+                    // Validate range
+                    if (start >= fileSize || end >= fileSize) {
+                        context.res = {
+                            status: 416, // Range Not Satisfiable
+                            headers: {
+                                'Content-Range': `bytes */${fileSize}`
+                            },
+                            body: 'Requested range not satisfiable'
+                        };
+                        return;
+                    }
+                    
+                    context.log(`Range request: bytes ${start}-${end}/${fileSize}`);
+                } else {
+                    context.log(`Full file request: ${fileSize} bytes`);
+                }
+                
+                // Download the requested range
+                const downloadResponse = await blobClient.download(start, end - start + 1);
                 
                 // Convert stream to buffer
                 const chunks = [];
@@ -541,14 +578,9 @@ module.exports = async function (context, req) {
                 }
                 const buffer = Buffer.concat(chunks);
                 
-                context.log(`Downloaded ${buffer.length} bytes for ${blobPath}`);
+                context.log(`Downloaded ${buffer.length} bytes (${start}-${end}/${fileSize})`);
                 
-                // Determine content type - prioritize file extension over blob metadata
-                // (blob metadata may be wrong for converted files)
-                const contentType = getContentType(blobPath);
-                
-                // For video files, add Accept-Ranges header to support seeking
-                const isVideo = contentType && contentType.startsWith('video/');
+                // Build response headers
                 const headers = {
                     'Content-Type': contentType,
                     'Content-Disposition': `inline; filename="${blobPath.split('/').pop()}"`,
@@ -558,12 +590,15 @@ module.exports = async function (context, req) {
                 
                 if (isVideo) {
                     headers['Accept-Ranges'] = 'bytes';
-                    headers['Content-Range'] = `bytes 0-${buffer.length - 1}/${buffer.length}`;
+                    
+                    if (isRangeRequest) {
+                        headers['Content-Range'] = `bytes ${start}-${end}/${fileSize}`;
+                    }
                 }
                 
-                // Return the buffer
+                // Return the buffer with appropriate status
                 context.res = {
-                    status: 200,
+                    status: isRangeRequest ? 206 : 200, // 206 Partial Content for range requests
                     headers: headers,
                     body: buffer,
                     isRaw: true

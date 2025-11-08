@@ -1,6 +1,7 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import { loadFaceModels, detectAllFacesWithEmbeddings, areModelsLoaded } from '../lib/faceRecognition';
 
 interface UnindexedFile {
   uiID: number;
@@ -30,6 +31,13 @@ interface Event {
   neName: string;
   neRelation: string;
   neCount: number;
+}
+
+interface FaceSuggestion {
+  personId: number;
+  personName: string;
+  similarity: number;
+  faceIndex: number; // which face in the image (0, 1, 2...)
 }
 
 export default function ProcessNewFiles() {
@@ -66,11 +74,35 @@ export default function ProcessNewFiles() {
   const [newEventDesc, setNewEventDesc] = useState('');
   const [creatingEvent, setCreatingEvent] = useState(false);
 
+  // Face recognition
+  const [faceSuggestions, setFaceSuggestions] = useState<FaceSuggestion[]>([]);
+  const [recognizingFaces, setRecognizingFaces] = useState(false);
+  const [faceModelsLoaded, setFaceModelsLoaded] = useState(false);
+  const imageRef = useRef<HTMLImageElement>(null);
+
   // Load people and events for dropdowns
   useEffect(() => {
     loadPeople();
     loadEvents();
+    loadFaceModelsAsync();
   }, []);
+
+  const loadFaceModelsAsync = async () => {
+    if (areModelsLoaded()) {
+      setFaceModelsLoaded(true);
+      return;
+    }
+    
+    try {
+      console.log('Loading face recognition models...');
+      await loadFaceModels();
+      setFaceModelsLoaded(true);
+      console.log('Face models loaded successfully');
+    } catch (error) {
+      console.error('Failed to load face models:', error);
+      // Don't show error to user - face recognition is optional
+    }
+  };
 
   // Close dropdowns when clicking outside
   useEffect(() => {
@@ -106,10 +138,16 @@ export default function ProcessNewFiles() {
       setEventSearch('');
       setSelectedPeople([]);
       setPeopleSearch('');
+      setFaceSuggestions([]); // Clear previous suggestions
+      
+      // Trigger face recognition for images after a short delay (to ensure image loads)
+      if (file.uiType === 1 && faceModelsLoaded) {
+        setTimeout(() => recognizeFacesInCurrentImage(), 500);
+      }
     } else if (allFiles.length === 0) {
       setCurrentFile(null);
     }
-  }, [currentIndex, allFiles]);
+  }, [currentIndex, allFiles, faceModelsLoaded]);
 
   const loadPeople = async () => {
     setPeopleLoading(true);
@@ -261,6 +299,91 @@ export default function ProcessNewFiles() {
     } catch (err) {
       console.error('Error loading count:', err);
     }
+  };
+
+  const recognizeFacesInCurrentImage = async () => {
+    if (!currentFile || currentFile.uiType !== 1 || !imageRef.current) {
+      return;
+    }
+
+    setRecognizingFaces(true);
+    setFaceSuggestions([]);
+
+    try {
+      console.log('Detecting faces in image...');
+      
+      // Detect all faces in the image
+      const faceDetections = await detectAllFacesWithEmbeddings(imageRef.current);
+      
+      if (faceDetections.length === 0) {
+        console.log('No faces detected');
+        setRecognizingFaces(false);
+        return;
+      }
+
+      console.log(`Found ${faceDetections.length} face(s), identifying...`);
+      
+      // For each detected face, get identification suggestions
+      const allSuggestions: FaceSuggestion[] = [];
+      
+      for (let i = 0; i < faceDetections.length; i++) {
+        const face = faceDetections[i];
+        
+        try {
+          const identifyResponse = await fetch('/api/faces-identify', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              embedding: Array.from(face.descriptor),
+              threshold: 0.5, // Lower threshold to show more suggestions
+              topN: 3 // Get top 3 matches per face
+            })
+          });
+
+          const identifyData = await identifyResponse.json();
+          
+          if (identifyData.success && identifyData.matches && identifyData.matches.length > 0) {
+            // Add the best match for this face
+            const bestMatch = identifyData.matches[0];
+            allSuggestions.push({
+              personId: bestMatch.personId,
+              personName: bestMatch.personName,
+              similarity: bestMatch.similarity,
+              faceIndex: i
+            });
+            
+            console.log(`Face ${i + 1}: ${bestMatch.personName} (${(bestMatch.similarity * 100).toFixed(1)}% confidence)`);
+          }
+        } catch (err) {
+          console.error(`Error identifying face ${i}:`, err);
+        }
+      }
+      
+      setFaceSuggestions(allSuggestions);
+      console.log(`Face recognition complete: ${allSuggestions.length} suggestions`);
+      
+    } catch (error) {
+      console.error('Error recognizing faces:', error);
+    } finally {
+      setRecognizingFaces(false);
+    }
+  };
+
+  const applySuggestion = (suggestion: FaceSuggestion) => {
+    // Add person to selected if not already added
+    if (!selectedPeople.includes(suggestion.personId)) {
+      setSelectedPeople(prev => [...prev, suggestion.personId]);
+    }
+    // Remove this suggestion after applying
+    setFaceSuggestions(prev => prev.filter(s => 
+      !(s.personId === suggestion.personId && s.faceIndex === suggestion.faceIndex)
+    ));
+  };
+
+  const dismissSuggestion = (suggestion: FaceSuggestion) => {
+    setFaceSuggestions(prev => prev.filter(s => 
+      !(s.personId === suggestion.personId && s.faceIndex === suggestion.faceIndex)
+    ));
   };
 
   const handleSaveAndNext = async () => {
@@ -513,11 +636,74 @@ export default function ProcessNewFiles() {
 
           <div className="preview-content">
             {currentFile.uiType === 1 ? (
-              <img 
-                src={currentFile.uiBlobUrl} 
-                alt={currentFile.uiFileName}
-                className="preview-image"
-              />
+              <>
+                <img 
+                  ref={imageRef}
+                  src={currentFile.uiBlobUrl} 
+                  alt={currentFile.uiFileName}
+                  className="preview-image"
+                  crossOrigin="anonymous"
+                  onLoad={() => {
+                    // Trigger face recognition when image loads
+                    if (faceModelsLoaded && !recognizingFaces) {
+                      recognizeFacesInCurrentImage();
+                    }
+                  }}
+                />
+                
+                {/* Face Recognition Status */}
+                {recognizingFaces && (
+                  <div className="face-recognition-status">
+                    <div className="status-icon">👤</div>
+                    <div className="status-text">Recognizing faces...</div>
+                  </div>
+                )}
+                
+                {/* Face Suggestions */}
+                {faceSuggestions.length > 0 && (
+                  <div className="face-suggestions">
+                    <div className="suggestions-header">
+                      <span className="suggestions-icon">🎯</span>
+                      <strong>Suggested People:</strong>
+                    </div>
+                    {faceSuggestions.map((suggestion, index) => {
+                      const confidencePercent = (suggestion.similarity * 100).toFixed(0);
+                      const confidenceLevel = suggestion.similarity >= 0.7 ? 'high' : 
+                                            suggestion.similarity >= 0.6 ? 'medium' : 'low';
+                      
+                      return (
+                        <div key={`${suggestion.personId}-${suggestion.faceIndex}`} className="suggestion-item">
+                          <div className="suggestion-info">
+                            <div className="suggestion-name">{suggestion.personName}</div>
+                            <div className={`suggestion-confidence ${confidenceLevel}`}>
+                              {confidencePercent}% confidence
+                            </div>
+                            {faceSuggestions.length > 1 && (
+                              <div className="suggestion-face-index">Face {suggestion.faceIndex + 1}</div>
+                            )}
+                          </div>
+                          <div className="suggestion-actions">
+                            <button
+                              onClick={() => applySuggestion(suggestion)}
+                              className="btn-suggestion-apply"
+                              title="Add to tags"
+                            >
+                              ✓ Add
+                            </button>
+                            <button
+                              onClick={() => dismissSuggestion(suggestion)}
+                              className="btn-suggestion-dismiss"
+                              title="Dismiss"
+                            >
+                              ✕
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </>
             ) : (
               <video 
                 src={currentFile.uiBlobUrl} 
