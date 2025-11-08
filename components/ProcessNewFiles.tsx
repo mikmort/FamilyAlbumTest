@@ -78,6 +78,7 @@ export default function ProcessNewFiles() {
   const [faceSuggestions, setFaceSuggestions] = useState<FaceSuggestion[]>([]);
   const [recognizingFaces, setRecognizingFaces] = useState(false);
   const [faceModelsLoaded, setFaceModelsLoaded] = useState(false);
+  const [autoRecognizeEnabled, setAutoRecognizeEnabled] = useState(false); // Off by default
   const imageRef = useRef<HTMLImageElement>(null);
 
   // Load people and events for dropdowns
@@ -140,14 +141,14 @@ export default function ProcessNewFiles() {
       setPeopleSearch('');
       setFaceSuggestions([]); // Clear previous suggestions
       
-      // Trigger face recognition for images after a short delay (to ensure image loads)
-      if (file.uiType === 1 && faceModelsLoaded) {
+      // Only trigger auto-recognition if enabled
+      if (file.uiType === 1 && faceModelsLoaded && autoRecognizeEnabled) {
         setTimeout(() => recognizeFacesInCurrentImage(), 500);
       }
     } else if (allFiles.length === 0) {
       setCurrentFile(null);
     }
-  }, [currentIndex, allFiles, faceModelsLoaded]);
+  }, [currentIndex, allFiles, faceModelsLoaded, autoRecognizeEnabled]);
 
   const loadPeople = async () => {
     setPeopleLoading(true);
@@ -310,24 +311,28 @@ export default function ProcessNewFiles() {
     setFaceSuggestions([]);
 
     try {
-      console.log('Detecting faces in image...');
+      console.log('Detecting faces in image with high confidence threshold...');
       
-      // Detect all faces in the image
-      const faceDetections = await detectAllFacesWithEmbeddings(imageRef.current);
+      // Detect faces with high confidence threshold (0.7) to reduce false positives
+      const faceDetections = await detectAllFacesWithEmbeddings(imageRef.current, 0.7);
       
       if (faceDetections.length === 0) {
-        console.log('No faces detected');
+        console.log('No high-confidence faces detected');
         setRecognizingFaces(false);
         return;
       }
 
-      console.log(`Found ${faceDetections.length} face(s), identifying...`);
+      console.log(`Found ${faceDetections.length} high-confidence face(s), identifying...`);
       
       // For each detected face, get identification suggestions
       const allSuggestions: FaceSuggestion[] = [];
+      const seenPersonIds = new Set<number>(); // Track which people we've already suggested
       
       for (let i = 0; i < faceDetections.length; i++) {
         const face = faceDetections[i];
+        const detectionScore = face.detection.score;
+        
+        console.log(`Face ${i + 1}: Detection confidence = ${(detectionScore * 100).toFixed(1)}%`);
         
         try {
           const identifyResponse = await fetch('/api/faces-identify', {
@@ -335,24 +340,42 @@ export default function ProcessNewFiles() {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               embedding: Array.from(face.descriptor),
-              threshold: 0.5, // Lower threshold to show more suggestions
-              topN: 3 // Get top 3 matches per face
+              threshold: 0.65, // Higher threshold - only show very confident matches
+              topN: 5 // Get top 5 to find best unique match
             })
           });
 
           const identifyData = await identifyResponse.json();
           
           if (identifyData.success && identifyData.matches && identifyData.matches.length > 0) {
-            // Add the best match for this face
-            const bestMatch = identifyData.matches[0];
-            allSuggestions.push({
-              personId: bestMatch.personId,
-              personName: bestMatch.personName,
-              similarity: bestMatch.similarity,
-              faceIndex: i
-            });
+            console.log(`Face ${i + 1} top matches:`, identifyData.matches.slice(0, 3).map((m: any) => 
+              `${m.personName} (${(m.similarity * 100).toFixed(1)}%)`
+            ));
             
-            console.log(`Face ${i + 1}: ${bestMatch.personName} (${(bestMatch.similarity * 100).toFixed(1)}% confidence)`);
+            // Find the best match that we haven't already suggested
+            let bestMatch = null;
+            for (const match of identifyData.matches) {
+              if (!seenPersonIds.has(match.personId) && match.similarity >= 0.65) {
+                bestMatch = match;
+                break;
+              }
+            }
+            
+            if (bestMatch) {
+              allSuggestions.push({
+                personId: bestMatch.personId,
+                personName: bestMatch.personName,
+                similarity: bestMatch.similarity,
+                faceIndex: i
+              });
+              
+              seenPersonIds.add(bestMatch.personId);
+              console.log(`✓ Suggesting: ${bestMatch.personName} (${(bestMatch.similarity * 100).toFixed(1)}%)`);
+            } else {
+              console.log(`✗ Face ${i + 1}: No unique high-confidence matches`);
+            }
+          } else {
+            console.log(`✗ Face ${i + 1}: No matches above threshold`);
           }
         } catch (err) {
           console.error(`Error identifying face ${i}:`, err);
@@ -360,7 +383,7 @@ export default function ProcessNewFiles() {
       }
       
       setFaceSuggestions(allSuggestions);
-      console.log(`Face recognition complete: ${allSuggestions.length} suggestions`);
+      console.log(`Face recognition complete: ${allSuggestions.length} unique suggestions from ${faceDetections.length} faces`);
       
     } catch (error) {
       console.error('Error recognizing faces:', error);
@@ -603,7 +626,20 @@ export default function ProcessNewFiles() {
         {/* Left: Preview */}
         <div className="process-preview">
           <div className="preview-header">
-            <h3>Preview</h3>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+              <h3 style={{ margin: 0 }}>Preview</h3>
+              {currentFile.uiType === 1 && faceModelsLoaded && (
+                <button
+                  onClick={() => recognizeFacesInCurrentImage()}
+                  disabled={recognizingFaces || processing}
+                  className="btn btn-secondary"
+                  style={{ padding: '0.5rem 1rem', fontSize: '0.9rem' }}
+                  title="Manually detect and recognize faces in this image"
+                >
+                  👤 {recognizingFaces ? 'Recognizing...' : 'Recognize Faces'}
+                </button>
+              )}
+            </div>
             <div className="file-info">
               <div className="info-row">
                 <span className="label">File:</span>
@@ -644,8 +680,8 @@ export default function ProcessNewFiles() {
                   className="preview-image"
                   crossOrigin="anonymous"
                   onLoad={() => {
-                    // Trigger face recognition when image loads
-                    if (faceModelsLoaded && !recognizingFaces) {
+                    // Trigger face recognition when image loads (if auto-recognize is enabled)
+                    if (faceModelsLoaded && !recognizingFaces && autoRecognizeEnabled) {
                       recognizeFacesInCurrentImage();
                     }
                   }}
@@ -664,12 +700,16 @@ export default function ProcessNewFiles() {
                   <div className="face-suggestions">
                     <div className="suggestions-header">
                       <span className="suggestions-icon">🎯</span>
-                      <strong>Suggested People:</strong>
+                      <strong>Suggested People (Review Carefully):</strong>
+                      <span style={{ fontSize: '0.85rem', color: '#666', fontWeight: 'normal', marginLeft: '0.5rem' }}>
+                        Click ✕ to dismiss incorrect matches
+                      </span>
                     </div>
                     {faceSuggestions.map((suggestion, index) => {
                       const confidencePercent = (suggestion.similarity * 100).toFixed(0);
-                      const confidenceLevel = suggestion.similarity >= 0.7 ? 'high' : 
-                                            suggestion.similarity >= 0.6 ? 'medium' : 'low';
+                      // Adjusted thresholds to match our stricter detection
+                      const confidenceLevel = suggestion.similarity >= 0.75 ? 'high' : 
+                                            suggestion.similarity >= 0.68 ? 'medium' : 'low';
                       
                       return (
                         <div key={`${suggestion.personId}-${suggestion.faceIndex}`} className="suggestion-item">

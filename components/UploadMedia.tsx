@@ -103,7 +103,7 @@ export default function UploadMedia({ onProcessFiles }: UploadMediaProps) {
         newStatus[fileName] = 'Getting upload URL...';
         setUploadStatus({ ...newStatus });
 
-        const urlResponse = await fetch(`/api/upload/get-upload-url?fileName=${encodeURIComponent(fileName)}`);
+        const urlResponse = await fetch(`/api/getUploadUrl?fileName=${encodeURIComponent(fileName)}`);
         
         console.log('Get upload URL response status:', urlResponse.status);
         console.log('Get upload URL response headers:', Object.fromEntries(urlResponse.headers.entries()));
@@ -190,7 +190,7 @@ export default function UploadMedia({ onProcessFiles }: UploadMediaProps) {
         newStatus[fileName] = 'Processing...';
         setUploadStatus({ ...newStatus });
 
-        const completeResponse = await fetch('/api/upload/upload-complete', {
+        const completeResponse = await fetch('/api/uploadComplete', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({

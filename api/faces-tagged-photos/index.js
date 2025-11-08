@@ -153,15 +153,23 @@ module.exports = async function (context, req) {
                 p.PLastModifiedDate,
                 '1900-01-01'
               ) as PhotoDate,
-              ROW_NUMBER() OVER (ORDER BY COALESCE(
-                p.PDateEntered,
-                DATEFROMPARTS(ISNULL(p.PYear, 2000), ISNULL(p.PMonth, 1), 1),
-                p.PLastModifiedDate,
-                '1900-01-01'
-              )) as RowNum
+              -- Count number of people tagged in this photo (for prioritizing solo/couple photos)
+              (SELECT COUNT(*) FROM PhotoPersonPairs pp2 WHERE pp2.PFileName = pp.PFileName) as PeopleCount,
+              ROW_NUMBER() OVER (ORDER BY 
+                -- First prioritize by people count (fewer people = better training data)
+                (SELECT COUNT(*) FROM PhotoPersonPairs pp2 WHERE pp2.PFileName = pp.PFileName),
+                -- Then by date for distribution
+                COALESCE(
+                  p.PDateEntered,
+                  DATEFROMPARTS(ISNULL(p.PYear, 2000), ISNULL(p.PMonth, 1), 1),
+                  p.PLastModifiedDate,
+                  '1900-01-01'
+                )
+              ) as RowNum
             FROM PhotoPersonPairs pp
             INNER JOIN dbo.Pictures p ON pp.PFileName = p.PFileName
             WHERE pp.PersonID = @personId
+              AND (SELECT COUNT(*) FROM PhotoPersonPairs pp2 WHERE pp2.PFileName = pp.PFileName) <= 3  -- Skip group photos
           ),
           TotalCount AS (
             SELECT COUNT(*) as Total FROM PhotosWithDates
@@ -217,37 +225,53 @@ module.exports = async function (context, req) {
       return;
 
     } else if (maxPerPerson) {
-      // Fixed limit per person (legacy mode)
+      // Fixed limit per person (legacy mode) - prioritize photos with fewer people
       sqlQuery = `
         ${photoPersonPairsCTE},
-        RankedPhotos AS (
+        PhotosWithPeopleCount AS (
           SELECT 
             pp.PFileName as PFileName,
             ne.ID as PersonID,
             ne.neName as PersonName,
-            ROW_NUMBER() OVER (PARTITION BY ne.ID ORDER BY pp.PFileName) as RowNum
+            (SELECT COUNT(*) FROM PhotoPersonPairs pp2 WHERE pp2.PFileName = pp.PFileName) as PeopleCount
           FROM PhotoPersonPairs pp
           INNER JOIN dbo.NameEvent ne ON pp.PersonID = ne.ID
           WHERE ne.neType = 'N' -- Only people, not events
+            AND (SELECT COUNT(*) FROM PhotoPersonPairs pp2 WHERE pp2.PFileName = pp.PFileName) <= 3  -- Skip group photos
+        ),
+        RankedPhotos AS (
+          SELECT 
+            PFileName,
+            PersonID,
+            PersonName,
+            PeopleCount,
+            ROW_NUMBER() OVER (PARTITION BY PersonID ORDER BY PeopleCount, PFileName) as RowNum
+          FROM PhotosWithPeopleCount
         )
-        SELECT PFileName, PersonID, PersonName
+        SELECT PFileName, PersonID, PersonName, PeopleCount
         FROM RankedPhotos
         WHERE RowNum <= @maxPerPerson
-        ORDER BY PersonName, PFileName
+        ORDER BY PersonName, PeopleCount, PFileName
       `;
       params.maxPerPerson = maxPerPerson;
     } else {
-      // Get all tagged photos (no sampling)
+      // Get all tagged photos (no sampling) - but still prioritize photos with fewer people
       sqlQuery = `
-        ${photoPersonPairsCTE}
-        SELECT 
-          pp.PFileName as PFileName,
-          ne.ID as PersonID,
-          ne.neName as PersonName
-        FROM PhotoPersonPairs pp
-        INNER JOIN dbo.NameEvent ne ON pp.PersonID = ne.ID
-        WHERE ne.neType = 'N' -- Only people, not events
-        ORDER BY ne.neName, pp.PFileName
+        ${photoPersonPairsCTE},
+        PhotosWithPeopleCount AS (
+          SELECT 
+            pp.PFileName as PFileName,
+            ne.ID as PersonID,
+            ne.neName as PersonName,
+            (SELECT COUNT(*) FROM PhotoPersonPairs pp2 WHERE pp2.PFileName = pp.PFileName) as PeopleCount
+          FROM PhotoPersonPairs pp
+          INNER JOIN dbo.NameEvent ne ON pp.PersonID = ne.ID
+          WHERE ne.neType = 'N' -- Only people, not events
+            AND (SELECT COUNT(*) FROM PhotoPersonPairs pp2 WHERE pp2.PFileName = pp.PFileName) <= 3  -- Skip group photos
+        )
+        SELECT PFileName, PersonID, PersonName, PeopleCount
+        FROM PhotosWithPeopleCount
+        ORDER BY PersonName, PeopleCount, PFileName
       `;
     }
 

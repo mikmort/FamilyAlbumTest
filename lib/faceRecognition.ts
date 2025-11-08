@@ -39,11 +39,18 @@ export async function loadFaceModels(): Promise<void> {
 
 /**
  * Detect a single face in an image and generate 128-dim embedding
+ * Improved to select the best face in group photos:
+ * - Detects all faces first
+ * - Selects the largest face (likely the main subject)
+ * - Returns null if too many faces (likely irrelevant group photo)
+ * 
  * @param imageElement - HTMLImageElement or HTMLCanvasElement
+ * @param maxFaces - Maximum faces allowed in photo (default 3 for training)
  * @returns Object with detection info and embedding, or null if no face found
  */
 export async function detectFaceWithEmbedding(
-  imageElement: HTMLImageElement | HTMLCanvasElement
+  imageElement: HTMLImageElement | HTMLCanvasElement,
+  maxFaces: number = 3
 ): Promise<{
   detection: faceapi.FaceDetection;
   landmarks: faceapi.FaceLandmarks68;
@@ -54,19 +61,41 @@ export async function detectFaceWithEmbedding(
   }
 
   try {
-    const result = await faceapi
-      .detectSingleFace(imageElement)
+    // Detect all faces with good confidence threshold
+    const results = await faceapi
+      .detectAllFaces(imageElement, new faceapi.SsdMobilenetv1Options({ minConfidence: 0.6 }))
       .withFaceLandmarks()
-      .withFaceDescriptor();
+      .withFaceDescriptors();
 
-    if (!result) {
+    if (results.length === 0) {
       return null;
     }
 
+    // Skip if too many faces (likely group photo where we can't identify the target person)
+    if (results.length > maxFaces) {
+      console.log(`Skipping photo: ${results.length} faces detected (max ${maxFaces} allowed)`);
+      return null;
+    }
+
+    // Select the largest face (by bounding box area) - usually the main subject
+    let largestFace = results[0];
+    let largestArea = 0;
+
+    for (const result of results) {
+      const box = result.detection.box;
+      const area = box.width * box.height;
+      if (area > largestArea) {
+        largestArea = area;
+        largestFace = result;
+      }
+    }
+
+    console.log(`Selected largest face from ${results.length} detected (area: ${largestArea.toFixed(0)}px²)`);
+
     return {
-      detection: result.detection,
-      landmarks: result.landmarks,
-      descriptor: result.descriptor
+      detection: largestFace.detection,
+      landmarks: largestFace.landmarks,
+      descriptor: largestFace.descriptor
     };
   } catch (error) {
     console.error('Error detecting face:', error);
@@ -76,11 +105,14 @@ export async function detectFaceWithEmbedding(
 
 /**
  * Detect all faces in an image and generate embeddings for each
+ * Uses a higher confidence threshold to reduce false positives
  * @param imageElement - HTMLImageElement or HTMLCanvasElement
+ * @param minConfidence - Minimum detection confidence (0-1), default 0.6
  * @returns Array of detection results
  */
 export async function detectAllFacesWithEmbeddings(
-  imageElement: HTMLImageElement | HTMLCanvasElement
+  imageElement: HTMLImageElement | HTMLCanvasElement,
+  minConfidence: number = 0.6
 ): Promise<Array<{
   detection: faceapi.FaceDetection;
   landmarks: faceapi.FaceLandmarks68;
@@ -91,12 +123,22 @@ export async function detectAllFacesWithEmbeddings(
   }
 
   try {
+    // Use SSD MobileNet with higher score threshold to reduce false positives
     const results = await faceapi
-      .detectAllFaces(imageElement)
+      .detectAllFaces(imageElement, new faceapi.SsdMobilenetv1Options({ minConfidence }))
       .withFaceLandmarks()
       .withFaceDescriptors();
 
-    return results.map(result => ({
+    console.log(`Detected ${results.length} faces with confidence >= ${minConfidence}`);
+    
+    // Additional filtering: only keep faces with good confidence
+    const filteredResults = results.filter(result => 
+      result.detection.score >= minConfidence
+    );
+    
+    console.log(`After filtering: ${filteredResults.length} high-confidence faces`);
+
+    return filteredResults.map(result => ({
       detection: result.detection,
       landmarks: result.landmarks,
       descriptor: result.descriptor
