@@ -1,5 +1,5 @@
 const { query, execute } = require('../shared/db');
-const { blobExists, getContainerClient, uploadBlob, deleteBlob } = require('../shared/storage');
+const { blobExists, getContainerClient, uploadBlob, deleteBlob, getBlobSasUrl } = require('../shared/storage');
 const { checkAuthorization } = require('../shared/auth');
 const fs = require('fs');
 const os = require('os');
@@ -547,6 +547,28 @@ module.exports = async function (context, req) {
                 // Determine content type - prioritize file extension over blob metadata
                 const contentType = getContentType(blobPath);
                 const isVideo = contentType && contentType.startsWith('video/');
+                
+                // For large videos (>50MB) and not thumbnails, redirect to direct SAS URL
+                // This avoids Azure Functions memory/timeout limits
+                const containerName = process.env.AZURE_STORAGE_CONTAINER || 'family-album-media';
+                const largeSizeThreshold = 50 * 1024 * 1024; // 50MB
+                
+                if (isVideo && !thumbnail && fileSize > largeSizeThreshold) {
+                    context.log(`Large video detected (${fileSize} bytes), redirecting to SAS URL`);
+                    
+                    // Generate a SAS URL valid for 1 hour
+                    const sasUrl = getBlobSasUrl(containerName, blobPath, 60);
+                    
+                    // Redirect to the SAS URL
+                    context.res = {
+                        status: 302,
+                        headers: {
+                            'Location': sasUrl,
+                            'Cache-Control': 'no-cache'
+                        }
+                    };
+                    return;
+                }
                 
                 // Parse Range header for video streaming support
                 const rangeHeader = req.headers['range'] || req.headers['Range'];
