@@ -49,6 +49,40 @@ export default function Home() {
     checkAuthStatus();
   }, []);
 
+  // Handle URL parameters (e.g., ?file=xyz.jpg&fullscreen=true)
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    
+    const params = new URLSearchParams(window.location.search);
+    const fileParam = params.get('file');
+    const fullscreenParam = params.get('fullscreen');
+    
+    if (fileParam) {
+      // Load the specific media file and open it
+      const loadMediaFromParam = async () => {
+        try {
+          const response = await fetch(`/api/media/${encodeURIComponent(fileParam)}`);
+          if (response.ok) {
+            const data = await response.json();
+            if (data.media) {
+              setSelectedMedia(data.media);
+              setMediaList([data.media]); // Single item for now
+              setView('gallery');
+              if (fullscreenParam === 'true') {
+                setStartFullscreen(true);
+              }
+              // Clear URL parameters after loading
+              window.history.replaceState({}, '', window.location.pathname);
+            }
+          }
+        } catch (err) {
+          console.error('Error loading media from URL param:', err);
+        }
+      };
+      loadMediaFromParam();
+    }
+  }, []);
+
   // Load new media count when authenticated
   useEffect(() => {
     if (authStatus?.authenticated && authStatus?.authorized) {

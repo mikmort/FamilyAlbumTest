@@ -65,6 +65,11 @@ export default function NewMediaPage() {
     router.push(`/?file=${encodeURIComponent(filename)}`);
   };
 
+  const handleMediaFullscreen = (filename: string) => {
+    // Open media in fullscreen mode (right-click)
+    router.push(`/?file=${encodeURIComponent(filename)}&fullscreen=true`);
+  };
+
   const handleBack = () => {
     router.push('/');
   };
@@ -168,13 +173,18 @@ export default function NewMediaPage() {
             <div
               key={item.PFileName}
               onClick={() => handleMediaClick(item.PFileName)}
+              onContextMenu={(e) => {
+                e.preventDefault(); // Prevent default context menu
+                handleMediaFullscreen(item.PFileName);
+              }}
               style={{
                 cursor: 'pointer',
                 borderRadius: '8px',
                 overflow: 'hidden',
                 boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
                 transition: 'transform 0.2s',
-                background: '#fff'
+                background: '#fff',
+                position: 'relative'
               }}
               onMouseEnter={(e) => {
                 e.currentTarget.style.transform = 'scale(1.05)';
@@ -184,14 +194,42 @@ export default function NewMediaPage() {
               }}
             >
               <img
-                src={`/api/media/${item.PFileName}?thumb=true`}
+                src={
+                  item.PThumbnailUrl 
+                    ? `${item.PThumbnailUrl}${item.PThumbnailUrl.includes('?') ? '&' : '?'}v=${new Date(item.PLastModifiedDate).getTime()}` 
+                    : `/api/media/${item.PFileName}?thumb=true`
+                }
                 alt={item.PDescription || item.PFileName}
                 style={{
                   width: '100%',
                   height: '200px',
                   objectFit: 'cover'
                 }}
+                onError={(e) => {
+                  console.error('❌ Thumbnail failed to load:', {
+                    fileName: item.PFileName,
+                    thumbnailUrl: item.PThumbnailUrl,
+                    type: item.PType === 2 ? 'video' : 'image'
+                  });
+                  // Set a gray placeholder on error
+                  (e.target as HTMLImageElement).src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="200" height="200"%3E%3Crect width="200" height="200" fill="%23ddd"/%3E%3Ctext x="50%25" y="50%25" text-anchor="middle" dy=".3em" fill="%23999" font-family="sans-serif"%3ENo Thumbnail%3C/text%3E%3C/svg%3E';
+                }}
               />
+              {item.PType === 2 && (
+                <div style={{
+                  position: 'absolute',
+                  bottom: '40px',
+                  right: '8px',
+                  background: 'rgba(0, 0, 0, 0.7)',
+                  color: 'white',
+                  padding: '4px 8px',
+                  borderRadius: '4px',
+                  fontSize: '0.75rem',
+                  fontWeight: 'bold'
+                }}>
+                  {item.PTime ? `${Math.floor(item.PTime / 60)}:${(item.PTime % 60).toString().padStart(2, '0')}` : 'VIDEO'}
+                </div>
+              )}
               <div style={{ padding: '8px' }}>
                 <p style={{ 
                   fontSize: '0.85rem', 
