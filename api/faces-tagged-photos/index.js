@@ -72,9 +72,9 @@ module.exports = async function (context, req) {
     const smartSample = req.query.smartSample !== 'false'; // Default true
     const maxPerPerson = req.query.maxPerPerson ? parseInt(req.query.maxPerPerson) : null;
 
-    // Common CTE that combines tags from both NamePhoto table and PPeopleList field
+    // Common CTE definition (without WITH keyword - we'll add it per query)
     const photoPersonPairsCTE = `
-      WITH PhotoPersonPairs AS (
+      PhotoPersonPairs AS (
         -- Get tags from NamePhoto table (preferred source of truth)
         SELECT 
           np.npFileName as PFileName,
@@ -101,7 +101,7 @@ module.exports = async function (context, req) {
     if (smartSample && !maxPerPerson) {
       // Step 1: Get counts per person to calculate sample sizes
       const countQuery = `
-        ${photoPersonPairsCTE}
+        WITH ${photoPersonPairsCTE}
         SELECT 
           ne.ID as PersonID,
           ne.neName as PersonName,
@@ -142,7 +142,7 @@ module.exports = async function (context, req) {
         // Get photos distributed across timeline
         // Use a simpler approach: calculate bucket size and take one photo per bucket
         const sampleQuery = `
-          ${photoPersonPairsCTE},
+          WITH ${photoPersonPairsCTE},
           PhotosWithDates AS (
             SELECT 
               pp.PFileName,
@@ -227,7 +227,7 @@ module.exports = async function (context, req) {
     } else if (maxPerPerson) {
       // Fixed limit per person (legacy mode) - prioritize photos with fewer people
       sqlQuery = `
-        ${photoPersonPairsCTE},
+        WITH ${photoPersonPairsCTE},
         PhotosWithPeopleCount AS (
           SELECT 
             pp.PFileName as PFileName,
@@ -257,7 +257,7 @@ module.exports = async function (context, req) {
     } else {
       // Get all tagged photos (no sampling) - but still prioritize photos with fewer people
       sqlQuery = `
-        ${photoPersonPairsCTE},
+        WITH ${photoPersonPairsCTE},
         PhotosWithPeopleCount AS (
           SELECT 
             pp.PFileName as PFileName,
