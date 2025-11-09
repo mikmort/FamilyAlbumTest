@@ -1,3 +1,4 @@
+Using database credentials from local.settings.json
 Connected to database
 
 === DATABASE SCHEMA ===
@@ -44,8 +45,11 @@ Table: FaceEmbeddings
   Embedding                      nvarchar(MAX)      NOT NULL
   CreatedDate                    datetime2           NOT NULL DEFAULT (getdate())
   UpdatedDate                    datetime2           NOT NULL DEFAULT (getdate())
+  ModelVersion                   varchar(50)       NOT NULL DEFAULT ('insightface-arcface')
+  EmbeddingDimensions            int           NOT NULL DEFAULT ((512))
 
   Indexes:
+    IX_FaceEmbeddings_ModelVersion: ModelVersion, PersonID (NONCLUSTERED)
     IX_FaceEmbeddings_PersonID: PersonID (NONCLUSTERED)
     IX_FaceEmbeddings_PhotoFileName: PhotoFileName (NONCLUSTERED)
 
@@ -124,8 +128,12 @@ Table: NameEvent
   neType                         char(1)        NOT NULL
   neDateLastModified             datetime2           NULL DEFAULT (getdate())
   neCount                        int           NULL DEFAULT ((0))
+  EventDate                      date           NULL
+  Birthday                       date           NULL
 
   Indexes:
+    IX_NameEvent_Birthday: Birthday (NONCLUSTERED)
+    IX_NameEvent_EventDate: EventDate (NONCLUSTERED)
     IX_NameEvent_Name: neName (NONCLUSTERED)
     IX_NameEvent_Type: neType (NONCLUSTERED)
 

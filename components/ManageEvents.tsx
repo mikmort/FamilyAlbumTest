@@ -8,6 +8,7 @@ type EventItem = {
     neType?: string
     neDateLastModified?: string | null
     neCount?: number
+    EventDate?: string | null
 }
 
 export default function ManageEvents() {
@@ -18,11 +19,13 @@ export default function ManageEvents() {
     const [newName, setNewName] = useState('')
     const [newDate, setNewDate] = useState('')
     const [newDesc, setNewDesc] = useState('')
+    const [newEventDate, setNewEventDate] = useState('')
 
     const [editingId, setEditingId] = useState<number | null>(null)
     const [editName, setEditName] = useState('')
     const [editDate, setEditDate] = useState('')
     const [editDesc, setEditDesc] = useState('')
+    const [editEventDate, setEditEventDate] = useState('')
 
     useEffect(() => {
         fetchEvents()
@@ -52,6 +55,7 @@ export default function ManageEvents() {
             const payload: any = { name: newName.trim() }
             // If user provided a description, send as relation (neRelation)
             if (newDesc) payload.relation = newDesc
+            if (newEventDate) payload.eventDate = newEventDate
 
             const res = await fetch('/api/events', {
                 method: 'POST',
@@ -68,11 +72,13 @@ export default function ManageEvents() {
                 neType: 'E',
                 neDateLastModified: created.neDateLastModified ?? null,
                 neCount: created.photoCount ?? created.neCount ?? 0,
+                EventDate: created.eventDate ?? created.EventDate ?? newEventDate ?? null,
             }
             setEvents(prev => [ev, ...prev])
             setNewName('')
             setNewDate('')
             setNewDesc('')
+            setNewEventDate('')
         } catch (err: any) {
             setError(err?.message ?? 'Create error')
         }
@@ -83,6 +89,7 @@ export default function ManageEvents() {
         setEditName(ev.neName)
         setEditDate(ev.neDateLastModified ?? '')
         setEditDesc(ev.neRelation ?? '')
+        setEditEventDate(ev.EventDate ?? '')
     }
 
     function cancelEdit() {
@@ -90,6 +97,7 @@ export default function ManageEvents() {
         setEditName('')
         setEditDate('')
         setEditDesc('')
+        setEditEventDate('')
     }
 
     async function handleUpdate(e: FormEvent) {
@@ -99,6 +107,7 @@ export default function ManageEvents() {
         try {
             const payload: any = { id: editingId, name: editName }
             if (editDesc) payload.relation = editDesc
+            if (editEventDate) payload.eventDate = editEventDate
 
             console.log('🔍 Updating event:', payload);
 
@@ -130,6 +139,7 @@ export default function ManageEvents() {
                 neType: 'E',
                 neDateLastModified: updated.event?.neDateLastModified ?? null,
                 neCount: updated.event?.neCount ?? 0,
+                EventDate: updated.event?.EventDate ?? editEventDate ?? null,
             }
             setEvents(prev => prev.map(x => (x.id === editingId ? ev : x)))
             cancelEdit()
@@ -176,13 +186,19 @@ export default function ManageEvents() {
                         required
                     />
                     <input
+                        type="date"
+                        placeholder="Event date (optional)"
+                        value={newEventDate}
+                        onChange={e => setNewEventDate(e.target.value)}
+                    />
+                    <input
                         placeholder="Description (optional)"
                         value={newDesc}
                         onChange={e => setNewDesc(e.target.value)}
                     />
                     <div>
                         <button type="submit">Create</button>
-                        <button type="button" onClick={() => { setNewName(''); setNewDate(''); setNewDesc('') }} style={{ marginLeft: 8 }}>
+                        <button type="button" onClick={() => { setNewName(''); setNewDate(''); setNewDesc(''); setNewEventDate('') }} style={{ marginLeft: 8 }}>
                             Clear
                         </button>
                     </div>
@@ -200,8 +216,14 @@ export default function ManageEvents() {
                         <li key={ev.id} style={{ border: '1px solid #ddd', padding: 12, marginBottom: 8 }}>
                             {editingId === ev.id ? (
                                 <form onSubmit={handleUpdate} style={{ display: 'grid', gap: 8 }}>
-                                    <input value={editName} onChange={e => setEditName(e.target.value)} required />
-                                    <input value={editDesc ?? ''} onChange={e => setEditDesc(e.target.value)} />
+                                    <input value={editName} onChange={e => setEditName(e.target.value)} placeholder="Event name" required />
+                                    <input 
+                                        type="date" 
+                                        value={editEventDate ?? ''} 
+                                        onChange={e => setEditEventDate(e.target.value)} 
+                                        placeholder="Event date"
+                                    />
+                                    <input value={editDesc ?? ''} onChange={e => setEditDesc(e.target.value)} placeholder="Description" />
                                     <div>
                                         <button type="submit">Save</button>
                                         <button type="button" onClick={cancelEdit} style={{ marginLeft: 8 }}>Cancel</button>
@@ -212,8 +234,15 @@ export default function ManageEvents() {
                                     <div>
                                         <strong>{ev.neName}</strong>
                                         <div style={{ fontSize: 12, color: '#555' }}>
-                                            {ev.neDateLastModified ? new Date(ev.neDateLastModified).toLocaleDateString() : 'No date'}
+                                            {ev.EventDate 
+                                                ? new Date(ev.EventDate).toLocaleDateString('en-US', { 
+                                                    year: 'numeric', 
+                                                    month: 'short', 
+                                                    day: 'numeric' 
+                                                  })
+                                                : 'No date'}
                                             {ev.neRelation ? ` · ${ev.neRelation}` : ''}
+                                            {' · '}{ev.neCount || 0} photos
                                         </div>
                                     </div>
                                     <div>

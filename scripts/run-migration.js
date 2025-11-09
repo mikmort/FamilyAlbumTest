@@ -23,8 +23,13 @@ async function runMigration() {
     await sql.connect(config);
     console.log('✓ Connected to database');
 
-    // Read migration script
-    const migrationPath = path.join(__dirname, '..', 'database', 'add-embedding-model-version.sql');
+    // Read migration script from command line argument or default
+    const migrationFile = process.argv[2] || path.join(__dirname, '..', 'database', 'add-embedding-model-version.sql');
+    const migrationPath = path.isAbsolute(migrationFile) 
+      ? migrationFile 
+      : path.join(__dirname, '..', migrationFile);
+    
+    console.log(`\nMigration file: ${path.basename(migrationPath)}`);
     const migrationSQL = fs.readFileSync(migrationPath, 'utf8');
     
     console.log('\nRunning migration script...');

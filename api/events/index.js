@@ -35,7 +35,8 @@ module.exports = async function (context, req) {
                         neRelation,
                         neType,
                         neDateLastModified,
-                        ISNULL(neCount, 0) as neCount
+                        ISNULL(neCount, 0) as neCount,
+                        EventDate
                     FROM dbo.NameEvent WITH (NOLOCK)
                     WHERE neType = 'E'
                     ORDER BY neName
@@ -69,7 +70,8 @@ module.exports = async function (context, req) {
                         neRelation,
                         neType,
                         neDateLastModified,
-                        ISNULL(neCount, 0) as neCount
+                        ISNULL(neCount, 0) as neCount,
+                        EventDate
                     FROM dbo.NameEvent
                     WHERE ID = @id AND neType = 'E'
                 `;
@@ -100,7 +102,7 @@ module.exports = async function (context, req) {
 
         // POST /api/events - Create new event
         if (method === 'POST') {
-            const { name, neName, relation, neRelation } = req.body;
+            const { name, neName, relation, neRelation, eventDate } = req.body;
             const eventName = name || neName;
             const eventRelation = relation || neRelation || null;
 
@@ -129,21 +131,22 @@ module.exports = async function (context, req) {
 
             // Insert new event
             const insertQuery = `
-                INSERT INTO dbo.NameEvent (neName, neRelation, neType, neDateLastModified, neCount)
-                VALUES (@name, @relation, 'E', GETDATE(), 0);
+                INSERT INTO dbo.NameEvent (neName, neRelation, neType, neDateLastModified, neCount, EventDate)
+                VALUES (@name, @relation, 'E', GETDATE(), 0, @eventDate);
                 SELECT SCOPE_IDENTITY() as ID;
             `;
 
             const result = await query(insertQuery, {
                 name: eventName.trim(),
-                relation: eventRelation
+                relation: eventRelation,
+                eventDate: eventDate || null
             });
 
             const newId = result[0].ID;
 
             // Fetch the created event
             const createdEvent = await query(
-                `SELECT ID, neName, neRelation, neType, neDateLastModified, neCount 
+                `SELECT ID, neName, neRelation, neType, neDateLastModified, neCount, EventDate
                  FROM dbo.NameEvent WHERE ID = @id`,
                 { id: newId }
             );
@@ -159,7 +162,8 @@ module.exports = async function (context, req) {
                     // Also return alternate field names for compatibility
                     id: newId,
                     name: eventName.trim(),
-                    relation: eventRelation
+                    relation: eventRelation,
+                    eventDate: eventDate || null
                 }
             };
             return;
@@ -168,12 +172,12 @@ module.exports = async function (context, req) {
         // PUT /api/events/[id] or PUT /api/events - Update event
         if (method === 'PUT') {
             // Accept ID from URL path or request body (for compatibility)
-            const { name, neName, relation, neRelation, id: bodyId } = req.body;
+            const { name, neName, relation, neRelation, id: bodyId, eventDate } = req.body;
             const eventId = id || bodyId;
             const eventName = name || neName;
             const eventRelation = relation || neRelation;
 
-            context.log(`📝 Updating event ${eventId}: name="${eventName}", relation="${eventRelation}"`);
+            context.log(`📝 Updating event ${eventId}: name="${eventName}", relation="${eventRelation}", eventDate="${eventDate}"`);
 
             if (!eventId) {
                 context.res = {
@@ -211,6 +215,7 @@ module.exports = async function (context, req) {
                 UPDATE dbo.NameEvent
                 SET neName = @name,
                     neRelation = @relation,
+                    EventDate = @eventDate,
                     neDateLastModified = GETDATE()
                 WHERE ID = @id AND neType = 'E'
             `;
@@ -218,14 +223,15 @@ module.exports = async function (context, req) {
             await execute(updateQuery, {
                 id: parseInt(eventId),
                 name: eventName.trim(),
-                relation: eventRelation || null
+                relation: eventRelation || null,
+                eventDate: eventDate || null
             });
 
             context.log(`✅ Event ${eventId} updated successfully`);
 
             // Fetch updated event
             const updatedEvent = await query(
-                `SELECT ID, neName, neRelation, neType, neDateLastModified, neCount 
+                `SELECT ID, neName, neRelation, neType, neDateLastModified, neCount, EventDate
                  FROM dbo.NameEvent WHERE ID = @id`,
                 { id: parseInt(eventId) }
             );

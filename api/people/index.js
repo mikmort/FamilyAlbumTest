@@ -39,7 +39,8 @@ module.exports = async function (context, req) {
                         neRelation,
                         neType,
                         neDateLastModified,
-                        ISNULL(neCount, 0) as neCount
+                        ISNULL(neCount, 0) as neCount,
+                        Birthday
                     FROM dbo.NameEvent WITH (NOLOCK)
                     WHERE ID = @id AND neType = 'N'
                 `;
@@ -85,7 +86,8 @@ module.exports = async function (context, req) {
                         neRelation,
                         neType,
                         neDateLastModified,
-                        ISNULL(neCount, 0) as neCount
+                        ISNULL(neCount, 0) as neCount,
+                        Birthday
                     FROM dbo.NameEvent WITH (NOLOCK)
                     WHERE neType = 'N'
                     ORDER BY neName
@@ -107,7 +109,7 @@ module.exports = async function (context, req) {
 
         // POST /api/people - Create new person
         if (method === 'POST') {
-            const { name, neName, relation, neRelation } = req.body;
+            const { name, neName, relation, neRelation, birthday } = req.body;
             
             // Accept both 'name' and 'neName' for backwards compatibility
             const personName = name || neName;
@@ -122,14 +124,15 @@ module.exports = async function (context, req) {
             }
 
             const insertQuery = `
-                INSERT INTO dbo.NameEvent (neName, neRelation, neType, neCount)
-                OUTPUT INSERTED.ID, INSERTED.neName, INSERTED.neRelation, INSERTED.neType, INSERTED.neCount as photoCount
-                VALUES (@name, @relation, 'N', 0)
+                INSERT INTO dbo.NameEvent (neName, neRelation, neType, neCount, Birthday)
+                OUTPUT INSERTED.ID, INSERTED.neName, INSERTED.neRelation, INSERTED.neType, INSERTED.neCount as photoCount, INSERTED.Birthday
+                VALUES (@name, @relation, 'N', 0, @birthday)
             `;
 
             const result = await query(insertQuery, { 
                 name: personName,
-                relation: personRelation || null
+                relation: personRelation || null,
+                birthday: birthday || null
             });
 
             // Invalidate people cache
@@ -147,7 +150,7 @@ module.exports = async function (context, req) {
 
         // PUT /api/people - Update person
         if (method === 'PUT') {
-            const { id, name, relation } = req.body;
+            const { id, name, relation, birthday } = req.body;
 
             if (!id || !name) {
                 context.res = {
@@ -159,14 +162,19 @@ module.exports = async function (context, req) {
 
             const updateQuery = `
                 UPDATE dbo.NameEvent 
-                SET neName = @name, neRelation = @relation
+                SET neName = @name, neRelation = @relation, Birthday = @birthday
                 WHERE ID = @id
             `;
 
-            await execute(updateQuery, { id, name, relation: relation || null });
+            await execute(updateQuery, { 
+                id, 
+                name, 
+                relation: relation || null,
+                birthday: birthday || null
+            });
 
             const selectQuery = `
-                SELECT ID, neName, neRelation, ISNULL(neCount, 0) as neCount
+                SELECT ID, neName, neRelation, ISNULL(neCount, 0) as neCount, Birthday
                 FROM dbo.NameEvent
                 WHERE ID = @id
             `;

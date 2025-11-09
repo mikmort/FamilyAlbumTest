@@ -6,6 +6,7 @@ export interface Person {
   neRelation: string;
   neDateLastModified: Date;
   neCount: number;
+  Birthday?: string | null; // ISO date string (YYYY-MM-DD)
 }
 
 export interface Event {
@@ -14,6 +15,7 @@ export interface Event {
   neRelation: string;
   neDateLastModified: Date;
   neCount: number;
+  EventDate?: string | null; // ISO date string (YYYY-MM-DD)
 }
 
 export interface MediaItem {

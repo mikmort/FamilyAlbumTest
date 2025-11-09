@@ -14,6 +14,7 @@ export default function PeopleManager() {
   // Form state
   const [formName, setFormName] = useState('');
   const [formRelation, setFormRelation] = useState('');
+  const [formBirthday, setFormBirthday] = useState('');
 
   useEffect(() => {
     fetchPeople();
@@ -44,7 +45,11 @@ export default function PeopleManager() {
       const response = await fetch('/api/people', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: formName, relation: formRelation }),
+        body: JSON.stringify({ 
+          name: formName, 
+          relation: formRelation,
+          birthday: formBirthday || null
+        }),
       });
 
       if (!response.ok) throw new Error('Failed to create person');
@@ -53,6 +58,7 @@ export default function PeopleManager() {
       setIsCreating(false);
       setFormName('');
       setFormRelation('');
+      setFormBirthday('');
     } catch (err) {
       alert('Error creating person: ' + (err instanceof Error ? err.message : 'Unknown error'));
     }
@@ -68,7 +74,8 @@ export default function PeopleManager() {
       console.log('Updating person:', { 
         id: editingPerson.ID, 
         name: formName, 
-        relation: formRelation 
+        relation: formRelation,
+        birthday: formBirthday || null
       });
       
       const response = await fetch('/api/people', {
@@ -77,7 +84,8 @@ export default function PeopleManager() {
         body: JSON.stringify({ 
           id: editingPerson.ID, 
           name: formName, 
-          relation: formRelation 
+          relation: formRelation,
+          birthday: formBirthday || null
         }),
       });
 
@@ -93,6 +101,7 @@ export default function PeopleManager() {
       setEditingPerson(null);
       setFormName('');
       setFormRelation('');
+      setFormBirthday('');
       // Success - no notification needed
     } catch (err) {
       console.error('Error updating person:', err);
@@ -124,6 +133,7 @@ export default function PeopleManager() {
     setEditingPerson(person);
     setFormName(person.neName);
     setFormRelation(person.neRelation || '');
+    setFormBirthday(person.Birthday || '');
     setIsCreating(false);
   };
 
@@ -132,6 +142,7 @@ export default function PeopleManager() {
     setEditingPerson(null);
     setFormName('');
     setFormRelation('');
+    setFormBirthday('');
   };
 
   const cancelForm = () => {
@@ -139,6 +150,7 @@ export default function PeopleManager() {
     setEditingPerson(null);
     setFormName('');
     setFormRelation('');
+    setFormBirthday('');
   };
 
   const filteredPeople = people.filter(p => 
@@ -213,6 +225,15 @@ export default function PeopleManager() {
               placeholder="e.g., Grandmother, Uncle, Friend"
             />
           </div>
+          <div className="form-group">
+            <label>Birthday</label>
+            <input
+              type="date"
+              value={formBirthday}
+              onChange={(e) => setFormBirthday(e.target.value)}
+              placeholder="YYYY-MM-DD"
+            />
+          </div>
           <div className="flex flex-gap mt-2">
             {isCreating ? (
               <button className="btn btn-success" onClick={handleCreate}>
@@ -248,6 +269,7 @@ export default function PeopleManager() {
                 <tr>
                   <th>Name</th>
                   <th>Relationship</th>
+                  <th>Birthday</th>
                   <th>Photos</th>
                   <th>Actions</th>
                 </tr>
@@ -257,6 +279,15 @@ export default function PeopleManager() {
                   <tr key={person.ID}>
                     <td className="name-cell">{person.neName}</td>
                     <td className="relation-cell">{person.neRelation || '—'}</td>
+                    <td className="date-cell">
+                      {person.Birthday 
+                        ? new Date(person.Birthday).toLocaleDateString('en-US', { 
+                            year: 'numeric', 
+                            month: 'short', 
+                            day: 'numeric' 
+                          })
+                        : '—'}
+                    </td>
                     <td className="count-cell">{person.neCount || 0}</td>
                     <td className="actions-cell">
                       <button
