@@ -38,12 +38,27 @@ export default function HomePage({
       setLoading(true);
       const response = await fetch('/api/homepage');
       if (!response.ok) {
+        // Log detailed error information for debugging
+        const errorText = await response.text();
+        console.error('Homepage API error:', {
+          status: response.status,
+          statusText: response.statusText,
+          url: response.url,
+          responseBody: errorText
+        });
         throw new Error('Failed to load homepage data');
       }
       const result = await response.json();
       setData(result);
     } catch (err) {
       console.error('Error loading homepage data:', err);
+      // Log additional context for debugging
+      if (err instanceof Error) {
+        console.error('Error details:', {
+          message: err.message,
+          stack: err.stack
+        });
+      }
       setError('Failed to load homepage data');
     } finally {
       setLoading(false);
