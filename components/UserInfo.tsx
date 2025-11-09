@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { getLogoutUrl } from '../lib/auth';
 
 interface UserClaim {
   typ: string;
@@ -124,7 +125,7 @@ export default function UserInfo() {
           zIndex: 1000,
         }}>
           <a
-            href="/.auth/logout?post_logout_redirect_uri=/"
+            href={getLogoutUrl()}
             style={{
               display: 'block',
               padding: '0.75rem 1rem',
@@ -139,7 +140,7 @@ export default function UserInfo() {
             🔄 Sign in as Different User
           </a>
           <a
-            href="/.auth/logout?post_logout_redirect_uri=/login.html"
+            href={getLogoutUrl()}
             style={{
               display: 'block',
               padding: '0.75rem 1rem',

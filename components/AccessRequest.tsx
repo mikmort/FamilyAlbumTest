@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { getLogoutUrl } from '../lib/auth';
 
 interface AuthStatus {
   authenticated: boolean;
@@ -263,7 +264,7 @@ export default function AccessRequest() {
             Signed in as: <strong style={{ color: '#666' }}>{authStatus.user.email}</strong>
             <br />
             <a 
-              href="/.auth/logout?post_logout_redirect_uri=/login.html"
+              href={getLogoutUrl()}
               style={{ color: '#667eea', textDecoration: 'none', marginTop: '10px', display: 'inline-block' }}
             >
               Sign out
