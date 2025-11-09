@@ -13,7 +13,42 @@ The test suite is designed to work with the Family Album application in **dev mo
 ## Test Files
 
 - `api-endpoints.spec.ts` - Tests core API endpoints (auth, people, events, media)
+  - **Note**: These tests require Azure Functions Core Tools (`func`) to be installed
+  - If `func` is not available, these tests are automatically skipped
+- `homepage.spec.ts` - Tests homepage functionality with fallback API routes
 - `navigation.spec.ts` - Tests basic page load and dev mode authentication bypass
+
+## Architecture
+
+The test suite uses a hybrid approach to support multiple environments:
+
+### With Azure Functions (Full Testing)
+
+When Azure Functions Core Tools (`func`) is installed:
+- Both Next.js frontend and Azure Functions API start
+- All tests run, including API endpoint tests
+- Tests verify actual API behavior
+
+### Without Azure Functions (Frontend Testing)
+
+When Azure Functions Core Tools is not available (e.g., GitHub Copilot):
+- Only Next.js frontend starts
+- API endpoint tests are automatically skipped (8 tests)
+- Homepage and navigation tests use fallback API routes (12 tests)
+- Fallback routes provide mock data for frontend testing
+
+### Fallback API Routes
+
+The following Next.js API routes provide mock data when Azure Functions is unavailable:
+- `/app/api/auth-status/route.ts` - Returns dev mode authentication
+- `/app/api/db-warmup/route.ts` - No-op endpoint for database warmup
+- `/app/api/new-media/route.ts` - Returns empty new media count
+- `/app/api/homepage/route.ts` - Returns mock homepage statistics
+
+Each fallback route:
+1. First attempts to forward the request to Azure Functions (localhost:7071)
+2. Falls back to mock data if Azure Functions is unavailable
+3. Only works in dev mode for security
 
 ## Setup
 
@@ -22,13 +57,47 @@ The test suite is designed to work with the Family Album application in **dev mo
 - Node.js 18+
 - All dependencies installed (`npm install`)
 - Playwright browsers installed (`npx playwright install chromium`)
+- *Optional*: Azure Functions Core Tools for full API testing
 
 ### Installation
+
+**Basic Setup (Frontend Testing Only):**
 
 ```bash
 npm install
 npx playwright install chromium
 ```
+
+**Full Setup (With Azure Functions):**
+
+```bash
+npm install
+npx playwright install chromium
+
+# Install Azure Functions Core Tools
+# macOS (Homebrew):
+brew install azure-functions-core-tools@4
+
+# Windows (Chocolatey):
+choco install azure-functions-core-tools-4
+
+# Linux/WSL:
+# See: https://docs.microsoft.com/azure/azure-functions/functions-run-local
+```
+
+### Quick Start
+
+```bash
+# Setup environment (creates .env.local with dev mode enabled)
+npm run setup:env
+
+# Run all tests
+npm test
+```
+
+**Expected Results:**
+- With Azure Functions: 20 tests (12 passed, 8 passed API tests)
+- Without Azure Functions: 20 tests (12 passed, 8 skipped API tests)
 
 ### Configuration
 
@@ -108,11 +177,43 @@ See `.github/workflows/playwright.yml` for the CI configuration.
 
 ## Troubleshooting
 
+### "Azure Functions Core Tools not available" message
+
+**Message:**
+```
+[Playwright Config] Azure Functions Core Tools (func): ❌ Not Available
+[Playwright Config] API server will be skipped. API endpoint tests will fail.
+```
+
+**This is expected behavior** if Azure Functions Core Tools is not installed.
+
+**Impact:**
+- 8 API endpoint tests will be skipped
+- 12 frontend tests will pass using fallback API routes
+- All tests should pass (no failures)
+
+**To enable API tests:**
+1. Install Azure Functions Core Tools (see Installation section)
+2. Verify: `which func` (should show the path)
+3. Re-run tests: `npm test`
+
 ### Tests Fail to Start
 
 - Check that `npm run dev` works manually
 - Verify port 3000 is not in use
-- Ensure `.env.local` has required variables if testing with Azure resources
+- Ensure `.env.local` exists (run `npm run setup:env`)
+
+### Homepage shows "Please Sign In"
+
+- Verify `DEV_MODE=true` in `.env.local`
+- Check that fallback API routes are being used
+- Restart the dev server: stop tests and run `npm test` again
+
+### All tests are skipped
+
+- Check that Chromium browser is available: `which chromium-browser`
+- Verify Playwright is installed: `npx playwright --version`
+- Try installing browsers: `npx playwright install chromium`
 
 ### Authentication Errors
 
@@ -122,7 +223,7 @@ See `.github/workflows/playwright.yml` for the CI configuration.
 
 ### Database Connection Errors
 
-- Tests should work without database credentials
+- Tests should work without database credentials (using fallback routes)
 - If using Azure SQL, verify credentials and firewall rules
 - Check that database is not paused (serverless tier)
 
@@ -131,3 +232,6 @@ See `.github/workflows/playwright.yml` for the CI configuration.
 - [Playwright Documentation](https://playwright.dev/)
 - [Playwright Best Practices](https://playwright.dev/docs/best-practices)
 - [Writing Tests](https://playwright.dev/docs/writing-tests)
+- [COPILOT_TESTING.md](../docs/COPILOT_TESTING.md) - Testing in GitHub Copilot environment
+- [DEV_MODE_TESTING.md](../docs/DEV_MODE_TESTING.md) - Dev mode authentication
+- [Azure Functions Core Tools](https://docs.microsoft.com/azure/azure-functions/functions-run-local) - Installing func CLI
