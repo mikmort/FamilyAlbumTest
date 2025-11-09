@@ -112,12 +112,15 @@ npm run dev
 
 Open [http://localhost:3000](http://localhost:3000) in your browser.
 
-### 4. Testing (Optional)
+### 4. Testing with Playwright
 
-The application includes Playwright tests for automated testing:
+The application includes comprehensive Playwright tests with **dev mode** for authentication bypass:
 
 ```bash
-# Run all tests
+# Automatic setup and run all tests
+node scripts/setup-env.js && npm test
+
+# Or manually run tests
 npm test
 
 # Run tests with browser visible
@@ -125,9 +128,33 @@ npm run test:headed
 
 # Run tests in debug mode
 npm run test:debug
+
+# Run specific test file
+npx playwright test tests/navigation.spec.ts
 ```
 
-Tests use **dev mode** to bypass authentication. See [tests/README.md](tests/README.md) for more details.
+**Dev Mode**: Tests automatically bypass OAuth authentication using dev mode. This allows GitHub Copilot and coding agents to run tests without OAuth setup.
+
+**Configuration**:
+- Dev mode is enabled in `playwright.config.ts`
+- For manual testing, create `.env.local` with `DEV_MODE=true`
+- For CI/CD, configure GitHub Secrets (see below)
+
+See [tests/README.md](tests/README.md) and [docs/DEV_MODE_TESTING.md](docs/DEV_MODE_TESTING.md) for details.
+
+### 5. Configure GitHub Secrets for CI/CD Testing
+
+To enable full Playwright testing in GitHub Actions and for coding agents:
+
+1. **Add GitHub Secrets** (Settings → Secrets and variables → Actions):
+   - `AZURE_SQL_SERVER`, `AZURE_SQL_DATABASE`, `AZURE_SQL_USER`, `AZURE_SQL_PASSWORD`
+   - `AZURE_STORAGE_ACCOUNT`, `AZURE_STORAGE_KEY`, `AZURE_STORAGE_CONTAINER`
+
+2. **Tests run automatically** on push/PR via the Playwright workflow
+
+3. **GitHub Copilot** can run tests with full access to Azure resources
+
+See [docs/GITHUB_SECRETS_SETUP.md](docs/GITHUB_SECRETS_SETUP.md) for detailed setup instructions.
 
 ## Deployment to Azure
 

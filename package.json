@@ -12,7 +12,9 @@
     "test:headed": "playwright test --headed",
     "test:debug": "playwright test --debug",
     "test:ui": "playwright test --ui",
-    "test:report": "playwright show-report"
+    "test:report": "playwright show-report",
+    "setup:env": "node scripts/setup-env.js",
+    "test:setup": "node scripts/setup-env.js && npm test"
   },
   "dependencies": {
     "@azure/storage-blob": "^12.29.1",
