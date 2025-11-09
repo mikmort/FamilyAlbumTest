@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { MediaItem, Person, Event } from '../lib/types';
 import Fuse from 'fuse.js';
 import { getNameVariations } from '../lib/nicknames';
@@ -18,6 +18,52 @@ function getRelativeTime(dateString: string): string {
   if (diffDays < 30) return `${Math.floor(diffDays / 7)} weeks ago`;
   if (diffDays < 365) return `${Math.floor(diffDays / 30)} months ago`;
   return `${Math.floor(diffDays / 365)} years ago`;
+}
+
+// Animated Section component with scroll reveal
+function AnimatedSection({ 
+  children, 
+  delay = 0 
+}: { 
+  children: React.ReactNode; 
+  delay?: number;
+}) {
+  const [isVisible, setIsVisible] = useState(false);
+  const sectionRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          setTimeout(() => setIsVisible(true), delay);
+        }
+      },
+      { threshold: 0.1, rootMargin: '0px 0px -50px 0px' }
+    );
+
+    if (sectionRef.current) {
+      observer.observe(sectionRef.current);
+    }
+
+    return () => {
+      if (sectionRef.current) {
+        observer.unobserve(sectionRef.current);
+      }
+    };
+  }, [delay]);
+
+  return (
+    <div
+      ref={sectionRef}
+      style={{
+        opacity: isVisible ? 1 : 0,
+        transform: isVisible ? 'translateY(0)' : 'translateY(30px)',
+        transition: 'opacity 0.6s ease-out, transform 0.6s ease-out',
+      }}
+    >
+      {children}
+    </div>
+  );
 }
 
 interface HomePageProps {
@@ -55,11 +101,32 @@ export default function HomePage({
   const [searchDropdownOpen, setSearchDropdownOpen] = useState(false);
   const [allPeople, setAllPeople] = useState<Person[]>([]);
   const [allEvents, setAllEvents] = useState<Event[]>([]);
+  
+  // Background carousel state
+  const [currentBgIndex, setCurrentBgIndex] = useState(0);
+  const backgroundPhotos = useMemo(() => {
+    if (!data) return [];
+    // Get up to 5 random photos from recent uploads for background
+    const photos = [...(data.recentUploads || [])];
+    return photos
+      .sort(() => Math.random() - 0.5)
+      .slice(0, 5)
+      .filter(p => p.PThumbnailUrl);
+  }, [data]);
 
   useEffect(() => {
     loadHomePageData();
     loadPeopleAndEvents();
   }, []);
+
+  // Rotate background photos every 8 seconds
+  useEffect(() => {
+    if (backgroundPhotos.length <= 1) return;
+    const interval = setInterval(() => {
+      setCurrentBgIndex(prev => (prev + 1) % backgroundPhotos.length);
+    }, 8000);
+    return () => clearInterval(interval);
+  }, [backgroundPhotos.length]);
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -198,22 +265,6 @@ export default function HomePage({
     }
   };
 
-  const handleRandomMemory = async () => {
-    try {
-      // Fetch a random media item from the API
-      const response = await fetch('/api/media?random=1&limit=1');
-      if (response.ok) {
-        const result = await response.json();
-        if (result.media && result.media.length > 0) {
-          const randomMedia = result.media[0];
-          onMediaFullscreen(randomMedia, result.media);
-        }
-      }
-    } catch (err) {
-      console.error('Error loading random memory:', err);
-    }
-  };
-
   if (loading) {
     return (
       <div style={{ textAlign: 'center', padding: '4rem' }}>
@@ -243,7 +294,7 @@ export default function HomePage({
       <div style={{
         background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
         borderRadius: '20px',
-        padding: '4rem 3rem',
+        padding: '2.5rem 2rem',
         color: 'white',
         marginBottom: '2rem',
         textAlign: 'center',
@@ -251,6 +302,48 @@ export default function HomePage({
         position: 'relative',
         overflow: 'hidden',
       }}>
+        {/* Animated Background Photos */}
+        {backgroundPhotos.length > 0 && (
+          <div style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            zIndex: 1,
+          }}>
+            {backgroundPhotos.map((photo, idx) => (
+              <div
+                key={photo.PFileName}
+                style={{
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
+                  backgroundImage: `url(${photo.PThumbnailUrl})`,
+                  backgroundSize: 'cover',
+                  backgroundPosition: 'center',
+                  filter: 'blur(20px) brightness(0.6)',
+                  opacity: currentBgIndex === idx ? 1 : 0,
+                  transition: 'opacity 2s ease-in-out',
+                }}
+              />
+            ))}
+          </div>
+        )}
+        
+        {/* Gradient overlay to ensure text readability */}
+        <div style={{
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'linear-gradient(135deg, rgba(102, 126, 234, 0.85) 0%, rgba(118, 75, 162, 0.85) 100%)',
+          zIndex: 2,
+        }} />
+        
         {/* Decorative pattern overlay */}
         <div style={{
           position: 'absolute',
@@ -260,18 +353,19 @@ export default function HomePage({
           bottom: 0,
           background: 'radial-gradient(circle at 20% 50%, rgba(255,255,255,0.1) 0%, transparent 50%), radial-gradient(circle at 80% 50%, rgba(255,255,255,0.1) 0%, transparent 50%)',
           pointerEvents: 'none',
+          zIndex: 3,
         }} />
         
         <div style={{ position: 'relative', zIndex: 10 }}>
           <h1 style={{ 
-            fontSize: '3rem', 
-            margin: '0 0 1rem 0', 
+            fontSize: '2.5rem', 
+            margin: '0 0 0.75rem 0', 
             fontWeight: 'bold',
             textShadow: '0 2px 10px rgba(0, 0, 0, 0.2)',
           }}>
             Welcome to Your Family Album
           </h1>
-          <p style={{ fontSize: '1.3rem', margin: '0 0 2.5rem 0', opacity: 0.95 }}>
+          <p style={{ fontSize: '1.1rem', margin: '0 0 1.75rem 0', opacity: 0.95 }}>
             Preserving memories, connecting generations
           </p>
           
@@ -279,21 +373,21 @@ export default function HomePage({
           <div className="search-wrapper" style={{ 
             background: 'rgba(255, 255, 255, 0.95)', 
             borderRadius: '50px', 
-            padding: '1.2rem 2rem',
+            padding: '1rem 1.75rem',
             display: 'flex',
             alignItems: 'center',
             gap: '1rem',
-            maxWidth: '650px',
-            margin: '0 auto 1.5rem',
+            maxWidth: '600px',
+            margin: '0 auto 1.25rem',
             position: 'relative',
             boxShadow: '0 8px 24px rgba(0, 0, 0, 0.15)',
             backdropFilter: 'blur(10px)',
             zIndex: 100,
           }}>
-            <span style={{ fontSize: '1.5rem' }}>🔍</span>
+            <span style={{ fontSize: '1.4rem' }}>🔍</span>
             <input
               type="text"
-              placeholder="Search for people, events, or years..."
+              placeholder="Search for people or events..."
               value={searchQuery}
               onChange={(e) => {
                 setSearchQuery(e.target.value);
@@ -304,7 +398,7 @@ export default function HomePage({
                 flex: 1,
                 border: 'none',
                 outline: 'none',
-                fontSize: '1.05rem',
+                fontSize: '1rem',
                 color: '#333',
                 background: 'transparent',
               }}
@@ -392,50 +486,21 @@ export default function HomePage({
             </div>
           )}
         </div>
-
-        <button
-          onClick={handleRandomMemory}
-          style={{
-            marginTop: '1.5rem',
-            background: 'rgba(255, 255, 255, 0.25)',
-            border: '2px solid rgba(255, 255, 255, 0.8)',
-            color: 'white',
-            padding: '1rem 2.5rem',
-            borderRadius: '50px',
-            fontSize: '1.1rem',
-            cursor: 'pointer',
-            fontWeight: '600',
-            transition: 'all 0.3s ease',
-            boxShadow: '0 4px 15px rgba(0, 0, 0, 0.2)',
-          }}
-          onMouseOver={(e) => {
-            e.currentTarget.style.background = 'white';
-            e.currentTarget.style.color = '#667eea';
-            e.currentTarget.style.transform = 'translateY(-3px)';
-            e.currentTarget.style.boxShadow = '0 6px 20px rgba(0, 0, 0, 0.3)';
-          }}
-          onMouseOut={(e) => {
-            e.currentTarget.style.background = 'rgba(255, 255, 255, 0.25)';
-            e.currentTarget.style.color = 'white';
-            e.currentTarget.style.transform = 'translateY(0)';
-            e.currentTarget.style.boxShadow = '0 4px 15px rgba(0, 0, 0, 0.2)';
-          }}
-        >
-          🎲 Surprise Me!
-        </button>
         </div>
       </div>
 
       {/* Recent Uploads Section */}
+      {/* Recent Uploads Section */}
       {data && data.recentUploads && data.recentUploads.length > 0 && (
-        <section style={{
-          background: 'linear-gradient(to bottom, #ffffff 0%, #f8f9fa 100%)',
-          borderRadius: '16px',
-          padding: '2.5rem',
-          marginBottom: '2rem',
-          boxShadow: '0 8px 20px rgba(0, 0, 0, 0.1)',
-          border: '1px solid rgba(0, 0, 0, 0.05)',
-        }}>
+        <AnimatedSection delay={0}>
+          <section style={{
+            background: 'linear-gradient(to bottom, #ffffff 0%, #f8f9fa 100%)',
+            borderRadius: '16px',
+            padding: '2.5rem',
+            marginBottom: '2rem',
+            boxShadow: '0 8px 20px rgba(0, 0, 0, 0.1)',
+            border: '1px solid rgba(0, 0, 0, 0.05)',
+          }}>
           <h2 style={{ 
             fontSize: '2rem', 
             marginBottom: '0.5rem', 
@@ -582,10 +647,12 @@ export default function HomePage({
             </div>
           )}
         </section>
+        </AnimatedSection>
       )}
 
       {/* On This Day Section */}
       {data && data.onThisDay && data.onThisDay.length > 0 && (
+        <AnimatedSection delay={150}>
         <section style={{
           background: 'white',
           borderRadius: '12px',
@@ -744,11 +811,13 @@ export default function HomePage({
             </div>
           )}
         </section>
+        </AnimatedSection>
       )}
 
       {/* Featured Person Section */}
       {data && data.featuredPerson && (
-        <section 
+        <AnimatedSection delay={300}>
+          <section 
           onClick={() => onNavigateToGallery([data.featuredPerson!.ID], null)}
           style={{
             background: 'linear-gradient(135deg, #fff9e6 0%, #fff3d6 100%)',
@@ -811,12 +880,14 @@ export default function HomePage({
             </div>
           </div>
         </section>
+        </AnimatedSection>
       )}
 
       {/* Featured Event Section */}
       {data && data.featuredEvent && (
-        <section 
-          onClick={() => onNavigateToGallery([], data.featuredEvent!.ID)}
+        <AnimatedSection delay={450}>
+          <section 
+            onClick={() => onNavigateToGallery([], data.featuredEvent!.ID)}
           style={{
             background: 'linear-gradient(135deg, #e3f2fd 0%, #d1e7fd 100%)',
             borderRadius: '16px',
@@ -875,11 +946,13 @@ export default function HomePage({
             </div>
           </div>
         </section>
+        </AnimatedSection>
       )}
 
       {/* Suggested Albums */}
       {data && data.randomSuggestion && (
-        <section style={{
+        <AnimatedSection delay={600}>
+          <section style={{
           background: 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)',
           borderRadius: '12px',
           padding: '2rem',
@@ -910,6 +983,7 @@ export default function HomePage({
             Explore Now →
           </button>
         </section>
+        </AnimatedSection>
       )}
     </div>
   );

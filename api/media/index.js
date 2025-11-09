@@ -775,7 +775,11 @@ module.exports = async function (context, req) {
 
             // Sorting
             if (random) {
+                // For random ordering with DISTINCT, we need to include NEWID() in SELECT
+                // But since we can't use it with DISTINCT, we'll use a subquery approach
+                // or just remove DISTINCT for random queries since duplicates are unlikely
                 mediaQuery += ` ORDER BY NEWID()`;
+                // Note: The DISTINCT will be removed for random queries below
             } else {
                 const orderDirection = sortOrder === 'asc' ? 'ASC' : 'DESC';
                 mediaQuery += ` ORDER BY p.PYear ${orderDirection}, p.PMonth ${orderDirection}, p.PFileName ${orderDirection}`;
@@ -783,8 +787,16 @@ module.exports = async function (context, req) {
 
             // Add TOP limit if specified
             if (limit && limit > 0) {
-                // Insert TOP clause after SELECT
-                mediaQuery = mediaQuery.replace('SELECT DISTINCT p.*', `SELECT DISTINCT TOP ${limit} p.*`);
+                // For random queries, we can't use DISTINCT with ORDER BY NEWID()
+                // So we remove DISTINCT for random queries
+                if (random) {
+                    mediaQuery = mediaQuery.replace('SELECT DISTINCT p.*', `SELECT TOP ${limit} p.*`);
+                } else {
+                    mediaQuery = mediaQuery.replace('SELECT DISTINCT p.*', `SELECT DISTINCT TOP ${limit} p.*`);
+                }
+            } else if (random) {
+                // Even without limit, remove DISTINCT for random queries
+                mediaQuery = mediaQuery.replace('SELECT DISTINCT p.*', `SELECT p.*`);
             }
 
             context.log('Executing main media query...');
