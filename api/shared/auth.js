@@ -105,6 +105,11 @@ function hasPermission(userRole, requiredRole) {
  * Extract user email from Azure Static Web Apps auth
  */
 function getUserEmail(context) {
+  // Dev mode bypass
+  if (process.env.DEV_MODE === 'true') {
+    return process.env.DEV_USER_EMAIL || 'dev@example.com';
+  }
+  
   const principal = context.req.headers['x-ms-client-principal'];
   if (!principal) return null;
   
@@ -138,6 +143,11 @@ function getUserEmail(context) {
  * Get user name from Azure Static Web Apps auth
  */
 function getUserName(context) {
+  // Dev mode bypass
+  if (process.env.DEV_MODE === 'true') {
+    return 'Dev User';
+  }
+  
   const principal = context.req.headers['x-ms-client-principal'];
   if (!principal) return null;
   
