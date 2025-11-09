@@ -204,12 +204,24 @@ module.exports = async function (context, req) {
       }
     }
 
-    // Calculate average similarity for each person
+    // Calculate average similarity for each person using top-N approach
+    // This balances between best match and consistency across multiple photos
+    const TOP_N = 3; // Use average of best 3 matches
+    
     for (const personId in scoresByPerson) {
       const person = scoresByPerson[personId];
-      const sum = person.scores.reduce((acc, s) => acc + s.similarity, 0);
-      person.avgSimilarity = sum / person.scores.length;
+      
+      // Sort scores descending
+      const sortedScores = person.scores
+        .map(s => s.similarity)
+        .sort((a, b) => b - a);
+      
+      // Take average of top N scores (or all if less than N)
+      const topScores = sortedScores.slice(0, Math.min(TOP_N, sortedScores.length));
+      const sum = topScores.reduce((acc, s) => acc + s, 0);
+      person.avgSimilarity = sum / topScores.length;
       person.embeddingCount = person.scores.length;
+      person.topNCount = topScores.length; // Track how many scores were averaged
     }
 
     // Log top 10 individual scores for debugging
@@ -224,16 +236,17 @@ module.exports = async function (context, req) {
         embeddingId: person.bestEmbeddingId,
         personId: person.personId,
         personName: person.personName,
-        similarity: person.avgSimilarity, // Use average instead of max
+        similarity: person.avgSimilarity, // Use top-N average
         maxSimilarity: person.maxSimilarity,
         photoFileName: person.bestPhotoFileName,
-        embeddingCount: person.embeddingCount
+        embeddingCount: person.embeddingCount,
+        topNCount: person.topNCount // Show how many were averaged
       }))
       .sort((a, b) => b.similarity - a.similarity);
 
     // Log top 10 aggregated scores per person
-    context.log('Top 10 aggregated scores (by average):', personMatches.slice(0, 10).map(p => 
-      `${p.personName}: avg=${(p.similarity * 100).toFixed(1)}%, max=${(p.maxSimilarity * 100).toFixed(1)}%, count=${p.embeddingCount}`
+    context.log('Top 10 aggregated scores (top-3 avg):', personMatches.slice(0, 10).map(p => 
+      `${p.personName}: top3avg=${(p.similarity * 100).toFixed(1)}%, max=${(p.maxSimilarity * 100).toFixed(1)}%, count=${p.embeddingCount}`
     ));
 
     // Filter by threshold and take top N

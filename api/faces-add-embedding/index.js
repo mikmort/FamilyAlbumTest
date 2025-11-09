@@ -4,15 +4,17 @@ const { query } = require('../shared/db');
 /**
  * Add Face Embedding Endpoint
  * 
- * Stores a 128-dimensional face embedding for a person from a specific photo.
- * This endpoint is called from the client after face-api.js generates embeddings.
+ * Stores face embeddings (128-dim face-api.js or 512-dim InsightFace) for a person from a specific photo.
+ * This endpoint is called from the client after generating embeddings.
  * 
  * POST /api/faces/add-embedding
  * 
  * Body: {
  *   "personId": 123,
  *   "photoFileName": "photo.jpg",
- *   "embedding": [0.123, -0.456, ...] // 128 floats
+ *   "embedding": [0.123, -0.456, ...], // 128 or 512 floats
+ *   "modelVersion": "insightface-arcface" | "face-api-js",
+ *   "embeddingDimensions": 512 | 128
  * }
  * 
  * Returns: {
@@ -45,7 +47,7 @@ module.exports = async function (context, req) {
   }
 
   try {
-    const { personId, photoFileName, embedding } = req.body;
+    const { personId, photoFileName, embedding, modelVersion, embeddingDimensions } = req.body;
 
     // Validate input
     if (!personId || !photoFileName || !embedding) {
@@ -57,11 +59,16 @@ module.exports = async function (context, req) {
       return;
     }
 
-    if (!Array.isArray(embedding) || embedding.length !== 128) {
+    // Default to face-api.js for backward compatibility
+    const model = modelVersion || 'face-api-js';
+    const dimensions = embeddingDimensions || 128;
+
+    // Validate embedding dimensions
+    if (!Array.isArray(embedding) || embedding.length !== dimensions) {
       context.res = {
         status: 400,
         headers: { 'Content-Type': 'application/json' },
-        body: { error: 'Embedding must be an array of 128 floats' }
+        body: { error: `Embedding must be an array of ${dimensions} floats for ${model}` }
       };
       return;
     }
@@ -69,11 +76,13 @@ module.exports = async function (context, req) {
     // Convert embedding array to JSON string for storage
     const embeddingJson = JSON.stringify(embedding);
 
-    // Check if embedding already exists for this person/photo combo
+    // Check if embedding already exists for this person/photo/model combo
     const existing = await query(
       `SELECT ID FROM dbo.FaceEmbeddings 
-       WHERE PersonID = @personId AND PhotoFileName = @photoFileName`,
-      { personId, photoFileName }
+       WHERE PersonID = @personId 
+       AND PhotoFileName = @photoFileName 
+       AND ModelVersion = @modelVersion`,
+      { personId, photoFileName, modelVersion: model }
     );
 
     let embeddingId;
@@ -83,21 +92,36 @@ module.exports = async function (context, req) {
       embeddingId = existing[0].ID;
       await query(
         `UPDATE dbo.FaceEmbeddings 
-         SET Embedding = @embedding, UpdatedDate = GETDATE()
+         SET Embedding = @embedding, 
+             ModelVersion = @modelVersion,
+             EmbeddingDimensions = @embeddingDimensions,
+             UpdatedDate = GETDATE()
          WHERE ID = @id`,
-        { id: embeddingId, embedding: embeddingJson }
+        { 
+          id: embeddingId, 
+          embedding: embeddingJson,
+          modelVersion: model,
+          embeddingDimensions: dimensions
+        }
       );
-      context.log(`Updated embedding ${embeddingId} for person ${personId}, photo ${photoFileName}`);
+      context.log(`Updated ${model} embedding ${embeddingId} (${dimensions}-dim) for person ${personId}, photo ${photoFileName}`);
     } else {
       // Insert new embedding
       const result = await query(
-        `INSERT INTO dbo.FaceEmbeddings (PersonID, PhotoFileName, Embedding)
+        `INSERT INTO dbo.FaceEmbeddings 
+         (PersonID, PhotoFileName, Embedding, ModelVersion, EmbeddingDimensions)
          OUTPUT INSERTED.ID
-         VALUES (@personId, @photoFileName, @embedding)`,
-        { personId, photoFileName, embedding: embeddingJson }
+         VALUES (@personId, @photoFileName, @embedding, @modelVersion, @embeddingDimensions)`,
+        { 
+          personId, 
+          photoFileName, 
+          embedding: embeddingJson,
+          modelVersion: model,
+          embeddingDimensions: dimensions
+        }
       );
       embeddingId = result[0].ID;
-      context.log(`Created embedding ${embeddingId} for person ${personId}, photo ${photoFileName}`);
+      context.log(`Created ${model} embedding ${embeddingId} (${dimensions}-dim) for person ${personId}, photo ${photoFileName}`);
     }
 
     context.res = {

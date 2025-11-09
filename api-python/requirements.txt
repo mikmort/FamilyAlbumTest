@@ -5,6 +5,11 @@ azure-functions>=1.11.0
 azure-cognitiveservices-vision-face>=0.6.0
 msrest>=0.6.21
 
+# InsightFace for state-of-the-art face recognition (512-dim ArcFace embeddings)
+insightface>=0.7.3
+onnxruntime>=1.15.0  # Required by InsightFace for model inference
+opencv-python>=4.8.0  # Required by InsightFace for image processing
+
 # Core dependencies
 numpy>=1.21.0,<2.0.0  # Pin numpy to 1.x for compatibility
 Pillow>=9.0.0
