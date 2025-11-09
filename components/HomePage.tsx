@@ -262,7 +262,7 @@ export default function HomePage({
           pointerEvents: 'none',
         }} />
         
-        <div style={{ position: 'relative', zIndex: 1 }}>
+        <div style={{ position: 'relative', zIndex: 10 }}>
           <h1 style={{ 
             fontSize: '3rem', 
             margin: '0 0 1rem 0', 
@@ -288,6 +288,7 @@ export default function HomePage({
             position: 'relative',
             boxShadow: '0 8px 24px rgba(0, 0, 0, 0.15)',
             backdropFilter: 'blur(10px)',
+            zIndex: 100,
           }}>
             <span style={{ fontSize: '1.5rem' }}>🔍</span>
             <input
@@ -317,10 +318,10 @@ export default function HomePage({
               marginTop: '0.5rem',
               background: 'white',
               borderRadius: '12px',
-              boxShadow: '0 8px 24px rgba(0, 0, 0, 0.15)',
+              boxShadow: '0 12px 32px rgba(0, 0, 0, 0.2)',
               maxHeight: '400px',
               overflowY: 'auto',
-              zIndex: 1000,
+              zIndex: 10000,
             }}>
               {searchResults.people.length > 0 && (
                 <>
@@ -451,10 +452,10 @@ export default function HomePage({
           </p>
           <div style={{
             display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
             gap: '1.5rem',
           }}>
-            {data.recentUploads.slice(0, 10).map((media, idx) => (
+            {data.recentUploads.slice(0, 6).map((media, idx) => (
               <div
                 key={idx}
                 style={{
@@ -555,7 +556,7 @@ export default function HomePage({
               </div>
             ))}
           </div>
-          {data.recentUploads.length > 10 && (
+          {data.recentUploads.length > 6 && (
             <div style={{ textAlign: 'center', marginTop: '1.5rem' }}>
               <button
                 onClick={onViewRecentUploads}
@@ -573,7 +574,7 @@ export default function HomePage({
                 onMouseOver={(e) => e.currentTarget.style.background = '#5568d3'}
                 onMouseOut={(e) => e.currentTarget.style.background = '#667eea'}
               >
-                Show More ({data.recentUploads.length - 10} more)
+                View All in Gallery ({data.recentUploads.length} photos)
               </button>
             </div>
           )}

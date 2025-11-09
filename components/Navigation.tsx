@@ -69,7 +69,7 @@ export default function Navigation({
           e.currentTarget.style.boxShadow = '0 4px 12px rgba(102, 126, 234, 0.4)';
         }}
       >
-        ➕ Add Memory
+        ➕ Add Photo/Video
       </button>
     </nav>
   );
