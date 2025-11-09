@@ -380,79 +380,6 @@ export default function HomePage({
         </button>
       </div>
 
-      {/* On This Day Section */}
-      {data && data.onThisDay && data.onThisDay.length > 0 && (
-        <section style={{
-          background: 'white',
-          borderRadius: '12px',
-          padding: '2rem',
-          marginBottom: '2rem',
-          boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1)',
-        }}>
-          <h2 style={{ 
-            fontSize: '1.8rem', 
-            marginBottom: '1rem', 
-            color: '#2c3e50',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '0.5rem'
-          }}>
-            🎉 In This Month - {monthNames[today.getMonth()]}
-          </h2>
-          <p style={{ color: '#666', marginBottom: '1.5rem' }}>
-            Memories from years past in {monthNames[today.getMonth()]}
-          </p>
-          <div style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))',
-            gap: '1rem',
-          }}>
-            {data.onThisDay.slice(0, 6).map((media, idx) => (
-              <div
-                key={idx}
-                style={{
-                  position: 'relative',
-                  paddingBottom: '100%',
-                  borderRadius: '8px',
-                  overflow: 'hidden',
-                  cursor: 'pointer',
-                  boxShadow: '0 2px 8px rgba(0, 0, 0, 0.15)',
-                  transition: 'transform 0.2s',
-                }}
-                onClick={() => onMediaClick(media, data.onThisDay)}
-                onMouseOver={(e) => e.currentTarget.style.transform = 'scale(1.05)'}
-                onMouseOut={(e) => e.currentTarget.style.transform = 'scale(1)'}
-              >
-                <img
-                  src={media.PThumbnailUrl}
-                  alt={media.PDescription || 'Family photo'}
-                  style={{
-                    position: 'absolute',
-                    top: 0,
-                    left: 0,
-                    width: '100%',
-                    height: '100%',
-                    objectFit: 'cover',
-                  }}
-                />
-                <div style={{
-                  position: 'absolute',
-                  bottom: 0,
-                  left: 0,
-                  right: 0,
-                  background: 'linear-gradient(to top, rgba(0,0,0,0.8), transparent)',
-                  color: 'white',
-                  padding: '0.5rem',
-                  fontSize: '0.85rem',
-                }}>
-                  {media.PYear}
-                </div>
-              </div>
-            ))}
-          </div>
-        </section>
-      )}
-
       {/* Recent Uploads Section */}
       {data && data.recentUploads && data.recentUploads.length > 0 && (
         <section style={{
@@ -473,7 +400,7 @@ export default function HomePage({
             ✨ Recent Uploads
           </h2>
           <p style={{ color: '#666', marginBottom: '1.5rem' }}>
-            New memories added recently
+            New memories added in the last 60 days
           </p>
           <div style={{
             display: 'grid',
@@ -546,6 +473,79 @@ export default function HomePage({
               </button>
             </div>
           )}
+        </section>
+      )}
+
+      {/* On This Day Section */}
+      {data && data.onThisDay && data.onThisDay.length > 0 && (
+        <section style={{
+          background: 'white',
+          borderRadius: '12px',
+          padding: '2rem',
+          marginBottom: '2rem',
+          boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1)',
+        }}>
+          <h2 style={{ 
+            fontSize: '1.8rem', 
+            marginBottom: '1rem', 
+            color: '#2c3e50',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.5rem'
+          }}>
+            🎉 In This Month - {monthNames[today.getMonth()]}
+          </h2>
+          <p style={{ color: '#666', marginBottom: '1.5rem' }}>
+            Memories from years past in {monthNames[today.getMonth()]}
+          </p>
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))',
+            gap: '1rem',
+          }}>
+            {data.onThisDay.slice(0, 6).map((media, idx) => (
+              <div
+                key={idx}
+                style={{
+                  position: 'relative',
+                  paddingBottom: '100%',
+                  borderRadius: '8px',
+                  overflow: 'hidden',
+                  cursor: 'pointer',
+                  boxShadow: '0 2px 8px rgba(0, 0, 0, 0.15)',
+                  transition: 'transform 0.2s',
+                }}
+                onClick={() => onMediaClick(media, data.onThisDay)}
+                onMouseOver={(e) => e.currentTarget.style.transform = 'scale(1.05)'}
+                onMouseOut={(e) => e.currentTarget.style.transform = 'scale(1)'}
+              >
+                <img
+                  src={media.PThumbnailUrl}
+                  alt={media.PDescription || 'Family photo'}
+                  style={{
+                    position: 'absolute',
+                    top: 0,
+                    left: 0,
+                    width: '100%',
+                    height: '100%',
+                    objectFit: 'cover',
+                  }}
+                />
+                <div style={{
+                  position: 'absolute',
+                  bottom: 0,
+                  left: 0,
+                  right: 0,
+                  background: 'linear-gradient(to top, rgba(0,0,0,0.8), transparent)',
+                  color: 'white',
+                  padding: '0.5rem',
+                  fontSize: '0.85rem',
+                }}>
+                  {media.PYear}
+                </div>
+              </div>
+            ))}
+          </div>
         </section>
       )}
 

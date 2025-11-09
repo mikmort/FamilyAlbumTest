@@ -53,11 +53,12 @@ module.exports = async function (context, req) {
             month: currentMonth
         });
 
-        // Get recent uploads
+        // Get recent uploads (last 60 days)
         const recentUploadsQuery = `
-            SELECT TOP 12
+            SELECT 
                 p.*
             FROM dbo.Pictures p
+            WHERE p.PDateEntered >= DATEADD(day, -60, GETDATE())
             ORDER BY p.PDateEntered DESC
         `;
         
