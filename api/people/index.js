@@ -1,5 +1,6 @@
 const { query, execute } = require('../shared/db');
 const { checkAuthorization } = require('../shared/auth');
+const { cache } = require('../shared/cache');
 
 module.exports = async function (context, req) {
     context.log('People API function processed a request.');
@@ -27,29 +28,37 @@ module.exports = async function (context, req) {
     try {
         // GET /api/people/:id - Get single person by ID
         if (method === 'GET' && personId) {
-            const personQuery = `
-                SELECT 
-                    ID,
-                    neName,
-                    neRelation,
-                    neType,
-                    neDateLastModified,
-                    ISNULL(neCount, 0) as neCount
-                FROM dbo.NameEvent WITH (NOLOCK)
-                WHERE ID = @id AND neType = 'N'
-            `;
-            const people = await query(personQuery, { id: personId });
+            const cacheKey = `person:${personId}`;
+            let person = cache.get(cacheKey);
+            
+            if (!person) {
+                const personQuery = `
+                    SELECT 
+                        ID,
+                        neName,
+                        neRelation,
+                        neType,
+                        neDateLastModified,
+                        ISNULL(neCount, 0) as neCount
+                    FROM dbo.NameEvent WITH (NOLOCK)
+                    WHERE ID = @id AND neType = 'N'
+                `;
+                const people = await query(personQuery, { id: personId });
 
-            if (people.length === 0) {
-                context.res = {
-                    status: 404,
-                    headers: { 'Content-Type': 'application/json' },
-                    body: {
-                        success: false,
-                        error: 'Person not found'
-                    }
-                };
-                return;
+                if (people.length === 0) {
+                    context.res = {
+                        status: 404,
+                        headers: { 'Content-Type': 'application/json' },
+                        body: {
+                            success: false,
+                            error: 'Person not found'
+                        }
+                    };
+                    return;
+                }
+                
+                person = people[0];
+                cache.set(cacheKey, person);
             }
 
             context.res = {
@@ -57,7 +66,7 @@ module.exports = async function (context, req) {
                 headers: { 'Content-Type': 'application/json' },
                 body: {
                     success: true,
-                    person: people[0]
+                    person: person
                 }
             };
             return;
@@ -65,19 +74,25 @@ module.exports = async function (context, req) {
         
         // GET /api/people - List all people
         if (method === 'GET') {
-            const peopleQuery = `
-                SELECT 
-                    ID,
-                    neName,
-                    neRelation,
-                    neType,
-                    neDateLastModified,
-                    ISNULL(neCount, 0) as neCount
-                FROM dbo.NameEvent WITH (NOLOCK)
-                WHERE neType = 'N'
-                ORDER BY neName
-            `;
-            const people = await query(peopleQuery);
+            const cacheKey = 'people:all';
+            let people = cache.get(cacheKey, 10 * 60 * 1000); // Cache for 10 minutes
+            
+            if (!people) {
+                const peopleQuery = `
+                    SELECT 
+                        ID,
+                        neName,
+                        neRelation,
+                        neType,
+                        neDateLastModified,
+                        ISNULL(neCount, 0) as neCount
+                    FROM dbo.NameEvent WITH (NOLOCK)
+                    WHERE neType = 'N'
+                    ORDER BY neName
+                `;
+                people = await query(peopleQuery);
+                cache.set(cacheKey, people);
+            }
 
             context.res = {
                 status: 200,
@@ -116,6 +131,9 @@ module.exports = async function (context, req) {
                 name: personName,
                 relation: personRelation || null
             });
+
+            // Invalidate people cache
+            cache.invalidatePattern('people:');
 
             context.res = {
                 status: 201,
@@ -163,6 +181,9 @@ module.exports = async function (context, req) {
                 return;
             }
 
+            // Invalidate people cache
+            cache.invalidatePattern('people:');
+
             context.res = {
                 status: 200,
                 body: {
@@ -192,6 +213,9 @@ module.exports = async function (context, req) {
             // Delete person
             const deleteQuery = `DELETE FROM dbo.NameEvent WHERE ID = @id`;
             await execute(deleteQuery, { id });
+
+            // Invalidate people cache
+            cache.invalidatePattern('people:');
 
             context.res = {
                 status: 204
