@@ -159,8 +159,9 @@ module.exports = async function (context, req) {
     }
 
     // Calculate similarity for each stored embedding
-    const matches = [];
     const allScores = []; // Track all scores for debugging
+    const scoresByPerson = {}; // Group scores by person
+    
     for (const stored of storedEmbeddings) {
       try {
         const storedEmbedding = JSON.parse(stored.Embedding);
@@ -175,40 +176,69 @@ module.exports = async function (context, req) {
           photoFileName: stored.PhotoFileName
         });
 
-        if (similarity >= threshold) {
-          matches.push({
-            embeddingId: stored.ID,
+        // Group by person ID
+        if (!scoresByPerson[stored.PersonID]) {
+          scoresByPerson[stored.PersonID] = {
             personId: stored.PersonID,
             personName: stored.PersonName,
-            similarity: similarity,
-            photoFileName: stored.PhotoFileName
-          });
+            scores: [],
+            maxSimilarity: 0,
+            avgSimilarity: 0
+          };
+        }
+        
+        scoresByPerson[stored.PersonID].scores.push({
+          similarity: similarity,
+          embeddingId: stored.ID,
+          photoFileName: stored.PhotoFileName
+        });
+        
+        // Track max similarity for this person
+        if (similarity > scoresByPerson[stored.PersonID].maxSimilarity) {
+          scoresByPerson[stored.PersonID].maxSimilarity = similarity;
+          scoresByPerson[stored.PersonID].bestPhotoFileName = stored.PhotoFileName;
+          scoresByPerson[stored.PersonID].bestEmbeddingId = stored.ID;
         }
       } catch (parseError) {
         context.log.error(`Error parsing embedding ${stored.ID}:`, parseError);
       }
     }
 
-    // Log top 10 scores for debugging (even if below threshold)
+    // Calculate average similarity for each person
+    for (const personId in scoresByPerson) {
+      const person = scoresByPerson[personId];
+      const sum = person.scores.reduce((acc, s) => acc + s.similarity, 0);
+      person.avgSimilarity = sum / person.scores.length;
+      person.embeddingCount = person.scores.length;
+    }
+
+    // Log top 10 individual scores for debugging
     allScores.sort((a, b) => b.similarity - a.similarity);
-    context.log('Top 10 similarity scores:', allScores.slice(0, 10).map(s => 
+    context.log('Top 10 individual embedding scores:', allScores.slice(0, 10).map(s => 
       `${s.personName}: ${(s.similarity * 100).toFixed(1)}%`
     ));
 
-    // Sort by similarity (highest first) and take top N
-    matches.sort((a, b) => b.similarity - a.similarity);
-    const topMatches = matches.slice(0, topN);
+    // Convert to array and sort by average similarity (gives equal weight to all people)
+    const personMatches = Object.values(scoresByPerson)
+      .map(person => ({
+        embeddingId: person.bestEmbeddingId,
+        personId: person.personId,
+        personName: person.personName,
+        similarity: person.avgSimilarity, // Use average instead of max
+        maxSimilarity: person.maxSimilarity,
+        photoFileName: person.bestPhotoFileName,
+        embeddingCount: person.embeddingCount
+      }))
+      .sort((a, b) => b.similarity - a.similarity);
 
-    // Group by person and get best match per person
-    const bestMatchPerPerson = {};
-    for (const match of topMatches) {
-      if (!bestMatchPerPerson[match.personId] || 
-          match.similarity > bestMatchPerPerson[match.personId].similarity) {
-        bestMatchPerPerson[match.personId] = match;
-      }
-    }
+    // Log top 10 aggregated scores per person
+    context.log('Top 10 aggregated scores (by average):', personMatches.slice(0, 10).map(p => 
+      `${p.personName}: avg=${(p.similarity * 100).toFixed(1)}%, max=${(p.maxSimilarity * 100).toFixed(1)}%, count=${p.embeddingCount}`
+    ));
 
-    const uniqueMatches = Object.values(bestMatchPerPerson);
+    // Filter by threshold and take top N
+    const matches = personMatches.filter(p => p.similarity >= threshold);
+    const uniqueMatches = matches.slice(0, topN);
 
     context.log(`Identified ${uniqueMatches.length} potential matches above threshold ${threshold}`);
 
