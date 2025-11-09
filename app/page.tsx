@@ -44,6 +44,15 @@ export default function Home() {
   const [startFullscreen, setStartFullscreen] = useState(false);
   const [mediaList, setMediaList] = useState<MediaItem[]>([]);
 
+  // Wake up database immediately on mount (before auth check)
+  // This helps reduce perceived loading time for serverless SQL databases
+  useEffect(() => {
+    // Fire and forget - we don't wait for this to complete
+    fetch('/api/db-warmup').catch(() => {
+      // Ignore errors - this is just a warmup hint
+    });
+  }, []);
+
   // Check authorization on mount
   useEffect(() => {
     checkAuthStatus();
