@@ -80,10 +80,10 @@ module.exports = async function (context, req) {
                 ne.ID,
                 ne.neName,
                 ne.neRelation,
-                (SELECT COUNT(*) FROM dbo.NamePhoto np WHERE np.neID = ne.ID) as neCount
+                (SELECT COUNT(*) FROM dbo.NamePhoto np WHERE np.npID = ne.ID) as neCount
             FROM dbo.NameEvent ne
             WHERE ne.neType = 'N'
-            AND EXISTS (SELECT 1 FROM dbo.NamePhoto np WHERE np.neID = ne.ID)
+            AND EXISTS (SELECT 1 FROM dbo.NamePhoto np WHERE np.npID = ne.ID)
             ORDER BY NEWID()
         `;
         
@@ -96,10 +96,10 @@ module.exports = async function (context, req) {
                 ne.ID,
                 ne.neName,
                 ne.neRelation,
-                (SELECT COUNT(*) FROM dbo.NamePhoto np WHERE np.neID = ne.ID) as neCount
+                (SELECT COUNT(*) FROM dbo.NamePhoto np WHERE np.npID = ne.ID) as neCount
             FROM dbo.NameEvent ne
             WHERE ne.neType = 'E'
-            AND EXISTS (SELECT 1 FROM dbo.NamePhoto np WHERE np.neID = ne.ID)
+            AND EXISTS (SELECT 1 FROM dbo.NamePhoto np WHERE np.npID = ne.ID)
             ORDER BY NEWID()
         `;
         
@@ -114,7 +114,7 @@ module.exports = async function (context, req) {
                 ne.neRelation
             FROM dbo.NameEvent ne
             WHERE ne.neType = 'E'
-            AND EXISTS (SELECT 1 FROM dbo.NamePhoto np WHERE np.neID = ne.ID)
+            AND EXISTS (SELECT 1 FROM dbo.NamePhoto np WHERE np.npID = ne.ID)
             ORDER BY NEWID()
         `;
         
