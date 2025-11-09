@@ -393,19 +393,55 @@
       resultsDiv.innerHTML = '<div class="status loading">🔄 Processing image...</div>';
 
       try {
+        // Check if Python API is running
+        if (selectedModel === 'insightface') {
+          resultsDiv.innerHTML = '<div class="status loading">🔄 Checking Python API availability...</div>';
+          try {
+            const healthCheck = await fetch('http://localhost:7072/api/generate-embeddings', { method: 'OPTIONS' });
+            if (!healthCheck.ok && healthCheck.status !== 405) {
+              throw new Error('Python API not responding');
+            }
+          } catch (healthError) {
+            resultsDiv.innerHTML = `
+              <div class="status error">
+                ❌ Python API not available on port 7072
+                <p style="margin-top: 10px; font-size: 0.9rem;">
+                  Please start the Python API first:<br>
+                  <code style="display: block; margin-top: 8px; padding: 8px; background: white; border-radius: 4px;">
+                    cd api-python<br>
+                    pip install -r requirements.txt<br>
+                    func start --port 7072
+                  </code>
+                </p>
+                <p style="margin-top: 10px; font-size: 0.85rem; color: #666;">
+                  Error: ${healthError.message}
+                </p>
+              </div>
+            `;
+            return;
+          }
+        }
+
         const formData = new FormData();
         formData.append('image', file);
 
         let embedding, dimensions, confidence;
 
         if (selectedModel === 'insightface') {
-          // Step 1: Generate InsightFace embedding
+          // Step 1: Generate InsightFace embedding (directly call Python API on port 7072)
           resultsDiv.innerHTML = '<div class="status loading">🔄 Generating 512-dim InsightFace embedding...</div>';
           
-          const generateResponse = await fetch('/api/generate-embeddings', {
+          const generateResponse = await fetch('http://localhost:7072/api/generate-embeddings', {
             method: 'POST',
             body: formData
           });
+
+          if (!generateResponse.ok) {
+            const errorText = await generateResponse.text();
+            console.error('Generate embeddings error:', errorText);
+            resultsDiv.innerHTML = `<div class="status error">❌ API Error (${generateResponse.status}): ${errorText.substring(0, 200)}</div>`;
+            return;
+          }
 
           const generateData = await generateResponse.json();
           
@@ -421,7 +457,7 @@
           // Step 2: Match against database
           resultsDiv.innerHTML = '<div class="status loading">🔍 Searching database for matches...</div>';
           
-          const matchResponse = await fetch('/api/faces-identify-v2', {
+          const matchResponse = await fetch('http://localhost:7072/api/faces-identify-v2', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
