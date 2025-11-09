@@ -29,6 +29,7 @@ module.exports = async function (context, req) {
     if (!authorized) {
       context.res = {
         status: 403,
+        headers: { 'Content-Type': 'application/json' },
         body: { error }
       };
       return;
@@ -37,6 +38,7 @@ module.exports = async function (context, req) {
     context.log.error('Authorization error:', authError);
     context.res = {
       status: 500,
+      headers: { 'Content-Type': 'application/json' },
       body: { error: 'Authorization check failed', details: authError.message }
     };
     return;
@@ -49,6 +51,7 @@ module.exports = async function (context, req) {
     if (!personId || !photoFileName || !embedding) {
       context.res = {
         status: 400,
+        headers: { 'Content-Type': 'application/json' },
         body: { error: 'Missing required fields: personId, photoFileName, embedding' }
       };
       return;
@@ -57,6 +60,7 @@ module.exports = async function (context, req) {
     if (!Array.isArray(embedding) || embedding.length !== 128) {
       context.res = {
         status: 400,
+        headers: { 'Content-Type': 'application/json' },
         body: { error: 'Embedding must be an array of 128 floats' }
       };
       return;
@@ -98,6 +102,7 @@ module.exports = async function (context, req) {
 
     context.res = {
       status: 200,
+      headers: { 'Content-Type': 'application/json' },
       body: {
         success: true,
         embeddingId: embeddingId
@@ -114,6 +119,7 @@ module.exports = async function (context, req) {
     if (err instanceof DatabaseWarmupError || isDatabaseWarmupError(err)) {
       context.res = {
         status: 503, // Service Unavailable
+        headers: { 'Content-Type': 'application/json' },
         body: {
           success: false,
           error: 'Database is warming up. Please wait a moment and try again.',
@@ -123,6 +129,7 @@ module.exports = async function (context, req) {
     } else {
       context.res = {
         status: 500,
+        headers: { 'Content-Type': 'application/json' },
         body: {
           success: false,
           error: err.message || 'Error adding face embedding'

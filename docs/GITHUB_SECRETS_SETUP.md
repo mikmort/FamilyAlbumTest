@@ -6,13 +6,24 @@ This document explains how to configure GitHub Secrets to enable full Playwright
 
 The Family Album application uses Azure SQL Database and Azure Blob Storage. To run tests that interact with these services, you need to configure GitHub Secrets with your Azure credentials.
 
-**Important**: Dev mode bypasses authentication, but tests still need database and storage access to function fully. However, tests can run in a limited capacity without these secrets.
+**E2E Testing Strategy**: GitHub Actions cannot run Azure Functions locally due to network restrictions (cdn.functions.azure.com is blocked). Instead, E2E tests run against the **deployed Azure Static Web Apps** production site where the API is already integrated and working.
 
 ## Required GitHub Secrets
 
 Navigate to your repository settings: **Settings** → **Secrets and variables** → **Actions**
 
 Add the following secrets:
+
+### Production URL (Required for E2E Testing)
+
+| Secret Name | Description | Example Value |
+|-------------|-------------|---------------|
+| `PRODUCTION_URL` | Your Azure Static Web Apps URL | `https://your-app.azurestaticapps.net` |
+
+**How to find your production URL:**
+1. Go to Azure Portal → Static Web Apps
+2. Find your application (e.g., "family-album-prod")
+3. Copy the URL from the **Overview** page
 
 ### Azure SQL Database Secrets
 
@@ -64,6 +75,12 @@ Create a separate blob storage container for test media:
 
 Ensure GitHub Actions runners can access your Azure resources:
 
+**✅ Completed via Azure CLI:**
+- Azure SQL Server: `AllowAllWindowsAzureIps` rule created (allows GitHub Actions to connect to database)
+- Storage Account: `AzureServices` bypass enabled (allows GitHub Actions to access blob storage)
+
+**Note**: These rules allow GitHub Actions to access your Azure SQL and Storage resources directly. However, GitHub Actions has network restrictions that prevent downloading Azure Functions extension bundles from `cdn.functions.azure.com`, which means API tests may not run in automated environments. This is expected and documented below.
+
 #### Azure SQL Firewall
 1. Navigate to your SQL Server in Azure Portal
 2. Go to **Security** → **Networking**
@@ -87,16 +104,50 @@ Ensure GitHub Actions runners can access your Azure resources:
 
 ### Step 5: Verify Setup
 
-After adding secrets, trigger the Playwright workflow:
+After adding secrets, trigger the E2E test workflow:
 
 1. Go to: **Actions** tab in GitHub
-2. Select: **Playwright Tests** workflow
+2. Select: **E2E Tests (Production)** workflow
 3. Click: **Run workflow** → **Run workflow**
-4. Monitor the test results
+4. Monitor the test results - tests will run against your deployed production site
 
-## Testing Locally with Coding Agent
+**Note**: The E2E workflow automatically runs after each successful deployment to Azure Static Web Apps.
 
-When GitHub Copilot or other coding agents run tests, they automatically use the configured GitHub Secrets. The secrets are available as environment variables.
+## How E2E Testing Works
+
+The application now supports two testing modes:
+
+### 1. Local Testing (Default)
+- Run: `npm test` or `npx playwright test`
+- Tests against: `http://localhost:3000`
+- Requires: Local dev server running (`npm run dev`)
+- Uses: DEV_MODE for authentication bypass
+
+### 2. E2E Testing (GitHub Actions)
+- Workflow: `.github/workflows/e2e-tests.yml`
+- Tests against: `$PRODUCTION_URL` (Azure Static Web Apps)
+- Requires: `PRODUCTION_URL` secret configured
+- Uses: Real authentication and deployed API
+- Runs: Automatically after successful deployments
+
+**Why test against production?**
+GitHub Actions has network restrictions that prevent local Azure Functions from downloading extension bundles (cdn.functions.azure.com). The solution is to test against the deployed site where the API is already integrated and working.
+
+## Testing with Coding Agent
+
+When GitHub Copilot or other coding agents run E2E tests:
+
+1. **Secrets are automatically available** as environment variables
+2. **Tests run against production** using the `PRODUCTION_URL` secret
+3. **No local API server needed** - the deployed Azure Functions API is used
+4. **Full integration testing** - tests validate the complete deployed application
+- Local development has full API access
+
+**Workaround Options**:
+1. **Frontend-only tests**: Run UI tests without API calls
+2. **Mock API responses**: Use Playwright route mocking
+3. **SKIP_API_SERVER mode**: Set environment variable to skip API startup
+4. **Local testing**: Full functionality available when running locally
 
 ### For Manual Local Testing
 
@@ -197,6 +248,23 @@ npm test -- tests/navigation.spec.ts
 2. Check storage account key hasn't been rotated
 3. Ensure container exists
 4. Verify firewall rules allow GitHub Actions
+
+### Azure Functions CDN Not Accessible
+
+**Problem**: `Cannot connect to cdn.functions.azure.com` or extension bundle download fails
+
+**Root Cause**: GitHub Actions environment has restricted network access that blocks `cdn.functions.azure.com`
+
+**Solutions**:
+1. **Skip API tests**: Set `SKIP_API_SERVER=true` in workflow environment
+2. **Frontend-only tests**: Run tests that don't require API:
+   ```bash
+   npm test -- tests/navigation.spec.ts tests/components.spec.ts
+   ```
+3. **Mock API**: Use Playwright route interception to mock API responses
+4. **Local testing**: Run full test suite locally where Azure Functions works
+
+**Note**: This is a known limitation of GitHub Actions network policies and cannot be resolved by changing Azure firewall rules.
 
 ### Secrets Not Available in Workflow
 

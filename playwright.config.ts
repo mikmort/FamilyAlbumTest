@@ -29,7 +29,8 @@ export default defineConfig({
   // Shared settings for all projects
   use: {
     // Base URL for tests
-    baseURL: 'http://localhost:3000',
+    // Use PRODUCTION_URL for E2E testing against deployed site, or localhost for local dev
+    baseURL: process.env.PRODUCTION_URL || 'http://localhost:3000',
     
     // Collect trace when retrying failed test
     trace: 'on-first-retry',
@@ -90,10 +91,10 @@ export default defineConfig({
     ]),
   ],
 
-  // Run both Azure Functions API and Next.js dev server before starting tests
-  // Note: Azure Functions requires internet access for extension bundles
-  // In restricted environments (like GitHub Copilot), skip API server
-  webServer: process.env.SKIP_API_SERVER === 'true' ? [
+  // Run your local dev server before starting the tests
+  // Skip when PRODUCTION_URL is set (E2E testing against deployed site)
+  // Or when SKIP_API_SERVER is true (frontend-only testing)
+  webServer: process.env.PRODUCTION_URL ? undefined : process.env.SKIP_API_SERVER === 'true' ? [
     // Next.js frontend only (API calls will fail but frontend tests work)
     {
       command: 'npm run dev',

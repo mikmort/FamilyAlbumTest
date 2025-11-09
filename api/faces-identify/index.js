@@ -59,6 +59,35 @@ function cosineSimilarity(embedding1, embedding2) {
   return dotProduct / (magnitude1 * magnitude2);
 }
 
+/**
+ * Calculate Euclidean distance between two embedding vectors
+ * face-api.js uses this by default for matching
+ * Returns distance (lower is better), converted to similarity (higher is better)
+ * @param {number[]} embedding1 - First 128-dim embedding
+ * @param {number[]} embedding2 - Second 128-dim embedding
+ * @returns {number} Similarity score between 0 and 1 (1 - normalized distance)
+ */
+function euclideanSimilarity(embedding1, embedding2) {
+  if (embedding1.length !== 128 || embedding2.length !== 128) {
+    throw new Error('Embeddings must be 128-dimensional');
+  }
+
+  let sumSquares = 0;
+  for (let i = 0; i < 128; i++) {
+    const diff = embedding1[i] - embedding2[i];
+    sumSquares += diff * diff;
+  }
+  
+  const distance = Math.sqrt(sumSquares);
+  
+  // face-api.js considers distance < 0.6 as a match
+  // Convert to similarity score: smaller distance = higher similarity
+  // Max realistic distance is ~2 for normalized vectors
+  const similarity = Math.max(0, 1 - (distance / 2));
+  
+  return similarity;
+}
+
 module.exports = async function (context, req) {
   context.log('Identify face processing request');
 
@@ -123,7 +152,9 @@ module.exports = async function (context, req) {
     for (const stored of storedEmbeddings) {
       try {
         const storedEmbedding = JSON.parse(stored.Embedding);
-        const similarity = cosineSimilarity(embedding, storedEmbedding);
+        
+        // Use Euclidean distance (face-api.js default) instead of cosine similarity
+        const similarity = euclideanSimilarity(embedding, storedEmbedding);
 
         if (similarity >= threshold) {
           matches.push({
