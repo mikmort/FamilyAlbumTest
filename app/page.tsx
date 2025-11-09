@@ -38,7 +38,9 @@ export default function Home() {
   const [loadingAuth, setLoadingAuth] = useState(true);
   const [newMediaCount, setNewMediaCount] = useState(0);
   const [selectedPeople, setSelectedPeople] = useState<number[]>([]);
+  const [selectedPeopleNames, setSelectedPeopleNames] = useState<string[]>([]);
   const [selectedEvent, setSelectedEvent] = useState<number | null>(null);
+  const [selectedEventName, setSelectedEventName] = useState<string | null>(null);
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
   const [showNoPeople, setShowNoPeople] = useState(false);
   const [exclusiveFilter, setExclusiveFilter] = useState(false);
@@ -287,8 +289,14 @@ export default function Home() {
             showNoPeople={showNoPeople}
             sortOrder={sortOrder}
             exclusiveFilter={exclusiveFilter}
-            onSelectedPeopleChange={setSelectedPeople}
-            onSelectedEventChange={setSelectedEvent}
+            onSelectedPeopleChange={(ids, names) => {
+              setSelectedPeople(ids);
+              setSelectedPeopleNames(names || []);
+            }}
+            onSelectedEventChange={(id, name) => {
+              setSelectedEvent(id);
+              setSelectedEventName(name || null);
+            }}
             onShowNoPeopleChange={setShowNoPeople}
             onSortOrderChange={setSortOrder}
             onExclusiveFilterChange={setExclusiveFilter}
@@ -325,8 +333,11 @@ export default function Home() {
               sortOrder={sortOrder}
               exclusiveFilter={exclusiveFilter}
               recentDays={recentDays}
+              peopleNames={selectedPeopleNames}
+              eventName={selectedEventName}
               onMediaClick={handleMediaClick}
               onMediaFullscreen={handleMediaFullscreen}
+              onNavigateHome={() => setView('home')}
             />
           </div>
         )}

@@ -11,8 +11,11 @@ interface ThumbnailGalleryProps {
   sortOrder: 'asc' | 'desc';
   exclusiveFilter: boolean;
   recentDays?: number | null;
+  peopleNames?: string[];
+  eventName?: string | null;
   onMediaClick: (media: MediaItem, allMedia: MediaItem[]) => void;
   onMediaFullscreen?: (media: MediaItem, allMedia: MediaItem[]) => void;
+  onNavigateHome?: () => void;
 }
 
 // Memoized thumbnail component for better performance
@@ -106,8 +109,11 @@ function ThumbnailGallery({
   sortOrder,
   exclusiveFilter,
   recentDays,
+  peopleNames,
+  eventName,
   onMediaClick,
   onMediaFullscreen,
+  onNavigateHome,
 }: ThumbnailGalleryProps) {
   const [retryCount, setRetryCount] = useState(0);
 
@@ -231,8 +237,70 @@ function ThumbnailGallery({
     );
   }
 
+  // Build breadcrumb items
+  const breadcrumbItems: string[] = ['Home'];
+  
+  if (recentDays) {
+    breadcrumbItems.push(`Recent (${recentDays} days)`);
+  } else if (noPeople) {
+    breadcrumbItems.push('Untagged Photos');
+  } else if (eventName) {
+    breadcrumbItems.push('Events', eventName);
+  } else if (peopleNames && peopleNames.length > 0) {
+    breadcrumbItems.push('People', peopleNames.join(' & '));
+  }
+
   return (
     <>
+      {/* Breadcrumb Navigation */}
+      {breadcrumbItems.length > 1 && (
+        <div style={{
+          background: 'white',
+          borderRadius: '8px',
+          padding: '0.75rem 1.5rem',
+          marginBottom: '1rem',
+          boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '0.5rem',
+          fontSize: '0.95rem',
+        }}>
+          {breadcrumbItems.map((item, index) => (
+            <div key={index} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              {index === 0 ? (
+                <button
+                  onClick={onNavigateHome}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    color: '#667eea',
+                    cursor: 'pointer',
+                    padding: 0,
+                    fontSize: 'inherit',
+                    fontWeight: '500',
+                    textDecoration: 'none',
+                  }}
+                  onMouseOver={(e) => e.currentTarget.style.textDecoration = 'underline'}
+                  onMouseOut={(e) => e.currentTarget.style.textDecoration = 'none'}
+                >
+                  {item}
+                </button>
+              ) : (
+                <span style={{ 
+                  color: index === breadcrumbItems.length - 1 ? '#2c3e50' : '#666',
+                  fontWeight: index === breadcrumbItems.length - 1 ? '600' : '400'
+                }}>
+                  {item}
+                </span>
+              )}
+              {index < breadcrumbItems.length - 1 && (
+                <span style={{ color: '#ccc', userSelect: 'none' }}>›</span>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+
       <div className="card mb-2">
         <p>
           <strong>{media.length}</strong> photo{media.length !== 1 ? 's' : ''} found

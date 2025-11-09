@@ -451,16 +451,19 @@ export default function HomePage({
             New memories added in the last 60 days
           </p>
           <div style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+            display: 'flex',
             gap: '1.5rem',
+            overflowX: 'hidden',
+            justifyContent: 'flex-start',
           }}>
-            {data.recentUploads.slice(0, 6).map((media, idx) => (
+            {data.recentUploads.slice(0, 5).map((media, idx) => (
               <div
                 key={idx}
                 style={{
                   position: 'relative',
-                  paddingBottom: '100%',
+                  flex: '0 0 auto',
+                  width: 'calc((100% - 6rem) / 5)', // 5 items with 1.5rem gaps
+                  paddingBottom: 'calc((100% - 6rem) / 5)', // Square aspect ratio
                   borderRadius: '12px',
                   overflow: 'hidden',
                   cursor: 'pointer',
@@ -556,7 +559,7 @@ export default function HomePage({
               </div>
             ))}
           </div>
-          {data.recentUploads.length > 6 && (
+          {data.recentUploads.length > 5 && (
             <div style={{ textAlign: 'center', marginTop: '1.5rem' }}>
               <button
                 onClick={onViewRecentUploads}
@@ -604,25 +607,37 @@ export default function HomePage({
             Memories from years past in {monthNames[today.getMonth()]}
           </p>
           <div style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))',
-            gap: '1rem',
+            display: 'flex',
+            flexWrap: 'wrap',
+            gap: '1.5rem',
           }}>
-            {data.onThisDay.slice(0, 6).map((media, idx) => (
+            {data.onThisDay.slice(0, 10).map((media, idx) => (
               <div
                 key={idx}
                 style={{
                   position: 'relative',
-                  paddingBottom: '100%',
-                  borderRadius: '8px',
+                  flex: '0 0 auto',
+                  width: 'calc((100% - 6rem) / 5)', // 5 items per row with 1.5rem gaps
+                  paddingBottom: 'calc((100% - 6rem) / 5)', // Square aspect ratio
+                  borderRadius: '12px',
                   overflow: 'hidden',
                   cursor: 'pointer',
-                  boxShadow: '0 2px 8px rgba(0, 0, 0, 0.15)',
-                  transition: 'transform 0.2s',
+                  boxShadow: '0 4px 12px rgba(0, 0, 0, 0.12)',
+                  transition: 'all 0.3s ease',
                 }}
                 onClick={() => onMediaClick(media, data.onThisDay)}
-                onMouseOver={(e) => e.currentTarget.style.transform = 'scale(1.05)'}
-                onMouseOut={(e) => e.currentTarget.style.transform = 'scale(1)'}
+                onMouseOver={(e) => {
+                  e.currentTarget.style.transform = 'translateY(-8px)';
+                  e.currentTarget.style.boxShadow = '0 12px 24px rgba(0, 0, 0, 0.2)';
+                  const overlay = e.currentTarget.querySelector('.hover-overlay') as HTMLElement;
+                  if (overlay) overlay.style.opacity = '1';
+                }}
+                onMouseOut={(e) => {
+                  e.currentTarget.style.transform = 'translateY(0)';
+                  e.currentTarget.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.12)';
+                  const overlay = e.currentTarget.querySelector('.hover-overlay') as HTMLElement;
+                  if (overlay) overlay.style.opacity = '0';
+                }}
               >
                 <img
                   src={media.PThumbnailUrl}
@@ -636,21 +651,98 @@ export default function HomePage({
                     objectFit: 'cover',
                   }}
                 />
-                <div style={{
-                  position: 'absolute',
-                  bottom: 0,
-                  left: 0,
-                  right: 0,
-                  background: 'linear-gradient(to top, rgba(0,0,0,0.8), transparent)',
-                  color: 'white',
-                  padding: '0.5rem',
-                  fontSize: '0.85rem',
-                }}>
-                  {media.PYear}
+                
+                {/* Year badge */}
+                {media.PYear && (
+                  <div style={{
+                    position: 'absolute',
+                    top: '10px',
+                    right: '10px',
+                    background: 'rgba(0, 0, 0, 0.75)',
+                    color: 'white',
+                    padding: '0.4rem 0.75rem',
+                    borderRadius: '20px',
+                    fontSize: '0.8rem',
+                    fontWeight: '500',
+                    backdropFilter: 'blur(8px)',
+                  }}>
+                    {media.PYear}
+                  </div>
+                )}
+
+                {/* Video play indicator */}
+                {media.PType === 2 && (
+                  <div style={{
+                    position: 'absolute',
+                    top: '50%',
+                    left: '50%',
+                    transform: 'translate(-50%, -50%)',
+                    fontSize: '3.5rem',
+                    color: 'white',
+                    textShadow: '0 3px 10px rgba(0,0,0,0.6)',
+                  }}>
+                    ▶️
+                  </div>
+                )}
+
+                {/* Hover overlay with description */}
+                <div 
+                  className="hover-overlay"
+                  style={{
+                    position: 'absolute',
+                    bottom: 0,
+                    left: 0,
+                    right: 0,
+                    background: 'linear-gradient(to top, rgba(0,0,0,0.85), rgba(0,0,0,0.3))',
+                    color: 'white',
+                    padding: '1.2rem 1rem 0.8rem',
+                    opacity: 0,
+                    transition: 'opacity 0.3s ease',
+                  }}
+                >
+                  {media.PDescription && (
+                    <div style={{ fontSize: '0.85rem', fontWeight: '500' }}>
+                      {media.PDescription}
+                    </div>
+                  )}
                 </div>
               </div>
             ))}
           </div>
+          
+          {data.onThisDay.length > 10 && (
+            <div style={{ marginTop: '1.5rem', textAlign: 'center' }}>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  // Navigate to gallery filtered by this month
+                  onSelectPeople();
+                }}
+                style={{
+                  padding: '0.9rem 2rem',
+                  background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '25px',
+                  cursor: 'pointer',
+                  fontSize: '1rem',
+                  fontWeight: '600',
+                  boxShadow: '0 4px 15px rgba(102, 126, 234, 0.4)',
+                  transition: 'all 0.3s ease',
+                }}
+                onMouseOver={(e) => {
+                  e.currentTarget.style.transform = 'translateY(-2px)';
+                  e.currentTarget.style.boxShadow = '0 6px 20px rgba(102, 126, 234, 0.6)';
+                }}
+                onMouseOut={(e) => {
+                  e.currentTarget.style.transform = 'translateY(0)';
+                  e.currentTarget.style.boxShadow = '0 4px 15px rgba(102, 126, 234, 0.4)';
+                }}
+              >
+                View All in Gallery ({data.onThisDay.length} photos)
+              </button>
+            </div>
+          )}
         </section>
       )}
 
