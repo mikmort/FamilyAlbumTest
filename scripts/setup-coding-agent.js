@@ -121,7 +121,15 @@ try {
   canRunFunctions = true;
 } catch {}
 
-if (canRunFunctions) {
+// Check if we have network restrictions
+let hasNetworkRestrictions = false;
+try {
+  execSync('ping -c 1 -W 1 cdn.functions.azure.com', { stdio: 'pipe', timeout: 2000 });
+} catch {
+  hasNetworkRestrictions = true;
+}
+
+if (canRunFunctions && !hasNetworkRestrictions) {
   console.log('Option A: Full stack (API + Frontend)');
   console.log('  npm run dev:full');
   console.log('');
@@ -130,6 +138,17 @@ if (canRunFunctions) {
   console.log('');
   console.log('Option C: Run tests');
   console.log('  npm test');
+} else if (canRunFunctions && hasNetworkRestrictions) {
+  console.log('⚠️  Azure Functions installed but network restricted');
+  console.log('   (Cannot download extension bundles from cdn.functions.azure.com)');
+  console.log('');
+  console.log('Option A: Run frontend only');
+  console.log('  npm run dev');
+  console.log('');
+  console.log('Option B: Run tests (without API)');
+  console.log('  SKIP_API_SERVER=true npm test');
+  console.log('');
+  console.log('💡 Tip: Tests will skip API server startup in restricted environments');
 } else {
   console.log('⚠️  Azure Functions not available. You can:');
   console.log('');
@@ -141,7 +160,7 @@ if (canRunFunctions) {
   console.log('  npm run dev');
   console.log('');
   console.log('Option C: Run tests (some tests may fail without API)');
-  console.log('  npm test');
+  console.log('  SKIP_API_SERVER=true npm test');
 }
 
 console.log('');
