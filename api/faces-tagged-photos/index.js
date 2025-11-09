@@ -28,7 +28,8 @@ function calculateSampleSize(totalPhotos) {
  * Get Tagged Photos Endpoint
  * 
  * Returns photos with manual person tags, using intelligent sampling:
- * - Distributes samples across photo timeline (using dates)
+ * - Prioritizes most recent photos (best for current appearance)
+ * - Favors solo/duo photos over group shots (better training quality)
  * - Uses logarithmic scaling based on total photos per person
  * - Minimum 5 photos, scales up to 60 for people with thousands of photos
  * 
@@ -199,17 +200,16 @@ module.exports = async function (context, req) {
         };
 
         try {
-          // Get photos distributed across timeline
-          // Use a simpler approach: calculate bucket size and take one photo per bucket
+          // Get most recent photos prioritizing fewer people in photos (better for training)
           const sampleQuery = `
           WITH ${photoPersonPairsCTE},
           PhotoCounts AS (
-            -- First count how many people are in each photo
+            -- Count how many people are in each photo
             SELECT PFileName, COUNT(*) as PeopleCount
             FROM PhotoPersonPairs
             GROUP BY PFileName
           ),
-          PhotosWithDates AS (
+          RankedPhotos AS (
             SELECT 
               pp.PFileName,
               pp.PersonID,
@@ -225,47 +225,18 @@ module.exports = async function (context, req) {
                 END,
                 p.PLastModifiedDate,
                 '1900-01-01'
-              ) as PhotoDate,
-              ROW_NUMBER() OVER (ORDER BY 
-                -- First prioritize by people count (fewer people = better training data)
-                pc.PeopleCount,
-                -- Then by date for distribution
-                COALESCE(
-                  p.PDateEntered,
-                  CASE 
-                    WHEN p.PYear >= 1 AND p.PYear <= 9999 AND p.PMonth >= 1 AND p.PMonth <= 12
-                    THEN DATEFROMPARTS(p.PYear, p.PMonth, 1)
-                    WHEN p.PYear >= 1 AND p.PYear <= 9999 AND (p.PMonth IS NULL OR p.PMonth < 1 OR p.PMonth > 12)
-                    THEN DATEFROMPARTS(p.PYear, 1, 1)
-                    ELSE NULL
-                  END,
-                  p.PLastModifiedDate,
-                  '1900-01-01'
-                )
-              ) as RowNum
+              ) as PhotoDate
             FROM PhotoPersonPairs pp
             INNER JOIN dbo.Pictures p ON pp.PFileName = p.PFileName
             INNER JOIN PhotoCounts pc ON pp.PFileName = pc.PFileName
             WHERE pp.PersonID = @personId
               AND pc.PeopleCount <= 3  -- Skip group photos
-          ),
-          TotalCount AS (
-            SELECT COUNT(*) as Total FROM PhotosWithDates
-          ),
-          SamplingInterval AS (
-            SELECT 
-              Total,
-              CASE 
-                WHEN Total <= @sampleSize THEN 1
-                ELSE CAST(CEILING(CAST(Total AS FLOAT) / @sampleSize) AS INT)
-              END as Interval
-            FROM TotalCount
           )
-          SELECT TOP (@sampleSize) pwd.PFileName, pwd.PersonID
-          FROM PhotosWithDates pwd
-          CROSS JOIN SamplingInterval si
-          WHERE si.Total <= @sampleSize OR (si.Interval > 0 AND (pwd.RowNum - 1) % si.Interval = 0)
-          ORDER BY pwd.PhotoDate
+          SELECT TOP (@sampleSize) PFileName, PersonID
+          FROM RankedPhotos
+          ORDER BY 
+            PeopleCount ASC,  -- Prioritize solo/duo photos
+            PhotoDate DESC    -- Then most recent first
         `;
 
           const personPhotos = await query(sampleQuery, {
