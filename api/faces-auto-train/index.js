@@ -1,4 +1,5 @@
 const { query } = require('../shared/db');
+const { checkAuthorization } = require('../shared/auth');
 
 /**
  * Automatic Face Recognition Training Trigger
@@ -9,25 +10,47 @@ const { query } = require('../shared/db');
  * - Only trains for persons who meet the threshold
  * 
  * Example: Person with 100 faces trained needs 20+ new confirmations to retrain
+ * 
+ * Note: This endpoint uses FaceEmbeddings table (client-side face-api.js model)
  */
 module.exports = async function (context, req) {
   context.log('Auto-train check triggered');
 
   try {
+    // Check authorization - requires Full role
+    const { authorized, user, error } = await checkAuthorization(context, 'Full');
+    if (!authorized) {
+      context.res = {
+        status: 403,
+        body: { error }
+      };
+      return;
+    }
+  } catch (authError) {
+    context.log.error('Authorization error:', authError);
+    context.res = {
+      status: 500,
+      body: { error: 'Authorization check failed', details: authError.message }
+    };
+    return;
+  }
+
+  try {
     // Query to find persons who need retraining based on 20% threshold
+    // Uses FaceEmbeddings table which stores client-side embeddings
     const needsTrainingQuery = `
       WITH PersonStats AS (
         SELECT 
           p.ID as PersonID,
-          p.DisplayName as PersonName,
-          ISNULL(pe.FaceCount, 0) as TrainedFaceCount,
-          (SELECT COUNT(*) 
-           FROM FaceEncodings fe 
-           WHERE fe.PersonID = p.ID 
-           AND fe.IsConfirmed = 1) as TotalConfirmedFaces
+          p.neName as PersonName,
+          (SELECT COUNT(DISTINCT fe1.ID)
+           FROM dbo.FaceEmbeddings fe1
+           WHERE fe1.PersonID = p.ID) as TrainedFaceCount,
+          (SELECT COUNT(DISTINCT np.npFileName)
+           FROM dbo.NamePhoto np
+           WHERE np.npID = p.ID) as TotalConfirmedFaces
         FROM 
-          NameEvent p
-          LEFT JOIN PersonEncodings pe ON p.ID = pe.PersonID
+          dbo.NameEvent p
         WHERE 
           p.neType = 'N'
       )
@@ -48,8 +71,7 @@ module.exports = async function (context, req) {
         PercentageIncrease DESC;
     `;
 
-    const result = await query(needsTrainingQuery);
-    const personsNeedingTraining = result.recordset;
+    const personsNeedingTraining = await query(needsTrainingQuery);
 
     if (personsNeedingTraining.length === 0) {
       context.log('No persons meet the 20% threshold for retraining');
@@ -59,7 +81,7 @@ module.exports = async function (context, req) {
           success: true,
           trainingTriggered: false,
           message: 'No persons meet the 20% threshold for retraining',
-          personsChecked: result.recordset.length
+          personsChecked: 0
         }
       };
       return;
