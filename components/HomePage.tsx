@@ -327,7 +327,7 @@ export default function HomePage({
                   backgroundSize: 'cover',
                   backgroundPosition: 'center',
                   filter: 'blur(15px) brightness(0.8)',
-                  opacity: currentBgIndex === idx ? 1 : 0,
+                  opacity: currentBgIndex === idx ? 0.8 : 0,
                   transition: 'opacity 2s ease-in-out',
                 }}
               />
@@ -342,7 +342,7 @@ export default function HomePage({
           left: 0,
           right: 0,
           bottom: 0,
-          background: 'linear-gradient(135deg, rgba(102, 126, 234, 0.5) 0%, rgba(118, 75, 162, 0.5) 100%)',
+          background: 'linear-gradient(135deg, rgba(120, 130, 200, 0.5) 0%, rgba(140, 120, 180, 0.5) 100%)',
           zIndex: 2,
         }} />
         
