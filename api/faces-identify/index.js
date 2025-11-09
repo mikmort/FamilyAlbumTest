@@ -63,9 +63,12 @@ function cosineSimilarity(embedding1, embedding2) {
  * Calculate Euclidean distance between two embedding vectors
  * face-api.js uses this by default for matching
  * Returns distance (lower is better), converted to similarity (higher is better)
+ * 
+ * face-api.js threshold: 0.6 (distances <= 0.6 are considered matches)
+ * 
  * @param {number[]} embedding1 - First 128-dim embedding
  * @param {number[]} embedding2 - Second 128-dim embedding
- * @returns {number} Similarity score between 0 and 1 (1 - normalized distance)
+ * @returns {number} Similarity score between 0 and 1
  */
 function euclideanSimilarity(embedding1, embedding2) {
   if (embedding1.length !== 128 || embedding2.length !== 128) {
@@ -81,11 +84,17 @@ function euclideanSimilarity(embedding1, embedding2) {
   const distance = Math.sqrt(sumSquares);
   
   // face-api.js uses Euclidean distance with threshold 0.6
-  // Distance 0.0 = perfect match (100% similarity)
-  // Distance 0.6 = threshold (40% similarity)
-  // Distance 1.0 = poor match (0% similarity)
-  // Convert distance to similarity percentage: 1 - (distance / 1.0)
-  const similarity = Math.max(0, Math.min(1, 1 - distance));
+  // Convert to similarity percentage using exponential decay:
+  // Distance 0.0 = 100% match
+  // Distance 0.4 = ~85% match (excellent)
+  // Distance 0.6 = ~70% match (threshold - good)
+  // Distance 0.8 = ~50% match (poor)
+  // Distance 1.0 = ~37% match (very poor)
+  // Distance 1.5+ = ~10% match (no match)
+  
+  // Using formula: similarity = e^(-k*distance) where k controls decay rate
+  // With k=1.5, we get good discrimination around the 0.6 threshold
+  const similarity = Math.exp(-1.5 * distance);
   
   return similarity;
 }
@@ -113,7 +122,7 @@ module.exports = async function (context, req) {
   }
 
   try {
-    const { embedding, threshold = 0.4, topN = 5 } = req.body;
+    const { embedding, threshold = 0.7, topN = 5 } = req.body;
 
     // Validate input
     if (!embedding || !Array.isArray(embedding) || embedding.length !== 128) {
