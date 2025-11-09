@@ -164,6 +164,12 @@ export default function Home() {
     setStartFullscreen(true);
   };
 
+  const handleNavigateToGallery = (peopleIds: number[], eventId: number | null) => {
+    setSelectedPeople(peopleIds);
+    setSelectedEvent(eventId);
+    setView('gallery');
+  };
+
   // Show database warming message
   if (authStatus?.databaseWarming) {
     return (
@@ -241,6 +247,7 @@ export default function Home() {
             onMediaClick={handleMediaClick}
             onMediaFullscreen={handleMediaFullscreen}
             onSelectPeople={() => setView('select')}
+            onNavigateToGallery={handleNavigateToGallery}
           />
         )}
 

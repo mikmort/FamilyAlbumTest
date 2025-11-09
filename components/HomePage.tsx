@@ -1,12 +1,15 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { MediaItem, Person, Event } from '../lib/types';
+import Fuse from 'fuse.js';
+import { getNameVariations } from '../lib/nicknames';
 
 interface HomePageProps {
   onMediaClick: (media: MediaItem, allMedia: MediaItem[]) => void;
   onMediaFullscreen: (media: MediaItem, allMedia: MediaItem[]) => void;
   onSelectPeople: () => void;
+  onNavigateToGallery: (peopleIds: number[], eventId: number | null) => void;
 }
 
 interface HomePageData {
@@ -24,13 +27,31 @@ export default function HomePage({
   onMediaClick,
   onMediaFullscreen,
   onSelectPeople,
+  onNavigateToGallery,
 }: HomePageProps) {
   const [data, setData] = useState<HomePageData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchDropdownOpen, setSearchDropdownOpen] = useState(false);
+  const [allPeople, setAllPeople] = useState<Person[]>([]);
+  const [allEvents, setAllEvents] = useState<Event[]>([]);
 
   useEffect(() => {
     loadHomePageData();
+    loadPeopleAndEvents();
+  }, []);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      if (!target.closest('.search-wrapper')) {
+        setSearchDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
   const loadHomePageData = async () => {
@@ -79,9 +100,99 @@ export default function HomePage({
     }
   };
 
-  const handleRandomMemory = () => {
-    // This will be implemented to show a random photo/event
-    alert('Random memory feature coming soon!');
+  const loadPeopleAndEvents = async () => {
+    try {
+      const [peopleResponse, eventsResponse] = await Promise.all([
+        fetch('/api/people'),
+        fetch('/api/events'),
+      ]);
+
+      if (peopleResponse.ok && eventsResponse.ok) {
+        const peopleData = await peopleResponse.json();
+        const eventsData = await eventsResponse.json();
+        
+        const peopleArray = peopleData.success ? peopleData.people : peopleData;
+        const eventsArray = eventsData.success ? eventsData.events : eventsData;
+        
+        setAllPeople(peopleArray || []);
+        setAllEvents(eventsArray || []);
+      }
+    } catch (err) {
+      console.error('Error loading people and events:', err);
+    }
+  };
+
+  // Create Fuse instances for fuzzy search
+  const peopleFuse = useMemo(() => {
+    return new Fuse(allPeople, {
+      keys: ['neName'],
+      threshold: 0.4,
+      includeScore: true,
+    });
+  }, [allPeople]);
+
+  const eventsFuse = useMemo(() => {
+    return new Fuse(allEvents, {
+      keys: ['neName'],
+      threshold: 0.4,
+      includeScore: true,
+    });
+  }, [allEvents]);
+
+  // Filter people and events based on search query with fuzzy matching and nicknames
+  const searchResults = useMemo(() => {
+    if (!searchQuery.trim()) {
+      return { people: [], events: [] };
+    }
+
+    const searchVariations = getNameVariations(searchQuery.toLowerCase().trim());
+    
+    // Try exact/nickname matches for people
+    const exactPeopleMatches = allPeople.filter(person => {
+      const personNameLower = person.neName.toLowerCase();
+      return searchVariations.some(variation => 
+        personNameLower.includes(variation) || variation.includes(personNameLower)
+      );
+    });
+
+    // If we have exact matches, use those; otherwise, use fuzzy search
+    const peopleResults = exactPeopleMatches.length > 0
+      ? exactPeopleMatches
+      : peopleFuse.search(searchQuery).map(result => result.item);
+
+    // Fuzzy search for events
+    const eventResults = eventsFuse.search(searchQuery).map(result => result.item);
+
+    return {
+      people: peopleResults.slice(0, 5),
+      events: eventResults.slice(0, 5),
+    };
+  }, [searchQuery, allPeople, allEvents, peopleFuse, eventsFuse]);
+
+  const handleSearchItemClick = (type: 'person' | 'event', id: number) => {
+    setSearchQuery('');
+    setSearchDropdownOpen(false);
+    if (type === 'person') {
+      onNavigateToGallery([id], null);
+    } else {
+      onNavigateToGallery([], id);
+    }
+  };
+
+  const handleRandomMemory = async () => {
+    try {
+      // Fetch a random media item from the API
+      const response = await fetch('/api/media?random=1&limit=1');
+      if (response.ok) {
+        const result = await response.json();
+        if (result.media && result.media.length > 0) {
+          const randomMedia = result.media[0];
+          onMediaFullscreen(randomMedia, result.media);
+        }
+      }
+    } catch (err) {
+      console.error('Error loading random memory:', err);
+    }
   };
 
   if (loading) {
@@ -111,7 +222,7 @@ export default function HomePage({
     <div style={{ maxWidth: '1200px', margin: '0 auto' }}>
       {/* Hero Section */}
       <div style={{
-        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+        background: 'linear-gradient(135deg, #8B9DC3 0%, #6B7FA8 100%)',
         borderRadius: '16px',
         padding: '3rem',
         color: 'white',
@@ -127,7 +238,7 @@ export default function HomePage({
         </p>
         
         {/* Search Bar */}
-        <div style={{ 
+        <div className="search-wrapper" style={{ 
           background: 'white', 
           borderRadius: '50px', 
           padding: '1rem 2rem',
@@ -136,11 +247,18 @@ export default function HomePage({
           gap: '1rem',
           maxWidth: '600px',
           margin: '0 auto',
+          position: 'relative',
         }}>
           <span style={{ fontSize: '1.5rem' }}>🔍</span>
           <input
             type="text"
             placeholder="Search for people, events, or years..."
+            value={searchQuery}
+            onChange={(e) => {
+              setSearchQuery(e.target.value);
+              setSearchDropdownOpen(true);
+            }}
+            onFocus={() => setSearchDropdownOpen(true)}
             style={{
               flex: 1,
               border: 'none',
@@ -148,9 +266,89 @@ export default function HomePage({
               fontSize: '1rem',
               color: '#333',
             }}
-            onClick={onSelectPeople}
-            readOnly
           />
+          {searchDropdownOpen && searchQuery && (searchResults.people.length > 0 || searchResults.events.length > 0) && (
+            <div style={{
+              position: 'absolute',
+              top: '100%',
+              left: 0,
+              right: 0,
+              marginTop: '0.5rem',
+              background: 'white',
+              borderRadius: '12px',
+              boxShadow: '0 8px 24px rgba(0, 0, 0, 0.15)',
+              maxHeight: '400px',
+              overflowY: 'auto',
+              zIndex: 1000,
+            }}>
+              {searchResults.people.length > 0 && (
+                <>
+                  <div style={{
+                    padding: '0.75rem 1rem',
+                    fontSize: '0.85rem',
+                    fontWeight: 'bold',
+                    color: '#666',
+                    borderBottom: '1px solid #f0f0f0',
+                  }}>
+                    People
+                  </div>
+                  {searchResults.people.map((person) => (
+                    <div
+                      key={`person-${person.ID}`}
+                      onClick={() => handleSearchItemClick('person', person.ID)}
+                      style={{
+                        padding: '0.75rem 1rem',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        borderBottom: '1px solid #f0f0f0',
+                        transition: 'background 0.2s',
+                      }}
+                      onMouseOver={(e) => e.currentTarget.style.background = '#f8f9fa'}
+                      onMouseOut={(e) => e.currentTarget.style.background = 'white'}
+                    >
+                      <span style={{ color: '#333', fontWeight: '500' }}>{person.neName}</span>
+                      <span style={{ color: '#999', fontSize: '0.85rem' }}>{person.neCount} photos</span>
+                    </div>
+                  ))}
+                </>
+              )}
+              {searchResults.events.length > 0 && (
+                <>
+                  <div style={{
+                    padding: '0.75rem 1rem',
+                    fontSize: '0.85rem',
+                    fontWeight: 'bold',
+                    color: '#666',
+                    borderBottom: '1px solid #f0f0f0',
+                  }}>
+                    Events
+                  </div>
+                  {searchResults.events.map((event) => (
+                    <div
+                      key={`event-${event.ID}`}
+                      onClick={() => handleSearchItemClick('event', event.ID)}
+                      style={{
+                        padding: '0.75rem 1rem',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        borderBottom: '1px solid #f0f0f0',
+                        transition: 'background 0.2s',
+                      }}
+                      onMouseOver={(e) => e.currentTarget.style.background = '#f8f9fa'}
+                      onMouseOut={(e) => e.currentTarget.style.background = 'white'}
+                    >
+                      <span style={{ color: '#333', fontWeight: '500' }}>{event.neName}</span>
+                      <span style={{ color: '#999', fontSize: '0.85rem' }}>{event.neCount} photos</span>
+                    </div>
+                  ))}
+                </>
+              )}
+            </div>
+          )}
         </div>
 
         <button
@@ -179,56 +377,6 @@ export default function HomePage({
           🎲 Surprise Me!
         </button>
       </div>
-
-      {/* Stats Bar */}
-      {data && (
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-          gap: '1rem',
-          marginBottom: '2rem',
-        }}>
-          <div style={{
-            background: 'white',
-            borderRadius: '12px',
-            padding: '1.5rem',
-            textAlign: 'center',
-            boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1)',
-          }}>
-            <div style={{ fontSize: '2rem', marginBottom: '0.5rem' }}>📸</div>
-            <div style={{ fontSize: '1.8rem', fontWeight: 'bold', color: '#3498db' }}>
-              {data.totalPhotos.toLocaleString()}
-            </div>
-            <div style={{ color: '#666', fontSize: '0.9rem' }}>Photos & Videos</div>
-          </div>
-          <div style={{
-            background: 'white',
-            borderRadius: '12px',
-            padding: '1.5rem',
-            textAlign: 'center',
-            boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1)',
-          }}>
-            <div style={{ fontSize: '2rem', marginBottom: '0.5rem' }}>👥</div>
-            <div style={{ fontSize: '1.8rem', fontWeight: 'bold', color: '#9b59b6' }}>
-              {data.totalPeople.toLocaleString()}
-            </div>
-            <div style={{ color: '#666', fontSize: '0.9rem' }}>Family Members</div>
-          </div>
-          <div style={{
-            background: 'white',
-            borderRadius: '12px',
-            padding: '1.5rem',
-            textAlign: 'center',
-            boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1)',
-          }}>
-            <div style={{ fontSize: '2rem', marginBottom: '0.5rem' }}>📅</div>
-            <div style={{ fontSize: '1.8rem', fontWeight: 'bold', color: '#e74c3c' }}>
-              {data.totalEvents.toLocaleString()}
-            </div>
-            <div style={{ color: '#666', fontSize: '0.9rem' }}>Events</div>
-          </div>
-        </div>
-      )}
 
       {/* On This Day Section */}
       {data && data.onThisDay && data.onThisDay.length > 0 && (
@@ -323,14 +471,14 @@ export default function HomePage({
             ✨ Recent Uploads
           </h2>
           <p style={{ color: '#666', marginBottom: '1.5rem' }}>
-            New memories added this week
+            New memories added recently
           </p>
           <div style={{
             display: 'grid',
             gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))',
             gap: '1rem',
           }}>
-            {data.recentUploads.slice(0, 6).map((media, idx) => (
+            {data.recentUploads.slice(0, 10).map((media, idx) => (
               <div
                 key={idx}
                 style={{
@@ -374,18 +522,56 @@ export default function HomePage({
               </div>
             ))}
           </div>
+          {data.recentUploads.length > 10 && (
+            <div style={{ textAlign: 'center', marginTop: '1.5rem' }}>
+              <button
+                onClick={() => {
+                  // Navigate to a view of all recent uploads
+                  onMediaClick(data.recentUploads[0], data.recentUploads);
+                }}
+                style={{
+                  background: '#667eea',
+                  color: 'white',
+                  border: 'none',
+                  padding: '0.75rem 2rem',
+                  borderRadius: '8px',
+                  fontSize: '1rem',
+                  cursor: 'pointer',
+                  fontWeight: '500',
+                  transition: 'background 0.2s',
+                }}
+                onMouseOver={(e) => e.currentTarget.style.background = '#5568d3'}
+                onMouseOut={(e) => e.currentTarget.style.background = '#667eea'}
+              >
+                Show More ({data.recentUploads.length - 10} more)
+              </button>
+            </div>
+          )}
         </section>
       )}
 
       {/* Featured Person Section */}
       {data && data.featuredPerson && (
-        <section style={{
+        <section 
+          onClick={() => onNavigateToGallery([data.featuredPerson!.ID], null)}
+          style={{
           background: 'white',
           borderRadius: '12px',
           padding: '2rem',
           marginBottom: '2rem',
           boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1)',
-        }}>
+            cursor: 'pointer',
+            transition: 'transform 0.2s, box-shadow 0.2s',
+        }}
+          onMouseOver={(e) => {
+            e.currentTarget.style.transform = 'translateY(-4px)';
+            e.currentTarget.style.boxShadow = '0 8px 20px rgba(0, 0, 0, 0.15)';
+          }}
+          onMouseOut={(e) => {
+            e.currentTarget.style.transform = 'translateY(0)';
+            e.currentTarget.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.1)';
+          }}
+        >
           <h2 style={{ 
             fontSize: '1.8rem', 
             marginBottom: '1rem', 
@@ -400,20 +586,33 @@ export default function HomePage({
             {data.featuredPerson.neRelation}
           </p>
           <p style={{ color: '#999', fontSize: '0.9rem' }}>
-            {data.featuredPerson.neCount} photos
+            {data.featuredPerson.neCount} photos • Click to view →
           </p>
         </section>
       )}
 
       {/* Featured Event Section */}
       {data && data.featuredEvent && (
-        <section style={{
+        <section 
+          onClick={() => onNavigateToGallery([], data.featuredEvent!.ID)}
+          style={{
           background: 'white',
           borderRadius: '12px',
           padding: '2rem',
           marginBottom: '2rem',
           boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1)',
-        }}>
+            cursor: 'pointer',
+            transition: 'transform 0.2s, box-shadow 0.2s',
+        }}
+          onMouseOver={(e) => {
+            e.currentTarget.style.transform = 'translateY(-4px)';
+            e.currentTarget.style.boxShadow = '0 8px 20px rgba(0, 0, 0, 0.15)';
+          }}
+          onMouseOut={(e) => {
+            e.currentTarget.style.transform = 'translateY(0)';
+            e.currentTarget.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.1)';
+          }}
+        >
           <h2 style={{ 
             fontSize: '1.8rem', 
             marginBottom: '1rem', 
@@ -428,7 +627,7 @@ export default function HomePage({
             {data.featuredEvent.neRelation}
           </p>
           <p style={{ color: '#999', fontSize: '0.9rem' }}>
-            {data.featuredEvent.neCount} photos
+            {data.featuredEvent.neCount} photos • Click to view →
           </p>
         </section>
       )}
@@ -450,7 +649,7 @@ export default function HomePage({
             {data.randomSuggestion.neName}
           </p>
           <button
-            onClick={onSelectPeople}
+            onClick={() => onNavigateToGallery([], data.randomSuggestion!.ID)}
             style={{
               background: 'white',
               color: '#f5576c',

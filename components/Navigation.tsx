@@ -22,7 +22,7 @@ export default function Navigation({
       <button onClick={onHome} style={{ fontWeight: 'bold' }}>
         🏠 Home
       </button>
-      <button onClick={onSelectPeople}>Select People</button>
+      <button onClick={onSelectPeople}>Find People/Events</button>
       <button 
         onClick={onNewMedia}
         style={{ position: 'relative' }}

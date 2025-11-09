@@ -664,8 +664,10 @@ module.exports = async function (context, req) {
             const noPeople = req.query.noPeople === 'true';
             const sortOrder = req.query.sortOrder || 'desc';
             const exclusiveFilter = req.query.exclusiveFilter === 'true';
+            const random = req.query.random === '1' || req.query.random === 'true';
+            const limit = req.query.limit ? parseInt(req.query.limit) : null;
 
-            context.log('Parsed filters:', { peopleIds, eventId, noPeople, sortOrder, exclusiveFilter });
+            context.log('Parsed filters:', { peopleIds, eventId, noPeople, sortOrder, exclusiveFilter, random, limit });
 
             let mediaQuery = `
                 SELECT DISTINCT p.*
@@ -765,8 +767,18 @@ module.exports = async function (context, req) {
             }
 
             // Sorting
-            const orderDirection = sortOrder === 'asc' ? 'ASC' : 'DESC';
-            mediaQuery += ` ORDER BY p.PYear ${orderDirection}, p.PMonth ${orderDirection}, p.PFileName ${orderDirection}`;
+            if (random) {
+                mediaQuery += ` ORDER BY NEWID()`;
+            } else {
+                const orderDirection = sortOrder === 'asc' ? 'ASC' : 'DESC';
+                mediaQuery += ` ORDER BY p.PYear ${orderDirection}, p.PMonth ${orderDirection}, p.PFileName ${orderDirection}`;
+            }
+
+            // Add TOP limit if specified
+            if (limit && limit > 0) {
+                // Insert TOP clause after SELECT
+                mediaQuery = mediaQuery.replace('SELECT DISTINCT p.*', `SELECT DISTINCT TOP ${limit} p.*`);
+            }
 
             context.log('Executing main media query...');
             context.log('Query:', mediaQuery);
