@@ -1,36 +1,33 @@
 'use client';
 
 interface NavigationProps {
-  onManagePeople: () => void;
-  onManageEvents: () => void;
+  onHome: () => void;
   onSelectPeople: () => void;
-  onProcessFiles: () => void;
   onUploadMedia: () => void;
   onNewMedia: () => void;
-  onAdminSettings?: () => void;
-  pendingCount?: number;
+  onSettings: () => void;
   newMediaCount?: number;
 }
 
 export default function Navigation({
-  onManagePeople,
-  onManageEvents,
+  onHome,
   onSelectPeople,
-  onProcessFiles,
   onUploadMedia,
   onNewMedia,
-  onAdminSettings,
-  pendingCount = 0,
+  onSettings,
   newMediaCount = 0,
 }: NavigationProps) {
   return (
     <nav className="nav-menu">
+      <button onClick={onHome} style={{ fontWeight: 'bold' }}>
+        🏠 Home
+      </button>
       <button onClick={onSelectPeople}>Select People</button>
       <button 
         onClick={onNewMedia}
         style={{ position: 'relative' }}
       >
-        ✨ New Media
+        ✨ New Pictures/Videos
         {newMediaCount > 0 && (
           <span style={{
             position: 'absolute',
@@ -53,40 +50,10 @@ export default function Navigation({
           </span>
         )}
       </button>
-      <button onClick={onManagePeople}>Manage People</button>
-      <button onClick={onManageEvents}>Manage Events</button>
       <button onClick={onUploadMedia}>Upload Media</button>
-      <button onClick={onProcessFiles}>Process New Files</button>
-      {onAdminSettings && (
-        <button onClick={onAdminSettings} style={{ 
-          background: '#dc3545', 
-          borderColor: '#dc3545',
-          position: 'relative'
-        }}>
-          🔒 Admin Settings
-          {pendingCount > 0 && (
-            <span style={{
-              position: 'absolute',
-              top: '-8px',
-              right: '-8px',
-              background: '#ffc107',
-              color: '#000',
-              borderRadius: '50%',
-              width: '24px',
-              height: '24px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              fontSize: '0.75rem',
-              fontWeight: 'bold',
-              border: '2px solid white',
-              boxShadow: '0 2px 4px rgba(0,0,0,0.2)'
-            }}>
-              {pendingCount}
-            </span>
-          )}
-        </button>
-      )}
+      <button onClick={onSettings}>
+        ⚙️ Settings
+      </button>
     </nav>
   );
 }
