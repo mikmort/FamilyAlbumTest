@@ -123,20 +123,67 @@ export default function FaceTrainingTest() {
         
         console.log(`Training ${person.name}...`);
         
-        // Train on first 5 photos (keep rest for testing)
-        const trainingPhotos = person.photos.slice(0, 5);
+        // Get all photos for this person to check dates
+        const urlResponse = await fetch(`/api/media?peopleIds=${personId}`);
+        const mediaList = await urlResponse.json();
         
-        for (const photoFileName of trainingPhotos) {
+        if (!Array.isArray(mediaList)) {
+          continue;
+        }
+        
+        // Smart fallback approach: Try 5, 10, then 15 years
+        let recentPhotos: any[] = [];
+        let yearsBack = 5;
+        let usedYears = 5;
+        
+        // Helper function to filter photos by years back
+        const filterPhotosByYears = (photos: any[], years: number) => {
+          const currentDate = new Date();
+          const cutoffDate = new Date(currentDate.getFullYear() - years, currentDate.getMonth(), 1);
+          const minYear = cutoffDate.getFullYear();
+          const minMonth = cutoffDate.getMonth() + 1; // JavaScript months are 0-indexed
+          
+          return photos.filter((photo: any) => {
+            if (!photo.PYear) return false; // Skip photos without year
+            
+            const photoYear = photo.PYear;
+            const photoMonth = photo.PMonth || 1; // Default to January if month is missing
+            
+            // Check if photo is within the time range
+            if (photoYear > minYear) return true;
+            if (photoYear === minYear && photoMonth >= minMonth) return true;
+            return false;
+          });
+        };
+        
+        // Try 5 years first
+        recentPhotos = filterPhotosByYears(mediaList, 5);
+        
+        // If less than 2 photos in last 5 years, try 10 years
+        if (recentPhotos.length < 2) {
+          console.log(`${person.name}: Only ${recentPhotos.length} photos in last 5 years, trying 10 years...`);
+          recentPhotos = filterPhotosByYears(mediaList, 10);
+          yearsBack = 10;
+          usedYears = 10;
+        }
+        
+        // If still less than 2 photos, try 15 years
+        if (recentPhotos.length < 2) {
+          console.log(`${person.name}: Only ${recentPhotos.length} photos in last 10 years, trying 15 years...`);
+          recentPhotos = filterPhotosByYears(mediaList, 15);
+          yearsBack = 15;
+          usedYears = 15;
+        }
+        
+        console.log(`${person.name}: Using ${recentPhotos.length} photos from last ${usedYears} years (out of ${mediaList.length} total)`);
+        
+        // Train on first 5 recent photos (keep rest for testing)
+        const trainingPhotos = recentPhotos.slice(0, 5);
+        
+        for (const photoData of trainingPhotos) {
+          const photoFileName = photoData.PFileName;
+          
           try {
-            // Get photo metadata and position data
-            const urlResponse = await fetch(`/api/media?peopleIds=${personId}`);
-            const mediaList = await urlResponse.json();
-            
-            // Find the specific photo in the list
-            const photoData = Array.isArray(mediaList) 
-              ? mediaList.find((m: any) => m.PFileName === photoFileName)
-              : null;
-            
             if (!photoData?.PBlobUrl) {
               results.push({
                 personId,
@@ -335,9 +382,15 @@ export default function FaceTrainingTest() {
         <ol>
           <li>Clear existing training data</li>
           <li>Select a few people to train on</li>
-          <li>Train on 5 photos per person</li>
+          <li>Train on up to 5 photos per person using <strong>smart date selection</strong></li>
           <li>Test recognition on a different photo</li>
         </ol>
+        <p style={{ marginTop: '10px', marginBottom: 0, fontSize: '14px', color: '#666' }}>
+          ℹ️ <strong>Smart Date Selection:</strong> Training prioritizes recent photos for best accuracy:
+          <br/>• If person has 2+ photos from last 5 years → use those
+          <br/>• If less than 2 photos in last 5 years → try last 10 years
+          <br/>• If still less than 2 photos → try last 15 years
+        </p>
       </div>
 
       {error && (

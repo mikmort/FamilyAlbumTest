@@ -38,25 +38,87 @@ module.exports = async function (context, req) {
   try {
     // Query to find persons who need retraining based on 20% threshold
     // Uses FaceEmbeddings table which stores client-side embeddings
+    // Smart date selection: Try 5, 10, then 15 years based on photo availability
     const needsTrainingQuery = `
-      WITH PersonStats AS (
+      WITH PersonPhotoCount AS (
+        -- Count photos in different time ranges
         SELECT 
           p.ID as PersonID,
           p.neName as PersonName,
-          (SELECT COUNT(DISTINCT fe1.ID)
-           FROM dbo.FaceEmbeddings fe1
-           WHERE fe1.PersonID = p.ID) as TrainedFaceCount,
+          -- Last 5 years
           (SELECT COUNT(DISTINCT np.npFileName)
            FROM dbo.NamePhoto np
-           WHERE np.npID = p.ID) as TotalConfirmedFaces
-        FROM 
-          dbo.NameEvent p
-        WHERE 
-          p.neType = 'N'
+           INNER JOIN dbo.Pictures pic ON np.npFileName = pic.PFileName
+           WHERE np.npID = p.ID
+             AND pic.PYear >= YEAR(DATEADD(YEAR, -5, GETDATE()))
+             AND (pic.PYear > YEAR(DATEADD(YEAR, -5, GETDATE())) 
+                  OR (pic.PYear = YEAR(DATEADD(YEAR, -5, GETDATE())) 
+                      AND ISNULL(pic.PMonth, 1) >= MONTH(DATEADD(YEAR, -5, GETDATE()))))
+          ) as Photos5Years,
+          -- Last 10 years
+          (SELECT COUNT(DISTINCT np.npFileName)
+           FROM dbo.NamePhoto np
+           INNER JOIN dbo.Pictures pic ON np.npFileName = pic.PFileName
+           WHERE np.npID = p.ID
+             AND pic.PYear >= YEAR(DATEADD(YEAR, -10, GETDATE()))
+             AND (pic.PYear > YEAR(DATEADD(YEAR, -10, GETDATE())) 
+                  OR (pic.PYear = YEAR(DATEADD(YEAR, -10, GETDATE())) 
+                      AND ISNULL(pic.PMonth, 1) >= MONTH(DATEADD(YEAR, -10, GETDATE()))))
+          ) as Photos10Years,
+          -- Last 15 years
+          (SELECT COUNT(DISTINCT np.npFileName)
+           FROM dbo.NamePhoto np
+           INNER JOIN dbo.Pictures pic ON np.npFileName = pic.PFileName
+           WHERE np.npID = p.ID
+             AND pic.PYear >= YEAR(DATEADD(YEAR, -15, GETDATE()))
+             AND (pic.PYear > YEAR(DATEADD(YEAR, -15, GETDATE())) 
+                  OR (pic.PYear = YEAR(DATEADD(YEAR, -15, GETDATE())) 
+                      AND ISNULL(pic.PMonth, 1) >= MONTH(DATEADD(YEAR, -15, GETDATE()))))
+          ) as Photos15Years
+        FROM dbo.NameEvent p
+        WHERE p.neType = 'N'
+      ),
+      PersonYearsToUse AS (
+        -- Determine which time range to use for each person
+        SELECT 
+          PersonID,
+          PersonName,
+          CASE 
+            WHEN Photos5Years >= 2 THEN 5
+            WHEN Photos10Years >= 2 THEN 10
+            ELSE 15
+          END as YearsBack
+        FROM PersonPhotoCount
+      ),
+      PersonStats AS (
+        SELECT 
+          ptu.PersonID,
+          ptu.PersonName,
+          ptu.YearsBack,
+          (SELECT COUNT(DISTINCT fe1.ID)
+           FROM dbo.FaceEmbeddings fe1
+           INNER JOIN dbo.Pictures pic ON fe1.PhotoFileName = pic.PFileName
+           WHERE fe1.PersonID = ptu.PersonID
+             AND pic.PYear >= YEAR(DATEADD(YEAR, -ptu.YearsBack, GETDATE()))
+             AND (pic.PYear > YEAR(DATEADD(YEAR, -ptu.YearsBack, GETDATE())) 
+                  OR (pic.PYear = YEAR(DATEADD(YEAR, -ptu.YearsBack, GETDATE())) 
+                      AND ISNULL(pic.PMonth, 1) >= MONTH(DATEADD(YEAR, -ptu.YearsBack, GETDATE()))))
+          ) as TrainedFaceCount,
+          (SELECT COUNT(DISTINCT np.npFileName)
+           FROM dbo.NamePhoto np
+           INNER JOIN dbo.Pictures pic ON np.npFileName = pic.PFileName
+           WHERE np.npID = ptu.PersonID
+             AND pic.PYear >= YEAR(DATEADD(YEAR, -ptu.YearsBack, GETDATE()))
+             AND (pic.PYear > YEAR(DATEADD(YEAR, -ptu.YearsBack, GETDATE())) 
+                  OR (pic.PYear = YEAR(DATEADD(YEAR, -ptu.YearsBack, GETDATE())) 
+                      AND ISNULL(pic.PMonth, 1) >= MONTH(DATEADD(YEAR, -ptu.YearsBack, GETDATE()))))
+          ) as TotalConfirmedFaces
+        FROM PersonYearsToUse ptu
       )
       SELECT 
         PersonID,
         PersonName,
+        YearsBack,
         TrainedFaceCount,
         TotalConfirmedFaces,
         (TotalConfirmedFaces - TrainedFaceCount) as NewFaces,
@@ -88,7 +150,7 @@ module.exports = async function (context, req) {
     }
 
     context.log(`${personsNeedingTraining.length} person(s) need retraining:`, 
-      personsNeedingTraining.map(p => `${p.PersonName} (${p.NewFaces} new faces, ${Math.round(p.PercentageIncrease * 100)}% increase)`));
+      personsNeedingTraining.map(p => `${p.PersonName} (${p.NewFaces} new faces, ${Math.round(p.PercentageIncrease * 100)}% increase, using ${p.YearsBack}-year range)`));
 
     // Get Python Function App URL
     const pythonFunctionUrl = process.env.PYTHON_FUNCTION_APP_URL || 'https://familyalbum-faces-api.azurewebsites.net';
@@ -97,7 +159,7 @@ module.exports = async function (context, req) {
     const trainingResults = [];
     for (const person of personsNeedingTraining) {
       try {
-        context.log(`Training person: ${person.PersonName} (ID: ${person.PersonID})`);
+        context.log(`Training person: ${person.PersonName} (ID: ${person.PersonID}) using ${person.YearsBack}-year range`);
         
         const response = await fetch(`${pythonFunctionUrl}/api/faces/train`, {
           method: 'POST',
@@ -112,6 +174,7 @@ module.exports = async function (context, req) {
           personName: person.PersonName,
           newFaces: person.NewFaces,
           percentageIncrease: Math.round(person.PercentageIncrease * 100),
+          yearsBack: person.YearsBack,
           success: data.success,
           error: data.error
         });
@@ -124,6 +187,7 @@ module.exports = async function (context, req) {
           personName: person.PersonName,
           newFaces: person.NewFaces,
           percentageIncrease: Math.round(person.PercentageIncrease * 100),
+          yearsBack: person.YearsBack,
           success: false,
           error: err.message
         });
