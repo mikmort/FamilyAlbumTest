@@ -37,6 +37,20 @@ export default function HomePage({
     try {
       setLoading(true);
       const response = await fetch('/api/homepage');
+      
+      // Handle database warmup scenario (503 Service Unavailable)
+      if (response.status === 503) {
+        const errorData = await response.json();
+        if (errorData.databaseWarming) {
+          console.log('Database is warming up, retrying in 3 seconds...');
+          // Wait and retry
+          setTimeout(() => {
+            loadHomePageData();
+          }, 3000);
+          return;
+        }
+      }
+      
       if (!response.ok) {
         // Log detailed error information for debugging
         const errorText = await response.text();
