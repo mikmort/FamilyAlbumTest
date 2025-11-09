@@ -160,12 +160,20 @@ module.exports = async function (context, req) {
 
     // Calculate similarity for each stored embedding
     const matches = [];
+    const allScores = []; // Track all scores for debugging
     for (const stored of storedEmbeddings) {
       try {
         const storedEmbedding = JSON.parse(stored.Embedding);
         
         // Use Euclidean distance (face-api.js default) instead of cosine similarity
         const similarity = euclideanSimilarity(embedding, storedEmbedding);
+
+        // Track for debugging
+        allScores.push({
+          personName: stored.PersonName,
+          similarity: similarity,
+          photoFileName: stored.PhotoFileName
+        });
 
         if (similarity >= threshold) {
           matches.push({
@@ -180,6 +188,12 @@ module.exports = async function (context, req) {
         context.log.error(`Error parsing embedding ${stored.ID}:`, parseError);
       }
     }
+
+    // Log top 10 scores for debugging (even if below threshold)
+    allScores.sort((a, b) => b.similarity - a.similarity);
+    context.log('Top 10 similarity scores:', allScores.slice(0, 10).map(s => 
+      `${s.personName}: ${(s.similarity * 100).toFixed(1)}%`
+    ));
 
     // Sort by similarity (highest first) and take top N
     matches.sort((a, b) => b.similarity - a.similarity);
