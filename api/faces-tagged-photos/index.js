@@ -179,12 +179,21 @@ module.exports = async function (context, req) {
           ),
           TotalCount AS (
             SELECT COUNT(*) as Total FROM PhotosWithDates
+          ),
+          SamplingInterval AS (
+            SELECT 
+              Total,
+              CASE 
+                WHEN Total <= @sampleSize THEN 1
+                ELSE CAST(CEILING(CAST(Total AS FLOAT) / @sampleSize) AS INT)
+              END as Interval
+            FROM TotalCount
           )
-          SELECT TOP (@sampleSize) PFileName, PersonID
-          FROM PhotosWithDates
-          CROSS JOIN TotalCount
-          WHERE (RowNum - 1) % (CASE WHEN Total < @sampleSize THEN 1 ELSE Total / @sampleSize END) = 0
-          ORDER BY PhotoDate
+          SELECT TOP (@sampleSize) pwd.PFileName, pwd.PersonID
+          FROM PhotosWithDates pwd
+          CROSS JOIN SamplingInterval si
+          WHERE si.Total <= @sampleSize OR (pwd.RowNum - 1) % si.Interval = 0
+          ORDER BY pwd.PhotoDate
         `;
 
         const personPhotos = await query(sampleQuery, {
@@ -345,12 +354,28 @@ module.exports = async function (context, req) {
 
   } catch (err) {
     context.log.error('Error fetching tagged photos:', err);
-    context.res = {
-      status: 500,
-      body: {
-        success: false,
-        error: err.message || 'Error fetching tagged photos'
-      }
-    };
+    
+    // Import DatabaseWarmupError check from db module
+    const { DatabaseWarmupError, isDatabaseWarmupError } = require('../shared/db');
+    
+    // Check if this is a database warmup error
+    if (err instanceof DatabaseWarmupError || isDatabaseWarmupError(err)) {
+      context.res = {
+        status: 503, // Service Unavailable
+        body: {
+          success: false,
+          error: 'Database is warming up. Please wait a moment and try again.',
+          isWarmup: true
+        }
+      };
+    } else {
+      context.res = {
+        status: 500,
+        body: {
+          success: false,
+          error: err.message || 'Error fetching tagged photos'
+        }
+      };
+    }
   }
 };
