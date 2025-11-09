@@ -168,6 +168,44 @@ npx playwright test tests/media-gallery.spec.ts
 
 Tests are configured to use dev mode automatically. See `playwright.config.ts` for configuration.
 
+### Pull Request Requirements
+
+When creating pull requests, follow these guidelines to ensure clear documentation of changes:
+
+**Screenshots for UX Changes:**
+- **ALWAYS include screenshots** when your changes affect the user interface or user experience
+- Take screenshots showing:
+  - The new or modified UI components
+  - Before/after comparisons for UI updates (when applicable)
+  - Different states of interactive elements (hover, active, disabled, etc.)
+  - Mobile/responsive views if the change affects responsive behavior
+- Place screenshots in the PR description to make visual changes immediately clear to reviewers
+- Use descriptive captions for each screenshot explaining what is shown
+
+**When screenshots are applicable:**
+- New pages or views
+- Modified layouts or styling
+- New or updated React components with visual elements
+- Changes to navigation, menus, or interactive controls
+- Form updates or validation messages
+- Modal dialogs, tooltips, or popups
+- Icon or color scheme changes
+- Responsive design adjustments
+
+**When screenshots are NOT required:**
+- API-only changes (backend logic, database queries)
+- Configuration file updates
+- Documentation-only changes
+- Build script or tooling modifications
+- Changes without visual impact
+
+**How to capture screenshots:**
+- Run the application locally using `npm run dev`
+- Navigate to the affected pages/features
+- Use browser dev tools or built-in screenshot capabilities
+- For automated testing, Playwright can capture screenshots: `await page.screenshot({ path: 'feature.png' })`
+- Include full-page screenshots for layout changes, or focused screenshots for component changes
+
 ## API Endpoints
 
 ### Authentication
