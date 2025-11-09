@@ -218,10 +218,10 @@ export default function HomePage({
             alignItems: 'center',
             gap: '0.5rem'
           }}>
-            🎉 On This Day - {monthNames[today.getMonth()]} {today.getDate()}
+            🎉 In This Month - {monthNames[today.getMonth()]}
           </h2>
           <p style={{ color: '#666', marginBottom: '1.5rem' }}>
-            Memories from years past on this date
+            Memories from years past in {monthNames[today.getMonth()]}
           </p>
           <div style={{
             display: 'grid',

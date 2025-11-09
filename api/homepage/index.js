@@ -20,18 +20,18 @@ module.exports = async function (context, req) {
         const currentMonth = today.getMonth() + 1; // JavaScript months are 0-indexed
         const currentDay = today.getDate();
 
-        // Get "On This Day" photos - photos taken on this day in past years
+        // Get "On This Day" photos - photos taken in this month in past years
+        // Note: Database only stores PMonth and PYear, not the specific day
         const onThisDayQuery = `
             SELECT TOP 12
                 p.*
             FROM dbo.Pictures p
-            WHERE p.PMonth = @month AND DAY(DATEADD(day, p.PTime, '1900-01-01')) = @day
-            ORDER BY p.PYear DESC
+            WHERE p.PMonth = @month
+            ORDER BY p.PYear DESC, p.PDateEntered DESC
         `;
         
         const onThisDay = await query(onThisDayQuery, { 
-            month: currentMonth, 
-            day: currentDay 
+            month: currentMonth
         });
 
         // Get recent uploads
