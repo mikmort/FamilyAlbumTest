@@ -783,40 +783,6 @@ export default function HomePage({
               </div>
             ))}
           </div>
-          
-          {data.onThisDay.length > 10 && (
-            <div style={{ marginTop: '1.5rem', textAlign: 'center' }}>
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  // Navigate to gallery filtered by this month
-                  onSelectPeople();
-                }}
-                style={{
-                  padding: '0.9rem 2rem',
-                  background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '25px',
-                  cursor: 'pointer',
-                  fontSize: '1rem',
-                  fontWeight: '600',
-                  boxShadow: '0 4px 15px rgba(102, 126, 234, 0.4)',
-                  transition: 'all 0.3s ease',
-                }}
-                onMouseOver={(e) => {
-                  e.currentTarget.style.transform = 'translateY(-2px)';
-                  e.currentTarget.style.boxShadow = '0 6px 20px rgba(102, 126, 234, 0.6)';
-                }}
-                onMouseOut={(e) => {
-                  e.currentTarget.style.transform = 'translateY(0)';
-                  e.currentTarget.style.boxShadow = '0 4px 15px rgba(102, 126, 234, 0.4)';
-                }}
-              >
-                View All in Gallery ({data.onThisDay.length} photos)
-              </button>
-            </div>
-          )}
         </section>
         </AnimatedSection>
       )}

@@ -353,23 +353,38 @@ export default function AdminSettings({ onRequestsChange }: AdminSettingsProps) 
           return;
         }
         
-        // Fetch next batch
-        const batchResponse = await fetch(`/api/faces-tagged-photos?smartSample=true&batch=${currentBatch}&batchSize=100`);
-        if (!batchResponse.ok) {
-          const errorText = await batchResponse.text();
-          console.error('Failed to fetch tagged photos batch:', batchResponse.status, errorText);
-          throw new Error(`Failed to fetch tagged photos batch ${currentBatch}: ${batchResponse.status} - ${errorText.substring(0, 200)}`);
-        }
+        // Fetch next batch (50 people per batch to keep request time under 30 seconds)
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 60000); // 60 second timeout
         
-        const batchData = await batchResponse.json();
-        batchInfo = batchData.batch;
-        
-        if (batchData.photos && batchData.photos.length > 0) {
-          photos.push(...batchData.photos);
-          setTrainingStatus(
-            `Fetching batch ${currentBatch + 1}/${batchInfo?.totalBatches || '?'}: ` +
-            `${photos.length} photos from ${batchInfo?.totalPersons || '?'} people...`
-          );
+        try {
+          const batchResponse = await fetch(`/api/faces-tagged-photos?smartSample=true&batch=${currentBatch}&batchSize=50`, {
+            signal: controller.signal
+          });
+          clearTimeout(timeoutId);
+          
+          if (!batchResponse.ok) {
+            const errorText = await batchResponse.text();
+            console.error('Failed to fetch tagged photos batch:', batchResponse.status, errorText);
+            throw new Error(`Failed to fetch tagged photos batch ${currentBatch}: ${batchResponse.status} - ${errorText.substring(0, 200)}`);
+          }
+          
+          const batchData = await batchResponse.json();
+          batchInfo = batchData.batch;
+          
+          if (batchData.photos && batchData.photos.length > 0) {
+            photos.push(...batchData.photos);
+            setTrainingStatus(
+              `Fetching batch ${currentBatch + 1}/${batchInfo?.totalBatches || '?'}: ` +
+              `${photos.length} photos from ${batchInfo?.totalPersons || '?'} people...`
+            );
+          }
+        } catch (fetchError: any) {
+          clearTimeout(timeoutId);
+          if (fetchError.name === 'AbortError') {
+            throw new Error(`Request timeout: batch ${currentBatch} took longer than 60 seconds`);
+          }
+          throw fetchError;
         }
         
         currentBatch++;
