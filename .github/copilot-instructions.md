@@ -126,6 +126,7 @@ Storage utilities are in `/api/shared/storage.js`.
 ```bash
 # Install dependencies
 npm install
+cd api && npm install && cd ..
 
 # Copy environment template
 cp .env.local.template .env.local
@@ -136,9 +137,17 @@ cp .env.local.template .env.local
 # DEV_USER_EMAIL=test@example.com
 # DEV_USER_ROLE=Full
 
-# Run development server
+# Setup Azure Functions configuration
+npm run setup:api-env
+
+# Run development server (Next.js only - API calls will fail)
 npm run dev
+
+# OR run full stack (Next.js + Azure Functions) - RECOMMENDED
+npm run dev:full
 ```
+
+**Note**: For full functionality, install [Azure Functions Core Tools](https://github.com/Azure/azure-functions-core-tools) and use `npm run dev:full`. See [docs/LOCAL_AZURE_FUNCTIONS.md](docs/LOCAL_AZURE_FUNCTIONS.md) for complete setup guide.
 
 ### Building and Linting
 

@@ -5,6 +5,9 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
+    "dev:api": "cd api && npm start",
+    "dev:frontend": "next dev",
+    "dev:full": "npm run setup:api-env && concurrently --names \"API,WEB\" --prefix-colors \"blue,green\" \"npm:dev:api\" \"npm:dev:frontend\"",
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
@@ -14,6 +17,7 @@
     "test:ui": "playwright test --ui",
     "test:report": "playwright show-report",
     "setup:env": "node scripts/setup-env.js",
+    "setup:api-env": "node scripts/setup-api-env.js",
     "test:setup": "node scripts/setup-env.js && npm test"
   },
   "dependencies": {
@@ -40,6 +44,7 @@
     "@types/react": "^18.2.0",
     "@types/react-dom": "^18.2.0",
     "better-sqlite3": "^12.4.1",
+    "concurrently": "^9.2.1",
     "csv-parse": "^6.1.0",
     "eslint": "^8.54.0",
     "eslint-config-next": "^14.0.0",
