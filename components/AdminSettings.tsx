@@ -335,22 +335,45 @@ export default function AdminSettings({ onRequestsChange }: AdminSettingsProps) 
       }
 
       // Step 3: Get photos with manual tags using smart sampling
+      // Fetch all batches automatically until hasMore=false
       setTrainingStatus(
         resumeFromCheckpoint
           ? 'Fetching remaining photos to process...'
           : 'Fetching tagged photos with intelligent sampling...'
       );
       
-      // Query for photos with manual tags using smart sampling
-      const photosResponse = await fetch(`/api/faces-tagged-photos?smartSample=true`);
-      if (!photosResponse.ok) {
-        const errorText = await photosResponse.text();
-        console.error('Failed to fetch tagged photos:', photosResponse.status, errorText);
-        throw new Error(`Failed to fetch tagged photos: ${photosResponse.status} - ${errorText.substring(0, 200)}`);
-      }
+      let photos: any[] = [];
+      let currentBatch = 0;
+      let batchInfo: any = null;
       
-      const photosData = await photosResponse.json();
-      let photos = photosData.photos || [];
+      do {
+        if (isPaused) {
+          setTrainingStatus('Training cancelled by user');
+          setIsTraining(false);
+          return;
+        }
+        
+        // Fetch next batch
+        const batchResponse = await fetch(`/api/faces-tagged-photos?smartSample=true&batch=${currentBatch}&batchSize=100`);
+        if (!batchResponse.ok) {
+          const errorText = await batchResponse.text();
+          console.error('Failed to fetch tagged photos batch:', batchResponse.status, errorText);
+          throw new Error(`Failed to fetch tagged photos batch ${currentBatch}: ${batchResponse.status} - ${errorText.substring(0, 200)}`);
+        }
+        
+        const batchData = await batchResponse.json();
+        batchInfo = batchData.batch;
+        
+        if (batchData.photos && batchData.photos.length > 0) {
+          photos.push(...batchData.photos);
+          setTrainingStatus(
+            `Fetching batch ${currentBatch + 1}/${batchInfo?.totalBatches || '?'}: ` +
+            `${photos.length} photos from ${batchInfo?.totalPersons || '?'} people...`
+          );
+        }
+        
+        currentBatch++;
+      } while (batchInfo?.hasMore === true);
       
       // Filter out already processed photos if resuming
       if (resumeFromCheckpoint && processedPhotos.size > 0) {
@@ -391,9 +414,12 @@ export default function AdminSettings({ onRequestsChange }: AdminSettingsProps) 
       const totalPhotos = photos.length;
       const totalPeople = Object.keys(photosByPerson).length;
       const alreadyProcessed = resumeFromCheckpoint ? processedPhotos.size : 0;
+      const totalBatches = batchInfo?.totalBatches || 1;
+      const totalPersonsInDB = batchInfo?.totalPersons || totalPeople;
 
       setTrainingStatus(
-        `Processing ${photos.length} photos for ${totalPeople} people...` +
+        `Fetched ${totalBatches} batch${totalBatches > 1 ? 'es' : ''}: ` +
+        `${photos.length} photos for ${totalPeople} people (${totalPersonsInDB} total in DB)...` +
         (alreadyProcessed > 0 ? ` (${alreadyProcessed} already done)` : '')
       );
 

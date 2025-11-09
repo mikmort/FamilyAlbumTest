@@ -73,6 +73,10 @@ module.exports = async function (context, req) {
   try {
     const smartSample = req.query.smartSample !== 'false'; // Default true
     const maxPerPerson = req.query.maxPerPerson ? parseInt(req.query.maxPerPerson) : null;
+    
+    // Batch pagination support for processing all persons
+    const batch = req.query.batch ? parseInt(req.query.batch) : 0;
+    const batchSize = req.query.batchSize ? parseInt(req.query.batchSize) : 100;
 
     // Common CTE definition (without WITH keyword - we'll add it per query)
     const photoPersonPairsCTE = `
@@ -123,28 +127,41 @@ module.exports = async function (context, req) {
           body: {
             success: true,
             photos: [],
-            message: 'No tagged photos found'
+            message: 'No tagged photos found',
+            batch: {
+              current: batch,
+              size: batchSize,
+              totalPersons: 0,
+              hasMore: false
+            }
           }
         };
         return;
       }
 
-      // Step 2: For each person, calculate sample size and get distributed samples
+      // Calculate batch range
+      const startIdx = batch * batchSize;
+      const endIdx = Math.min(startIdx + batchSize, counts.length);
+      const batchedCounts = counts.slice(startIdx, endIdx);
+      const hasMore = endIdx < counts.length;
+      
+      context.log(`Processing batch ${batch}: persons ${startIdx + 1}-${endIdx} of ${counts.length} (hasMore: ${hasMore})`);
+
+      // Step 2: For each person in this batch, calculate sample size and get distributed samples
       const allPhotos = [];
       const samplingStats = {};
       
-      // AGGRESSIVE limits to prevent timeout - start conservative
-      const MAX_TOTAL_PHOTOS = 2000;  // Reduced from 5000
-      const MAX_PERSONS = 100;  // Also limit number of persons processed
+      // Conservative limits to prevent timeout
+      const MAX_TOTAL_PHOTOS = 2000;
       let currentPhotoCount = 0;
       let processedPersons = 0;
 
-      context.log(`Starting smart sampling: ${counts.length} persons found, limiting to ${MAX_PERSONS} persons and ${MAX_TOTAL_PHOTOS} photos`);
+      context.log(`Starting smart sampling: ${counts.length} persons found (batch ${batch}: processing ${batchedCounts.length} persons)`);
 
-      for (const personCount of counts) {
-        // Stop if we've reached either limit
-        if (currentPhotoCount >= MAX_TOTAL_PHOTOS || processedPersons >= MAX_PERSONS) {
-          context.log(`Reached limit (photos: ${currentPhotoCount}/${MAX_TOTAL_PHOTOS}, persons: ${processedPersons}/${MAX_PERSONS})`);
+      for (const personCount of batchedCounts) {
+        // Stop if we've reached photo limit
+        if (currentPhotoCount >= MAX_TOTAL_PHOTOS) {
+          context.log(`Reached photo limit (${currentPhotoCount}/${MAX_TOTAL_PHOTOS})`);
           break;
         }
         
@@ -288,7 +305,14 @@ module.exports = async function (context, req) {
           smartSample: true,
           limited: currentPhotoCount >= MAX_TOTAL_PHOTOS,
           personsProcessed: processedPersons,
-          totalPersons: counts.length
+          totalPersons: counts.length,
+          batch: {
+            current: batch,
+            size: batchSize,
+            totalPersons: counts.length,
+            totalBatches: Math.ceil(counts.length / batchSize),
+            hasMore: hasMore
+          }
         }
       };
       return;
