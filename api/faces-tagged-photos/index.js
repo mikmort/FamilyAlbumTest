@@ -224,8 +224,7 @@ module.exports = async function (context, req) {
                   THEN DATEFROMPARTS(p.PYear, 1, 1)
                   ELSE NULL
                 END,
-                p.PLastModifiedDate,
-                '1900-01-01'
+                p.PLastModifiedDate
               ) as PhotoDate
             FROM PhotoPersonPairs pp
             INNER JOIN dbo.Pictures p ON pp.PFileName = p.PFileName
@@ -241,9 +240,19 @@ module.exports = async function (context, req) {
                   THEN DATEFROMPARTS(p.PYear, 1, 1)
                   ELSE NULL
                 END,
-                p.PLastModifiedDate,
-                '1900-01-01'
-              ) >= DATEADD(YEAR, -20, GETDATE())  -- Only photos from last 20 years
+                p.PLastModifiedDate
+              ) IS NOT NULL  -- Must have a date
+              AND COALESCE(
+                p.PDateEntered,
+                CASE 
+                  WHEN p.PYear >= 1 AND p.PYear <= 9999 AND p.PMonth >= 1 AND p.PMonth <= 12
+                  THEN DATEFROMPARTS(p.PYear, p.PMonth, 1)
+                  WHEN p.PYear >= 1 AND p.PYear <= 9999 AND (p.PMonth IS NULL OR p.PMonth < 1 OR p.PMonth > 12)
+                  THEN DATEFROMPARTS(p.PYear, 1, 1)
+                  ELSE NULL
+                END,
+                p.PLastModifiedDate
+              ) >= DATEADD(YEAR, -20, GETDATE())  -- Only last 20 years
           )
           SELECT TOP (@sampleSize) PFileName, PersonID
           FROM RankedPhotos
