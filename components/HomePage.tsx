@@ -108,10 +108,12 @@ export default function HomePage({
     if (!data) return [];
     // Get up to 5 random photos from recent uploads for background
     const photos = [...(data.recentUploads || [])];
-    return photos
+    const selected = photos
       .sort(() => Math.random() - 0.5)
       .slice(0, 5)
       .filter(p => p.PThumbnailUrl);
+    console.log('Background photos for carousel:', selected.length, selected.map(p => p.PThumbnailUrl));
+    return selected;
   }, [data]);
 
   useEffect(() => {
@@ -340,7 +342,7 @@ export default function HomePage({
           left: 0,
           right: 0,
           bottom: 0,
-          background: 'linear-gradient(135deg, rgba(102, 126, 234, 0.85) 0%, rgba(118, 75, 162, 0.85) 100%)',
+          background: 'linear-gradient(135deg, rgba(102, 126, 234, 0.7) 0%, rgba(118, 75, 162, 0.7) 100%)',
           zIndex: 2,
         }} />
         
