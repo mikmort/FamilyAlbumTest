@@ -302,7 +302,7 @@ export default function HomePage({
         textAlign: 'center',
         boxShadow: '0 15px 40px rgba(102, 126, 234, 0.3)',
         position: 'relative',
-        overflow: 'hidden',
+        overflow: 'visible',
       }}>
         {/* Animated Background Photos */}
         {backgroundPhotos.length > 0 && (
@@ -313,6 +313,8 @@ export default function HomePage({
             right: 0,
             bottom: 0,
             zIndex: 1,
+            overflow: 'hidden',
+            borderRadius: '20px',
           }}>
             {backgroundPhotos.map((photo, idx) => (
               <div
@@ -344,6 +346,8 @@ export default function HomePage({
           bottom: 0,
           background: 'linear-gradient(135deg, rgba(120, 130, 200, 0.5) 0%, rgba(140, 120, 180, 0.5) 100%)',
           zIndex: 2,
+          borderRadius: '20px',
+          pointerEvents: 'none',
         }} />
         
         {/* Decorative pattern overlay */}
@@ -356,6 +360,7 @@ export default function HomePage({
           background: 'radial-gradient(circle at 20% 50%, rgba(255,255,255,0.1) 0%, transparent 50%), radial-gradient(circle at 80% 50%, rgba(255,255,255,0.1) 0%, transparent 50%)',
           pointerEvents: 'none',
           zIndex: 3,
+          borderRadius: '20px',
         }} />
         
         <div style={{ position: 'relative', zIndex: 10 }}>
@@ -384,7 +389,7 @@ export default function HomePage({
             position: 'relative',
             boxShadow: '0 8px 24px rgba(0, 0, 0, 0.15)',
             backdropFilter: 'blur(10px)',
-            zIndex: 100,
+            zIndex: 10001,
           }}>
             <span style={{ fontSize: '1.4rem' }}>🔍</span>
             <input
@@ -417,7 +422,7 @@ export default function HomePage({
               boxShadow: '0 12px 32px rgba(0, 0, 0, 0.2)',
               maxHeight: '400px',
               overflowY: 'auto',
-              zIndex: 10000,
+              zIndex: 10002,
             }}>
               {searchResults.people.length > 0 && (
                 <>

@@ -106,32 +106,58 @@ module.exports = async function (context, req) {
 
     if (smartSample && !maxPerPerson) {
       // Step 1: Get counts per person to calculate sample sizes
+      // OPTIMIZATION: Add pagination directly in the count query to avoid fetching all 360 people every time
+      const queryStartIdx = batch * batchSize + 1; // SQL ROW_NUMBER() is 1-based
+      const queryEndIdx = (batch + 1) * batchSize;
+      
       const countQuery = `
-        WITH ${photoPersonPairsCTE}
+        WITH ${photoPersonPairsCTE},
+        PersonCounts AS (
+          SELECT 
+            ne.ID as PersonID,
+            ne.neName as PersonName,
+            COUNT(DISTINCT pp.PFileName) as TotalPhotos,
+            ROW_NUMBER() OVER (ORDER BY ne.neName) as RowNum
+          FROM PhotoPersonPairs pp
+          INNER JOIN dbo.NameEvent ne ON pp.PersonID = ne.ID
+          WHERE ne.neType = 'N' -- Only people, not events
+          GROUP BY ne.ID, ne.neName
+        )
         SELECT 
-          ne.ID as PersonID,
-          ne.neName as PersonName,
-          COUNT(DISTINCT pp.PFileName) as TotalPhotos
-        FROM PhotoPersonPairs pp
-        INNER JOIN dbo.NameEvent ne ON pp.PersonID = ne.ID
-        WHERE ne.neType = 'N' -- Only people, not events
-        GROUP BY ne.ID, ne.neName
-        ORDER BY ne.neName
+          PersonID,
+          PersonName,
+          TotalPhotos,
+          (SELECT COUNT(*) FROM PersonCounts) as TotalPersons
+        FROM PersonCounts
+        WHERE RowNum >= @startIdx AND RowNum <= @endIdx
+        ORDER BY PersonName
       `;
       
-      const counts = await query(countQuery);
+      const counts = await query(countQuery, { startIdx: queryStartIdx, endIdx: queryEndIdx });
       
       if (!counts || counts.length === 0) {
+        // Get total persons count even if this batch is empty
+        const totalPersonsQuery = `
+          WITH ${photoPersonPairsCTE}
+          SELECT COUNT(DISTINCT pp.PersonID) as TotalCount
+          FROM PhotoPersonPairs pp
+          INNER JOIN dbo.NameEvent ne ON pp.PersonID = ne.ID
+          WHERE ne.neType = 'N'
+        `;
+        const totalResult = await query(totalPersonsQuery);
+        const totalPersons = totalResult && totalResult[0] ? totalResult[0].TotalCount : 0;
+        
         context.res = {
           status: 200,
           body: {
             success: true,
             photos: [],
-            message: 'No tagged photos found',
+            message: 'No more tagged photos in this batch',
             batch: {
               current: batch,
               size: batchSize,
-              totalPersons: 0,
+              totalPersons: totalPersons,
+              totalBatches: Math.ceil(totalPersons / batchSize),
               hasMore: false
             }
           }
@@ -139,13 +165,12 @@ module.exports = async function (context, req) {
         return;
       }
 
-      // Calculate batch range
-      const startIdx = batch * batchSize;
-      const endIdx = Math.min(startIdx + batchSize, counts.length);
-      const batchedCounts = counts.slice(startIdx, endIdx);
-      const hasMore = endIdx < counts.length;
+      // Get total persons from first row (all rows have same TotalPersons)
+      const totalPersons = counts[0].TotalPersons || counts.length;
+      const totalBatches = Math.ceil(totalPersons / batchSize);
+      const hasMore = (batch + 1) * batchSize < totalPersons;
       
-      context.log(`Processing batch ${batch}: persons ${startIdx + 1}-${endIdx} of ${counts.length} (hasMore: ${hasMore})`);
+      context.log(`Processing batch ${batch}: ${counts.length} persons in this batch, ${totalPersons} total (hasMore: ${hasMore})`);
 
       // Step 2: For each person in this batch, calculate sample size and get distributed samples
       const allPhotos = [];
@@ -156,9 +181,9 @@ module.exports = async function (context, req) {
       let currentPhotoCount = 0;
       let processedPersons = 0;
 
-      context.log(`Starting smart sampling: ${counts.length} persons found (batch ${batch}: processing ${batchedCounts.length} persons)`);
+      context.log(`Starting smart sampling: ${totalPersons} persons total (batch ${batch}: processing ${counts.length} persons)`);
 
-      for (const personCount of batchedCounts) {
+      for (const personCount of counts) {
         // Stop if we've reached photo limit
         if (currentPhotoCount >= MAX_TOTAL_PHOTOS) {
           context.log(`Reached photo limit (${currentPhotoCount}/${MAX_TOTAL_PHOTOS})`);
@@ -305,12 +330,12 @@ module.exports = async function (context, req) {
           smartSample: true,
           limited: currentPhotoCount >= MAX_TOTAL_PHOTOS,
           personsProcessed: processedPersons,
-          totalPersons: counts.length,
+          totalPersons: totalPersons,
           batch: {
             current: batch,
             size: batchSize,
-            totalPersons: counts.length,
-            totalBatches: Math.ceil(counts.length / batchSize),
+            totalPersons: totalPersons,
+            totalBatches: totalBatches,
             hasMore: hasMore
           }
         }
