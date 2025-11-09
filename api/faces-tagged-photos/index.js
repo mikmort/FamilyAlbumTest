@@ -133,17 +133,21 @@ module.exports = async function (context, req) {
       const allPhotos = [];
       const samplingStats = {};
       
-      // Process in batches to avoid timeout (max 5000 total photos)
-      const MAX_TOTAL_PHOTOS = 5000;
+      // AGGRESSIVE limits to prevent timeout - start conservative
+      const MAX_TOTAL_PHOTOS = 2000;  // Reduced from 5000
+      const MAX_PERSONS = 100;  // Also limit number of persons processed
       let currentPhotoCount = 0;
       let processedPersons = 0;
 
+      context.log(`Starting smart sampling: ${counts.length} persons found, limiting to ${MAX_PERSONS} persons and ${MAX_TOTAL_PHOTOS} photos`);
+
       for (const personCount of counts) {
-        // Stop if we've reached the limit
-        if (currentPhotoCount >= MAX_TOTAL_PHOTOS) {
-          context.log(`Reached photo limit (${MAX_TOTAL_PHOTOS}), processed ${processedPersons}/${counts.length} persons`);
+        // Stop if we've reached either limit
+        if (currentPhotoCount >= MAX_TOTAL_PHOTOS || processedPersons >= MAX_PERSONS) {
+          context.log(`Reached limit (photos: ${currentPhotoCount}/${MAX_TOTAL_PHOTOS}, persons: ${processedPersons}/${MAX_PERSONS})`);
           break;
         }
+        
         
         const sampleSize = calculateSampleSize(personCount.TotalPhotos);
         samplingStats[personCount.PersonID] = {
@@ -152,9 +156,10 @@ module.exports = async function (context, req) {
           sampled: sampleSize
         };
 
-        // Get photos distributed across timeline
-        // Use a simpler approach: calculate bucket size and take one photo per bucket
-        const sampleQuery = `
+        try {
+          // Get photos distributed across timeline
+          // Use a simpler approach: calculate bucket size and take one photo per bucket
+          const sampleQuery = `
           WITH ${photoPersonPairsCTE},
           PhotoCounts AS (
             -- First count how many people are in each photo
@@ -221,19 +226,25 @@ module.exports = async function (context, req) {
           ORDER BY pwd.PhotoDate
         `;
 
-        const personPhotos = await query(sampleQuery, {
-          personId: personCount.PersonID,
-          sampleSize: sampleSize
-        });
+          const personPhotos = await query(sampleQuery, {
+            personId: personCount.PersonID,
+            sampleSize: sampleSize
+          });
 
-        // Add person name to each photo
-        personPhotos.forEach(photo => {
-          photo.PersonName = personCount.PersonName;
-          allPhotos.push(photo);
-        });
-        
-        currentPhotoCount += personPhotos.length;
-        processedPersons++;
+          // Add person name to each photo
+          personPhotos.forEach(photo => {
+            photo.PersonName = personCount.PersonName;
+            allPhotos.push(photo);
+          });
+          
+          currentPhotoCount += personPhotos.length;
+          processedPersons++;
+          
+        } catch (queryError) {
+          context.log.error(`Error querying photos for person ${personCount.PersonName}:`, queryError);
+          // Continue to next person instead of failing completely
+          continue;
+        }
       }
 
       context.log(`Smart sampling: ${allPhotos.length} photos from ${processedPersons} people (limit: ${MAX_TOTAL_PHOTOS})`);
