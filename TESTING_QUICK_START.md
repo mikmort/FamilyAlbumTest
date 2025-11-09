@@ -2,6 +2,8 @@
 
 This is the **fastest way** to get started with testing the Family Album application.
 
+> **✨ New**: Playwright testing now works seamlessly in GitHub Copilot! See [docs/COPILOT_TESTING.md](docs/COPILOT_TESTING.md) for details.
+
 ## One-Line Setup
 
 ```bash

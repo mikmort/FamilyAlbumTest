@@ -37,36 +37,57 @@ export default defineConfig({
     // Screenshot on failure
     screenshot: 'only-on-failure',
     
-    // Video on failure
-    video: 'retain-on-failure',
+    // Video on failure - disabled in Copilot environment due to ffmpeg requirements
+    video: process.env.COPILOT_AGENT_ACTION ? 'off' : 'retain-on-failure',
   },
 
   // Configure projects for major browsers
   projects: [
     {
       name: 'chromium',
-      use: { ...devices['Desktop Chrome'] },
+      use: { 
+        ...devices['Desktop Chrome'],
+        // Use system-installed Chromium in GitHub Copilot environment
+        // This avoids browser download issues when Playwright browsers can't be installed
+        launchOptions: process.env.COPILOT_AGENT_ACTION ? {
+          executablePath: '/usr/bin/chromium-browser',
+        } : undefined,
+      },
     },
 
-    {
-      name: 'firefox',
-      use: { ...devices['Desktop Firefox'] },
-    },
+    // Only run chromium in Copilot environment to speed up tests
+    // Firefox and Webkit require their own browser installations
+    ...(process.env.COPILOT_AGENT_ACTION ? [] : [
+      {
+        name: 'firefox',
+        use: { ...devices['Desktop Firefox'] },
+      },
 
-    {
-      name: 'webkit',
-      use: { ...devices['Desktop Safari'] },
-    },
+      {
+        name: 'webkit',
+        use: { ...devices['Desktop Safari'] },
+      },
+    ]),
 
     // Test against mobile viewports
     {
       name: 'Mobile Chrome',
-      use: { ...devices['Pixel 5'] },
+      use: { 
+        ...devices['Pixel 5'],
+        // Use system-installed Chromium for mobile tests in Copilot environment
+        launchOptions: process.env.COPILOT_AGENT_ACTION ? {
+          executablePath: '/usr/bin/chromium-browser',
+        } : undefined,
+      },
     },
-    {
-      name: 'Mobile Safari',
-      use: { ...devices['iPhone 12'] },
-    },
+    
+    // Only run Mobile Safari outside of Copilot environment
+    ...(process.env.COPILOT_AGENT_ACTION ? [] : [
+      {
+        name: 'Mobile Safari',
+        use: { ...devices['iPhone 12'] },
+      },
+    ]),
   ],
 
   // Run your local dev server before starting the tests
