@@ -57,11 +57,20 @@ if (!authorized) {
 
 When developing and testing with GitHub Copilot or Playwright, you can enable **Dev Mode** to bypass RBAC:
 
-1. Set `DEV_MODE=true` in your `.env.local` file
-2. Optionally set `DEV_USER_EMAIL` and `DEV_USER_ROLE` to simulate a specific user
-3. Dev mode is automatically disabled in production
+1. Run the setup script: `node scripts/setup-env.js` (automatically creates `.env.local` with dev mode)
+2. Or manually set `DEV_MODE=true` in your `.env.local` file
+3. Optionally set `DEV_USER_EMAIL` and `DEV_USER_ROLE` to simulate a specific user
+4. Dev mode is automatically disabled in production
 
 Dev mode allows automated testing without requiring actual OAuth authentication.
+
+**For GitHub Copilot and Coding Agents:**
+- Dev mode is pre-configured in `playwright.config.ts`
+- GitHub Secrets are automatically available as environment variables
+- Run `node scripts/setup-env.js` to create `.env.local` from secrets
+- Tests can run with or without Azure credentials (limited functionality without)
+
+See [docs/DEV_MODE_TESTING.md](docs/DEV_MODE_TESTING.md) and [docs/GITHUB_SECRETS_SETUP.md](docs/GITHUB_SECRETS_SETUP.md) for details.
 
 **Local Development Note**: This application uses Azure Static Web Apps architecture where the API (Azure Functions) runs separately from the frontend (Next.js). For full local testing:
 - Frontend: `npm run dev` (runs on port 3000)
