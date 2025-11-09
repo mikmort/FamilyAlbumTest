@@ -179,12 +179,21 @@ module.exports = async function (context, req) {
           ),
           TotalCount AS (
             SELECT COUNT(*) as Total FROM PhotosWithDates
+          ),
+          SamplingInterval AS (
+            SELECT 
+              Total,
+              CASE 
+                WHEN Total <= @sampleSize THEN 1
+                ELSE CAST(CEILING(CAST(Total AS FLOAT) / @sampleSize) AS INT)
+              END as Interval
+            FROM TotalCount
           )
-          SELECT TOP (@sampleSize) PFileName, PersonID
-          FROM PhotosWithDates
-          CROSS JOIN TotalCount
-          WHERE (RowNum - 1) % (CASE WHEN Total < @sampleSize THEN 1 ELSE Total / @sampleSize END) = 0
-          ORDER BY PhotoDate
+          SELECT TOP (@sampleSize) pwd.PFileName, pwd.PersonID
+          FROM PhotosWithDates pwd
+          CROSS JOIN SamplingInterval si
+          WHERE si.Total <= @sampleSize OR (pwd.RowNum - 1) % si.Interval = 0
+          ORDER BY pwd.PhotoDate
         `;
 
         const personPhotos = await query(sampleQuery, {
