@@ -5,6 +5,26 @@ module.exports = async function (context, req) {
     context.log('Homepage API called');
 
     try {
+        // Check if database is configured
+        if (!process.env.AZURE_SQL_SERVER || !process.env.AZURE_SQL_DATABASE) {
+            context.log.warn('Database credentials not configured, returning empty homepage data');
+            context.res = {
+                status: 200,
+                headers: { 'Content-Type': 'application/json' },
+                body: {
+                    onThisDay: [],
+                    recentUploads: [],
+                    totalPhotos: 0,
+                    totalPeople: 0,
+                    totalEvents: 0,
+                    featuredPerson: null,
+                    featuredEvent: null,
+                    randomSuggestion: null
+                }
+            };
+            return;
+        }
+
         // Check authorization (Read permission required)
         const { authorized, user, error } = await checkAuthorization(context, 'Read');
         if (!authorized) {
