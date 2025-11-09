@@ -156,7 +156,13 @@ module.exports = async function (context, req) {
               pc.PeopleCount,
               COALESCE(
                 p.PDateEntered,
-                DATEFROMPARTS(ISNULL(p.PYear, 2000), ISNULL(p.PMonth, 1), 1),
+                CASE 
+                  WHEN p.PYear >= 1 AND p.PYear <= 9999 AND p.PMonth >= 1 AND p.PMonth <= 12
+                  THEN DATEFROMPARTS(p.PYear, p.PMonth, 1)
+                  WHEN p.PYear >= 1 AND p.PYear <= 9999 AND (p.PMonth IS NULL OR p.PMonth < 1 OR p.PMonth > 12)
+                  THEN DATEFROMPARTS(p.PYear, 1, 1)
+                  ELSE NULL
+                END,
                 p.PLastModifiedDate,
                 '1900-01-01'
               ) as PhotoDate,
@@ -166,7 +172,13 @@ module.exports = async function (context, req) {
                 -- Then by date for distribution
                 COALESCE(
                   p.PDateEntered,
-                  DATEFROMPARTS(ISNULL(p.PYear, 2000), ISNULL(p.PMonth, 1), 1),
+                  CASE 
+                    WHEN p.PYear >= 1 AND p.PYear <= 9999 AND p.PMonth >= 1 AND p.PMonth <= 12
+                    THEN DATEFROMPARTS(p.PYear, p.PMonth, 1)
+                    WHEN p.PYear >= 1 AND p.PYear <= 9999 AND (p.PMonth IS NULL OR p.PMonth < 1 OR p.PMonth > 12)
+                    THEN DATEFROMPARTS(p.PYear, 1, 1)
+                    ELSE NULL
+                  END,
                   p.PLastModifiedDate,
                   '1900-01-01'
                 )
