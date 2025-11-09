@@ -354,12 +354,28 @@ module.exports = async function (context, req) {
 
   } catch (err) {
     context.log.error('Error fetching tagged photos:', err);
-    context.res = {
-      status: 500,
-      body: {
-        success: false,
-        error: err.message || 'Error fetching tagged photos'
-      }
-    };
+    
+    // Import DatabaseWarmupError check from db module
+    const { DatabaseWarmupError, isDatabaseWarmupError } = require('../shared/db');
+    
+    // Check if this is a database warmup error
+    if (err instanceof DatabaseWarmupError || isDatabaseWarmupError(err)) {
+      context.res = {
+        status: 503, // Service Unavailable
+        body: {
+          success: false,
+          error: 'Database is warming up. Please wait a moment and try again.',
+          isWarmup: true
+        }
+      };
+    } else {
+      context.res = {
+        status: 500,
+        body: {
+          success: false,
+          error: err.message || 'Error fetching tagged photos'
+        }
+      };
+    }
   }
 };
