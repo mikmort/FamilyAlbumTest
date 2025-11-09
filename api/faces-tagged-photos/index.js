@@ -1,5 +1,5 @@
 const { checkAuthorization } = require('../shared/auth');
-const { query } = require('../shared/db');
+const { query, DatabaseWarmupError, isDatabaseWarmupError } = require('../shared/db');
 const { getBlobSasUrl } = require('../shared/storage');
 
 /**
@@ -14,6 +14,8 @@ const { getBlobSasUrl } = require('../shared/storage');
  * - 5000+ photos: 60 (1-2%)
  */
 function calculateSampleSize(totalPhotos) {
+  // Ensure we always return at least 1 to avoid division by zero
+  if (totalPhotos <= 0) return 1;
   if (totalPhotos <= 10) return totalPhotos;
   if (totalPhotos <= 20) return 10;
   
@@ -204,7 +206,7 @@ module.exports = async function (context, req) {
           SELECT TOP (@sampleSize) pwd.PFileName, pwd.PersonID
           FROM PhotosWithDates pwd
           CROSS JOIN SamplingInterval si
-          WHERE si.Total <= @sampleSize OR (pwd.RowNum - 1) % si.Interval = 0
+          WHERE si.Total <= @sampleSize OR (si.Interval > 0 AND (pwd.RowNum - 1) % si.Interval = 0)
           ORDER BY pwd.PhotoDate
         `;
 
@@ -366,9 +368,6 @@ module.exports = async function (context, req) {
 
   } catch (err) {
     context.log.error('Error fetching tagged photos:', err);
-    
-    // Import DatabaseWarmupError check from db module
-    const { DatabaseWarmupError, isDatabaseWarmupError } = require('../shared/db');
     
     // Check if this is a database warmup error
     if (err instanceof DatabaseWarmupError || isDatabaseWarmupError(err)) {
