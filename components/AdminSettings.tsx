@@ -626,7 +626,7 @@ export default function AdminSettings({ onRequestsChange }: AdminSettingsProps) 
           Train the face recognition AI on confirmed face tags to improve accuracy and performance.
         </p>
         <p style={{ color: '#666', fontSize: '0.9rem', marginBottom: '0.5rem', fontStyle: 'italic' }}>
-          Uses intelligent sampling: samples are distributed across each person's timeline to capture aging and appearance changes.
+          Uses intelligent sampling: prioritizes most recent photos and solo/duo shots for optimal training quality.
         </p>
         <p style={{ color: '#007bff', fontSize: '0.9rem', marginBottom: '1rem', fontWeight: '500' }}>
           💡 Smart sampling: 5-10 photos for people with few photos, up to 60 photos for those with thousands. Logarithmic scaling ensures efficiency!
