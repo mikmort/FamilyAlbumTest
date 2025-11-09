@@ -666,8 +666,9 @@ module.exports = async function (context, req) {
             const exclusiveFilter = req.query.exclusiveFilter === 'true';
             const random = req.query.random === '1' || req.query.random === 'true';
             const limit = req.query.limit ? parseInt(req.query.limit) : null;
+            const recentDays = req.query.recentDays ? parseInt(req.query.recentDays) : null;
 
-            context.log('Parsed filters:', { peopleIds, eventId, noPeople, sortOrder, exclusiveFilter, random, limit });
+            context.log('Parsed filters:', { peopleIds, eventId, noPeople, sortOrder, exclusiveFilter, random, limit, recentDays });
 
             let mediaQuery = `
                 SELECT DISTINCT p.*
@@ -760,6 +761,12 @@ module.exports = async function (context, req) {
                         )
                     )
                 `);
+            }
+
+            // Filter by recent uploads (last N days)
+            if (recentDays && recentDays > 0) {
+                whereClauses.push(`p.PDateEntered >= DATEADD(day, -@recentDays, GETDATE())`);
+                params.recentDays = recentDays;
             }
 
             if (whereClauses.length > 0) {

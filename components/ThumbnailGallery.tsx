@@ -10,6 +10,7 @@ interface ThumbnailGalleryProps {
   noPeople: boolean;
   sortOrder: 'asc' | 'desc';
   exclusiveFilter: boolean;
+  recentDays?: number | null;
   onMediaClick: (media: MediaItem, allMedia: MediaItem[]) => void;
   onMediaFullscreen?: (media: MediaItem, allMedia: MediaItem[]) => void;
 }
@@ -104,6 +105,7 @@ function ThumbnailGallery({
   noPeople,
   sortOrder,
   exclusiveFilter,
+  recentDays,
   onMediaClick,
   onMediaFullscreen,
 }: ThumbnailGalleryProps) {
@@ -124,9 +126,12 @@ function ThumbnailGallery({
     if (noPeople) {
       params.append('noPeople', 'true');
     }
+    if (recentDays) {
+      params.append('recentDays', recentDays.toString());
+    }
     params.append('sortOrder', sortOrder);
     return params.toString();
-  }, [peopleIds, eventId, noPeople, sortOrder, exclusiveFilter]);
+  }, [peopleIds, eventId, noPeople, sortOrder, exclusiveFilter, recentDays]);
 
   // Use SWR for data fetching with caching
   const { data: media, error, isLoading, mutate } = useSWR<MediaItem[]>(

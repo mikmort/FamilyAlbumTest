@@ -42,6 +42,7 @@ export default function Home() {
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
   const [showNoPeople, setShowNoPeople] = useState(false);
   const [exclusiveFilter, setExclusiveFilter] = useState(false);
+  const [recentDays, setRecentDays] = useState<number | null>(null);
   const [selectedMedia, setSelectedMedia] = useState<MediaItem | null>(null);
   const [startFullscreen, setStartFullscreen] = useState(false);
   const [mediaList, setMediaList] = useState<MediaItem[]>([]);
@@ -144,6 +145,7 @@ export default function Home() {
     setView('home');
     setSelectedMedia(null);
     setStartFullscreen(false);
+    setRecentDays(null);
   };
 
   const handleMediaClick = (media: MediaItem, allMedia: MediaItem[]) => {
@@ -167,6 +169,15 @@ export default function Home() {
   const handleNavigateToGallery = (peopleIds: number[], eventId: number | null) => {
     setSelectedPeople(peopleIds);
     setSelectedEvent(eventId);
+    setRecentDays(null);
+    setView('gallery');
+  };
+
+  const handleViewRecentUploads = () => {
+    setSelectedPeople([]);
+    setSelectedEvent(null);
+    setShowNoPeople(false);
+    setRecentDays(60);
     setView('gallery');
   };
 
@@ -265,6 +276,7 @@ export default function Home() {
             onSelectPeople={() => setView('select')}
             onNavigateToGallery={handleNavigateToGallery}
             onViewNewMedia={() => setView('new-media')}
+            onViewRecentUploads={handleViewRecentUploads}
           />
         )}
 
@@ -288,7 +300,7 @@ export default function Home() {
           <div className="gallery-view">
             <div className="gallery-controls">
               <button className="btn btn-secondary" onClick={handleBack}>
-                ← Back to Selection
+                ← Back {recentDays ? 'to Home' : 'to Selection'}
               </button>
               <div className="flex flex-gap">
                 <button
@@ -300,12 +312,19 @@ export default function Home() {
               </div>
             </div>
 
+            {recentDays && (
+              <h2 style={{ marginBottom: '1rem', fontSize: '1.5rem' }}>
+                Recent Uploads (Last {recentDays} Days)
+              </h2>
+            )}
+
             <ThumbnailGallery
               peopleIds={selectedPeople}
               eventId={selectedEvent}
               noPeople={showNoPeople}
               sortOrder={sortOrder}
               exclusiveFilter={exclusiveFilter}
+              recentDays={recentDays}
               onMediaClick={handleMediaClick}
               onMediaFullscreen={handleMediaFullscreen}
             />
