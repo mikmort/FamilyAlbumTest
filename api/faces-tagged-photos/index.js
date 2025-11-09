@@ -132,8 +132,19 @@ module.exports = async function (context, req) {
       // Step 2: For each person, calculate sample size and get distributed samples
       const allPhotos = [];
       const samplingStats = {};
+      
+      // Process in batches to avoid timeout (max 5000 total photos)
+      const MAX_TOTAL_PHOTOS = 5000;
+      let currentPhotoCount = 0;
+      let processedPersons = 0;
 
       for (const personCount of counts) {
+        // Stop if we've reached the limit
+        if (currentPhotoCount >= MAX_TOTAL_PHOTOS) {
+          context.log(`Reached photo limit (${MAX_TOTAL_PHOTOS}), processed ${processedPersons}/${counts.length} persons`);
+          break;
+        }
+        
         const sampleSize = calculateSampleSize(personCount.TotalPhotos);
         samplingStats[personCount.PersonID] = {
           name: personCount.PersonName,
@@ -220,27 +231,41 @@ module.exports = async function (context, req) {
           photo.PersonName = personCount.PersonName;
           allPhotos.push(photo);
         });
+        
+        currentPhotoCount += personPhotos.length;
+        processedPersons++;
       }
 
-      context.log(`Smart sampling: ${allPhotos.length} photos from ${counts.length} people`);
+      context.log(`Smart sampling: ${allPhotos.length} photos from ${processedPersons} people (limit: ${MAX_TOTAL_PHOTOS})`);
       
-      // Generate SAS URLs
-      const photosWithUrls = await Promise.all(allPhotos.map(async (photo) => {
-        try {
-          const sasUrl = await getBlobSasUrl('family-album-media', photo.PFileName);
-          return {
-            PFileName: photo.PFileName,
-            PersonID: photo.PersonID,
-            PersonName: photo.PersonName,
-            url: sasUrl
-          };
-        } catch (err) {
-          context.log.error(`Error generating SAS URL for ${photo.PFileName}:`, err);
-          return null;
-        }
-      }));
+      // Generate SAS URLs in smaller batches to avoid overwhelming the system
+      const BATCH_SIZE = 50;
+      const photosWithUrls = [];
+      
+      for (let i = 0; i < allPhotos.length; i += BATCH_SIZE) {
+        const batch = allPhotos.slice(i, i + BATCH_SIZE);
+        const batchResults = await Promise.all(batch.map(async (photo) => {
+          try {
+            const sasUrl = await getBlobSasUrl('family-album-media', photo.PFileName);
+            return {
+              PFileName: photo.PFileName,
+              PersonID: photo.PersonID,
+              PersonName: photo.PersonName,
+              url: sasUrl
+            };
+          } catch (err) {
+            context.log.error(`Error generating SAS URL for ${photo.PFileName}:`, err);
+            return null;
+          }
+        }));
+        
+        photosWithUrls.push(...batchResults);
+        context.log(`Processed SAS URLs batch ${Math.floor(i / BATCH_SIZE) + 1}/${Math.ceil(allPhotos.length / BATCH_SIZE)}`);
+      }
 
       const validPhotos = photosWithUrls.filter(p => p !== null);
+      
+      context.log(`Returning ${validPhotos.length} photos with SAS URLs`);
 
       context.res = {
         status: 200,
@@ -249,7 +274,10 @@ module.exports = async function (context, req) {
           photos: validPhotos,
           totalCount: validPhotos.length,
           samplingStats: samplingStats,
-          smartSample: true
+          smartSample: true,
+          limited: currentPhotoCount >= MAX_TOTAL_PHOTOS,
+          personsProcessed: processedPersons,
+          totalPersons: counts.length
         }
       };
       return;
