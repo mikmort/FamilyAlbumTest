@@ -18,6 +18,7 @@
     "test:report": "playwright show-report",
     "setup:env": "node scripts/setup-env.js",
     "setup:api-env": "node scripts/setup-api-env.js",
+    "setup:agent": "node scripts/setup-coding-agent.js",
     "test:setup": "node scripts/setup-env.js && npm test"
   },
   "dependencies": {
