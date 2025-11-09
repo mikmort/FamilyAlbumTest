@@ -1,4 +1,4 @@
-const { query } = require('./db');
+const { query, DatabaseWarmupError } = require('./db');
 
 /**
  * Authorization utilities for role-based access control
@@ -14,51 +14,82 @@ const ROLE_HIERARCHY = {
 
 /**
  * Get user from database by email
+ * @throws {DatabaseWarmupError} if database is warming up
  */
 async function getUserByEmail(email) {
   if (!email) return null;
   
-  const result = await query(
-    `SELECT ID, Email, Role, Status, LastLoginAt, Notes 
-     FROM Users 
-     WHERE Email = @email`,
-    { email: email.toLowerCase() }
-  );
-  
-  return result.length > 0 ? result[0] : null;
+  try {
+    const result = await query(
+      `SELECT ID, Email, Role, Status, LastLoginAt, Notes 
+       FROM Users 
+       WHERE Email = @email`,
+      { email: email.toLowerCase() }
+    );
+    
+    return result.length > 0 ? result[0] : null;
+  } catch (error) {
+    // Re-throw DatabaseWarmupError so caller knows database is starting up
+    if (error.isWarmupError || error instanceof DatabaseWarmupError) {
+      throw error;
+    }
+    // For other errors, log and re-throw
+    throw error;
+  }
 }
 
 /**
  * Get or create user record
  * If user doesn't exist, creates with Pending status
+ * @throws {DatabaseWarmupError} if database is warming up
  */
 async function getOrCreateUser(email, name = null) {
-  let user = await getUserByEmail(email);
-  
-  if (!user) {
-    // Create new user with Pending status
-    await query(
-      `INSERT INTO Users (Email, Role, Status, Notes) 
-       VALUES (@email, 'Read', 'Pending', @notes)`,
-      { 
-        email: email.toLowerCase(),
-        notes: name ? `Requested by: ${name}` : 'Auto-created on first login'
-      }
-    );
-    user = await getUserByEmail(email);
+  try {
+    let user = await getUserByEmail(email);
+    
+    if (!user) {
+      // Create new user with Pending status
+      await query(
+        `INSERT INTO Users (Email, Role, Status, Notes) 
+         VALUES (@email, 'Read', 'Pending', @notes)`,
+        { 
+          email: email.toLowerCase(),
+          notes: name ? `Requested by: ${name}` : 'Auto-created on first login'
+        }
+      );
+      user = await getUserByEmail(email);
+    }
+    
+    return user;
+  } catch (error) {
+    // Re-throw DatabaseWarmupError so caller knows database is starting up
+    if (error.isWarmupError || error instanceof DatabaseWarmupError) {
+      throw error;
+    }
+    // For other errors, log and re-throw
+    throw error;
   }
-  
-  return user;
 }
 
 /**
  * Update user's last login time
+ * Silently fails on warmup errors (non-critical operation)
  */
 async function updateLastLogin(email) {
-  await query(
-    `UPDATE Users SET LastLoginAt = GETDATE() WHERE Email = @email`,
-    { email: email.toLowerCase() }
-  );
+  try {
+    await query(
+      `UPDATE Users SET LastLoginAt = GETDATE() WHERE Email = @email`,
+      { email: email.toLowerCase() }
+    );
+  } catch (error) {
+    // Don't block authorization on last login update failures
+    // But re-throw warmup errors so caller is aware
+    if (error.isWarmupError || error instanceof DatabaseWarmupError) {
+      throw error;
+    }
+    // Log other errors but don't fail authorization
+    console.error('Failed to update last login:', error.message);
+  }
 }
 
 /**
@@ -134,6 +165,8 @@ function getUserName(context) {
  * 
  * DEV MODE: Set DEV_MODE=true in environment to bypass authentication for testing.
  * Optionally set DEV_USER_EMAIL and DEV_USER_ROLE to simulate a specific user.
+ * 
+ * @throws {DatabaseWarmupError} if database is warming up - caller should handle this
  */
 async function checkAuthorization(context, requiredRole = 'Read') {
   // Dev mode bypass for testing (only in development)
@@ -167,40 +200,51 @@ async function checkAuthorization(context, requiredRole = 'Read') {
     };
   }
   
-  // Get or create user
-  const name = getUserName(context);
-  const user = await getOrCreateUser(email, name);
-  
-  // Update last login
-  await updateLastLogin(email);
-  
-  // Check if user is active
-  if (user.Status !== 'Active') {
+  try {
+    // Get or create user (can throw DatabaseWarmupError)
+    const name = getUserName(context);
+    const user = await getOrCreateUser(email, name);
+    
+    // Update last login (can throw DatabaseWarmupError)
+    await updateLastLogin(email);
+    
+    // Check if user is active
+    if (user.Status !== 'Active') {
+      return {
+        authorized: false,
+        user: user,
+        error: user.Status === 'Pending' 
+          ? 'Access pending approval' 
+          : user.Status === 'Denied'
+          ? 'Access has been denied'
+          : 'Account is suspended'
+      };
+    }
+    
+    // Check role permission
+    if (!hasPermission(user.Role, requiredRole)) {
+      return {
+        authorized: false,
+        user: user,
+        error: `Insufficient permissions. Required: ${requiredRole}, You have: ${user.Role}`
+      };
+    }
+    
     return {
-      authorized: false,
+      authorized: true,
       user: user,
-      error: user.Status === 'Pending' 
-        ? 'Access pending approval' 
-        : user.Status === 'Denied'
-        ? 'Access has been denied'
-        : 'Account is suspended'
+      error: null
     };
+  } catch (error) {
+    // Re-throw DatabaseWarmupError so API endpoints can handle it appropriately
+    if (error.isWarmupError || error instanceof DatabaseWarmupError) {
+      context.log.warn('Database is warming up during authorization check');
+      throw error;
+    }
+    // For other errors, log and re-throw
+    context.log.error('Error during authorization check:', error);
+    throw error;
   }
-  
-  // Check role permission
-  if (!hasPermission(user.Role, requiredRole)) {
-    return {
-      authorized: false,
-      user: user,
-      error: `Insufficient permissions. Required: ${requiredRole}, You have: ${user.Role}`
-    };
-  }
-  
-  return {
-    authorized: true,
-    user: user,
-    error: null
-  };
 }
 
 /**

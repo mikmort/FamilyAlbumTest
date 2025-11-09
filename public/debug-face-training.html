@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Face Training Diagnostic</title>
+  <style>
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      max-width: 1200px;
+      margin: 40px auto;
+      padding: 20px;
+      background: #f5f5f5;
+    }
+    h1 {
+      color: #333;
+      border-bottom: 3px solid #007acc;
+      padding-bottom: 10px;
+    }
+    .test-section {
+      background: white;
+      padding: 20px;
+      margin: 20px 0;
+      border-radius: 8px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    button {
+      background: #007acc;
+      color: white;
+      border: none;
+      padding: 12px 24px;
+      font-size: 16px;
+      border-radius: 4px;
+      cursor: pointer;
+      margin: 5px;
+    }
+    button:hover {
+      background: #005a9e;
+    }
+    button:disabled {
+      background: #ccc;
+      cursor: not-allowed;
+    }
+    .result {
+      margin-top: 20px;
+      padding: 15px;
+      border-radius: 4px;
+      white-space: pre-wrap;
+      font-family: 'Courier New', monospace;
+      font-size: 13px;
+      max-height: 600px;
+      overflow-y: auto;
+    }
+    .result.success {
+      background: #d4edda;
+      border: 1px solid #c3e6cb;
+      color: #155724;
+    }
+    .result.error {
+      background: #f8d7da;
+      border: 1px solid #f5c6cb;
+      color: #721c24;
+    }
+    .result.info {
+      background: #d1ecf1;
+      border: 1px solid #bee5eb;
+      color: #0c5460;
+    }
+    .loading {
+      color: #007acc;
+      font-style: italic;
+    }
+    .log-entry {
+      margin: 5px 0;
+      padding: 5px;
+      background: #f8f9fa;
+      border-left: 3px solid #007acc;
+    }
+    .summary-box {
+      background: #fff3cd;
+      border: 1px solid #ffc107;
+      padding: 15px;
+      margin: 15px 0;
+      border-radius: 4px;
+    }
+  </style>
+</head>
+<body>
+  <h1>🔍 Face Training Diagnostic Tool</h1>
+  
+  <div class="test-section">
+    <h2>Test 1: Original Endpoint (faces-tagged-photos)</h2>
+    <p>Test the original endpoint to see if it returns 500 error</p>
+    <button onclick="testOriginalEndpoint()" id="btn-original">Run Test</button>
+    <div id="result-original"></div>
+  </div>
+
+  <div class="test-section">
+    <h2>Test 2: Debug Endpoint (faces-tagged-photos-debug)</h2>
+    <p>Test the new diagnostic endpoint with detailed logging</p>
+    <button onclick="testDebugEndpoint()" id="btn-debug">Run Diagnostic</button>
+    <div id="result-debug"></div>
+  </div>
+
+  <div class="test-section">
+    <h2>Test 3: Direct Database Check</h2>
+    <p>Test auth-status to verify database connectivity</p>
+    <button onclick="testAuthStatus()" id="btn-auth">Check Auth Status</button>
+    <div id="result-auth"></div>
+  </div>
+
+  <script>
+    function setLoading(buttonId, resultId) {
+      document.getElementById(buttonId).disabled = true;
+      document.getElementById(resultId).innerHTML = '<p class="loading">Running test...</p>';
+    }
+
+    function showResult(resultId, data, isError = false) {
+      const resultDiv = document.getElementById(resultId);
+      const className = isError ? 'error' : 'success';
+      resultDiv.innerHTML = `<div class="result ${className}">${JSON.stringify(data, null, 2)}</div>`;
+      
+      // Re-enable button
+      const buttonId = resultId.replace('result-', 'btn-');
+      document.getElementById(buttonId).disabled = false;
+    }
+
+    async function testOriginalEndpoint() {
+      setLoading('btn-original', 'result-original');
+      
+      try {
+        const response = await fetch('/api/faces-tagged-photos?smartSample=true');
+        const data = await response.json();
+        
+        if (!response.ok) {
+          showResult('result-original', {
+            status: response.status,
+            statusText: response.statusText,
+            body: data
+          }, true);
+        } else {
+          showResult('result-original', {
+            status: response.status,
+            photosCount: data.photos?.length || 0,
+            samplingStats: data.samplingStats,
+            message: 'Success! Photos returned.'
+          }, false);
+        }
+      } catch (error) {
+        showResult('result-original', {
+          error: error.message,
+          stack: error.stack
+        }, true);
+      }
+    }
+
+    async function testDebugEndpoint() {
+      setLoading('btn-debug', 'result-debug');
+      
+      try {
+        const response = await fetch('/api/faces-tagged-photos-debug');
+        const data = await response.json();
+        
+        const resultDiv = document.getElementById('result-debug');
+        
+        // Build detailed output
+        let html = '';
+        
+        if (data.summary) {
+          html += '<div class="summary-box">';
+          html += '<h3>Summary</h3>';
+          html += `<pre>${JSON.stringify(data.summary, null, 2)}</pre>`;
+          html += '</div>';
+        }
+        
+        if (data.debugLog) {
+          html += '<h3>Debug Log</h3>';
+          data.debugLog.forEach(entry => {
+            html += `<div class="log-entry">`;
+            html += `<strong>${entry.step}</strong> @ ${entry.timestamp}<br>`;
+            html += `<pre>${JSON.stringify(entry.data, null, 2)}</pre>`;
+            html += `</div>`;
+          });
+        }
+        
+        if (data.error) {
+          html = `<div class="result error"><h3>Error</h3><pre>${JSON.stringify(data, null, 2)}</pre></div>` + html;
+        } else {
+          html = `<div class="result ${data.success ? 'success' : 'error'}"><strong>Status:</strong> ${response.status} ${response.statusText}</div>` + html;
+        }
+        
+        resultDiv.innerHTML = html;
+        document.getElementById('btn-debug').disabled = false;
+        
+      } catch (error) {
+        showResult('result-debug', {
+          error: error.message,
+          stack: error.stack
+        }, true);
+      }
+    }
+
+    async function testAuthStatus() {
+      setLoading('btn-auth', 'result-auth');
+      
+      try {
+        const response = await fetch('/api/auth-status');
+        const data = await response.json();
+        
+        showResult('result-auth', {
+          status: response.status,
+          authenticated: data.authenticated,
+          authorized: data.authorized,
+          user: data.user,
+          databaseWarming: data.databaseWarming
+        }, !response.ok);
+      } catch (error) {
+        showResult('result-auth', {
+          error: error.message,
+          stack: error.stack
+        }, true);
+      }
+    }
+
+    // Auto-run auth check on page load
+    window.addEventListener('load', () => {
+      testAuthStatus();
+    });
+  </script>
+</body>
+</html>
