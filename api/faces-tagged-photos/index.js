@@ -181,7 +181,8 @@ module.exports = async function (context, req) {
             SELECT COUNT(*) as Total FROM PhotosWithDates
           )
           SELECT TOP (@sampleSize) PFileName, PersonID
-          FROM PhotosWithDates, TotalCount
+          FROM PhotosWithDates
+          CROSS JOIN TotalCount
           WHERE (RowNum - 1) % (CASE WHEN Total < @sampleSize THEN 1 ELSE Total / @sampleSize END) = 0
           ORDER BY PhotoDate
         `;
