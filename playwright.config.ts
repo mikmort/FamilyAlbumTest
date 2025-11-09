@@ -90,21 +90,33 @@ export default defineConfig({
     ]),
   ],
 
-  // Run your local dev server before starting the tests
-  webServer: {
-    command: 'npm run dev',
-    url: 'http://localhost:3000',
-    reuseExistingServer: !process.env.CI,
-    stdout: 'ignore',
-    stderr: 'pipe',
-    timeout: 120 * 1000,
-    env: {
-      // Enable dev mode for tests to bypass authentication
-      DEV_MODE: 'true',
-      DEV_USER_EMAIL: 'test@example.com',
-      DEV_USER_ROLE: 'Admin',
-      // Use test database or mock data
-      // Add your test database credentials here if needed
+  // Run both Azure Functions API and Next.js dev server before starting tests
+  webServer: [
+    // Azure Functions API (must start first)
+    {
+      command: 'npm run setup:api-env && cd api && npm start',
+      url: 'http://localhost:7071/api/version',
+      reuseExistingServer: !process.env.CI,
+      stdout: 'ignore',
+      stderr: 'pipe',
+      timeout: 120 * 1000,
     },
-  },
+    // Next.js frontend (proxies API calls to Azure Functions)
+    {
+      command: 'npm run dev',
+      url: 'http://localhost:3000',
+      reuseExistingServer: !process.env.CI,
+      stdout: 'ignore',
+      stderr: 'pipe',
+      timeout: 120 * 1000,
+      env: {
+        // Enable dev mode for tests to bypass authentication
+        DEV_MODE: 'true',
+        DEV_USER_EMAIL: 'test@example.com',
+        DEV_USER_ROLE: 'Admin',
+        // Use test database or mock data
+        // Add your test database credentials here if needed
+      },
+    },
+  ],
 });

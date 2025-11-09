@@ -1,0 +1,25 @@
+{
+  "IsEncrypted": false,
+  "Values": {
+    "FUNCTIONS_WORKER_RUNTIME": "node",
+    "AzureWebJobsStorage": "",
+    
+    "AZURE_SQL_SERVER": "your-server.database.windows.net",
+    "AZURE_SQL_DATABASE": "your-database-name",
+    "AZURE_SQL_USER": "your-username",
+    "AZURE_SQL_PASSWORD": "your-password",
+    
+    "AZURE_STORAGE_ACCOUNT": "yourstorageaccount",
+    "AZURE_STORAGE_KEY": "your-storage-access-key",
+    "AZURE_STORAGE_CONTAINER": "family-album-media",
+    
+    "DEV_MODE": "true",
+    "DEV_USER_EMAIL": "dev@example.com",
+    "DEV_USER_ROLE": "Admin"
+  },
+  "Host": {
+    "LocalHttpPort": 7071,
+    "CORS": "*",
+    "CORSCredentials": false
+  }
+}
