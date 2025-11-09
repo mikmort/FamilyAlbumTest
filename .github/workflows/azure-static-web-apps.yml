@@ -34,56 +34,12 @@ jobs:
           node-version: '20'
           cache: 'npm'
 
-      # Cache node_modules for faster restoration
-      - name: Cache root node modules
-        uses: actions/cache@v4
-        id: npm-cache
-        with:
-          path: node_modules
-          key: ${{ runner.os }}-node-modules-${{ hashFiles('package-lock.json') }}
-          restore-keys: |
-            ${{ runner.os }}-node-modules-
-
-      # Cache API node_modules separately
-      - name: Cache API node modules
-        uses: actions/cache@v4
-        id: api-npm-cache
-        with:
-          path: api/node_modules
-          key: ${{ runner.os }}-api-node-modules-${{ hashFiles('api/package-lock.json') }}
-          restore-keys: |
-            ${{ runner.os }}-api-node-modules-
-
-      # Cache Next.js build output
-      - name: Cache Next.js build
-        uses: actions/cache@v4
-        with:
-          path: |
-            .next/cache
-            .next/static
-          key: ${{ runner.os }}-nextjs-${{ hashFiles('package-lock.json') }}-${{ hashFiles('**/*.ts', '**/*.tsx', '**/*.js', '**/*.jsx') }}
-          restore-keys: |
-            ${{ runner.os }}-nextjs-${{ hashFiles('package-lock.json') }}-
-            ${{ runner.os }}-nextjs-
-
-      # Cache TypeScript build info
-      - name: Cache TypeScript build
-        uses: actions/cache@v4
-        with:
-          path: |
-            .tsbuildinfo
-            **/.tsbuildinfo
-          key: ${{ runner.os }}-typescript-${{ hashFiles('tsconfig.json', '**/*.ts', '**/*.tsx') }}
-          restore-keys: |
-            ${{ runner.os }}-typescript-
-
+      # Streamlined installation - skip caching for faster builds
       - name: Install root dependencies
-        if: steps.npm-cache.outputs.cache-hit != 'true'
-        run: npm ci --prefer-offline --no-audit
+        run: npm ci --prefer-offline --no-audit --legacy-peer-deps
 
-      - name: Install API dependencies
-        if: steps.api-npm-cache.outputs.cache-hit != 'true'
-        run: cd api && npm ci --production --prefer-offline --no-audit
+      - name: Install API dependencies  
+        run: cd api && npm ci --production --prefer-offline --no-audit --legacy-peer-deps
 
       - name: Build Next.js static export
         run: npm run build
