@@ -91,7 +91,25 @@ export default defineConfig({
   ],
 
   // Run both Azure Functions API and Next.js dev server before starting tests
-  webServer: [
+  // Note: Azure Functions requires internet access for extension bundles
+  // In restricted environments (like GitHub Copilot), skip API server
+  webServer: process.env.SKIP_API_SERVER === 'true' ? [
+    // Next.js frontend only (API calls will fail but frontend tests work)
+    {
+      command: 'npm run dev',
+      url: 'http://localhost:3000',
+      reuseExistingServer: !process.env.CI,
+      stdout: 'ignore',
+      stderr: 'pipe',
+      timeout: 120 * 1000,
+      env: {
+        // Enable dev mode for tests to bypass authentication
+        DEV_MODE: 'true',
+        DEV_USER_EMAIL: 'test@example.com',
+        DEV_USER_ROLE: 'Admin',
+      },
+    },
+  ] : [
     // Azure Functions API (must start first)
     {
       command: 'npm run setup:api-env && cd api && npm start',

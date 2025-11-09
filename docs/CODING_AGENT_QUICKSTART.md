@@ -5,13 +5,17 @@ This guide helps GitHub Copilot and other coding agents quickly set up and test 
 ## TL;DR - Quick Commands
 
 ```bash
-# Setup and test in one command
+# Complete setup for GitHub Coding Agent (RECOMMENDED)
+npm run setup:agent
+
+# Or setup and test in one command
 npm run test:setup
 
 # Or step by step:
 npm run setup:env  # Create .env.local with dev mode
 npm test           # Run Playwright tests
-npm run dev        # Start development server
+npm run dev        # Start development server (frontend only)
+npm run dev:full   # Start API + frontend (requires Azure Functions)
 ```
 
 ## What's Already Configured
@@ -19,28 +23,46 @@ npm run dev        # Start development server
 ✅ **Dev Mode**: Authentication bypass is implemented and configured  
 ✅ **Playwright**: Test suite with comprehensive coverage  
 ✅ **GitHub Secrets**: Available as environment variables in GitHub Actions  
-✅ **Auto Setup**: Script to create `.env.local` from environment  
+✅ **Auto Setup**: Scripts to create `.env.local` and configure Azure Functions  
+✅ **Azure Functions**: Can run locally with Azure Functions Core Tools
 
 ## For Coding Agents Running Tests
 
-### Option 1: Automatic Setup (Recommended)
+### Option 1: Complete Setup (Recommended for GitHub Coding Agent)
+
+```bash
+# Checks Azure Functions, creates configs, provides guidance
+npm run setup:agent
+```
+
+This script will:
+- Check if Azure Functions Core Tools is installed
+- Create `.env.local` with dev mode
+- Create `api/local.settings.json` for Azure Functions
+- Check for Azure credentials (SQL + Storage)
+- Provide next steps based on your environment
+
+### Option 2: Quick Test Setup
 
 ```bash
 # This creates .env.local and runs tests
 npm run test:setup
 ```
 
-### Option 2: Manual Setup
+### Option 3: Manual Setup
 
 ```bash
 # 1. Create .env.local with dev mode enabled
 node scripts/setup-env.js
 
-# 2. Run tests
+# 2. Create API settings (for Azure Functions)
+node scripts/setup-api-env.js
+
+# 3. Run tests
 npm test
 ```
 
-### Option 3: Run Without Database/Storage
+### Option 4: Run Without Database/Storage
 
 Tests can run with limited functionality without Azure credentials:
 
@@ -165,6 +187,66 @@ Dev mode bypasses OAuth authentication for testing:
    - Can be set in `.env.local` for manual testing
 
 See [docs/DEV_MODE_TESTING.md](../docs/DEV_MODE_TESTING.md) for details.
+
+## Azure Functions (API)
+
+The application uses Azure Functions for its API backend.
+
+### With Azure Functions Core Tools
+
+If `func` command is available, you can run the full stack:
+
+```bash
+# Check if installed
+func --version
+
+# Start both API and Frontend
+npm run dev:full
+```
+
+This runs:
+- **API**: Azure Functions on `http://localhost:7071`
+- **Frontend**: Next.js on `http://localhost:3000`
+
+### Without Azure Functions Core Tools
+
+If `func` is not installed, you can still:
+- Run frontend only: `npm run dev`
+- Run tests (Playwright starts servers automatically)
+- Make frontend changes
+
+### Installing Azure Functions Core Tools
+
+**Linux/Ubuntu:**
+```bash
+./scripts/install-azure-functions.sh
+```
+
+**macOS:**
+```bash
+brew tap azure/functions
+brew install azure-functions-core-tools@4
+```
+
+**Windows:**
+```powershell
+npm install -g azure-functions-core-tools@4
+```
+
+**Manual:** https://docs.microsoft.com/azure/azure-functions/functions-run-local
+
+### When Do You Need It?
+
+**Required for:**
+- Running API locally for development
+- Testing API endpoints manually
+- Debugging API functions
+
+**NOT required for:**
+- Running Playwright tests (test framework starts servers)
+- Frontend-only changes
+- Documentation updates
+- Reviewing code
 
 ## GitHub Actions Integration
 
