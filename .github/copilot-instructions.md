@@ -173,7 +173,7 @@ Tests are configured to use dev mode automatically. See `playwright.config.ts` f
 When creating pull requests, follow these guidelines to ensure clear documentation of changes:
 
 **Screenshots for UX Changes:**
-- **ALWAYS include screenshots** when your changes affect the user interface or user experience
+- **Include screenshots when your changes affect the user interface or user experience AND can be validated with automated tests**
 - Take screenshots showing:
   - The new or modified UI components
   - Before/after comparisons for UI updates (when applicable)
@@ -200,11 +200,12 @@ When creating pull requests, follow these guidelines to ensure clear documentati
 - Changes without visual impact
 
 **How to capture screenshots:**
-- Run the application locally using `npm run dev`
-- Navigate to the affected pages/features
-- Use browser dev tools or built-in screenshot capabilities
-- For automated testing, Playwright can capture screenshots: `await page.screenshot({ path: 'feature.png' })`
+- **Only include screenshots if they can be captured in automated tests**
+- Use Playwright to capture screenshots during test execution: `await page.screenshot({ path: 'feature.png' })`
+- Do not create manual visualizations or mockups
+- Screenshots should reflect the actual working product as validated by tests
 - Include full-page screenshots for layout changes, or focused screenshots for component changes
+- Ensure the test that captures the screenshot is included in the PR
 
 ## API Endpoints
 
