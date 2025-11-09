@@ -10,6 +10,7 @@ interface HomePageProps {
   onMediaFullscreen: (media: MediaItem, allMedia: MediaItem[]) => void;
   onSelectPeople: () => void;
   onNavigateToGallery: (peopleIds: number[], eventId: number | null) => void;
+  onViewNewMedia: () => void;
 }
 
 interface HomePageData {
@@ -28,6 +29,7 @@ export default function HomePage({
   onMediaFullscreen,
   onSelectPeople,
   onNavigateToGallery,
+  onViewNewMedia,
 }: HomePageProps) {
   const [data, setData] = useState<HomePageData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -525,10 +527,7 @@ export default function HomePage({
           {data.recentUploads.length > 10 && (
             <div style={{ textAlign: 'center', marginTop: '1.5rem' }}>
               <button
-                onClick={() => {
-                  // Navigate to a view of all recent uploads
-                  onMediaClick(data.recentUploads[0], data.recentUploads);
-                }}
+                onClick={onViewNewMedia}
                 style={{
                   background: '#667eea',
                   color: 'white',

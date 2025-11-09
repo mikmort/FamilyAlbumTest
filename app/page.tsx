@@ -238,7 +238,23 @@ export default function Home() {
           onSettings={() => setShowSettingsMenu(true)}
           newMediaCount={newMediaCount}
         />
-        <UserInfo />
+        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+          <button
+            onClick={() => setShowSettingsMenu(true)}
+            style={{
+              background: '#3498db',
+              color: 'white',
+              border: 'none',
+              padding: '0.5rem 1rem',
+              borderRadius: '4px',
+              fontSize: '14px',
+              cursor: 'pointer',
+            }}
+          >
+            ⚙️ Settings
+          </button>
+          <UserInfo />
+        </div>
       </div>
 
       <main className="container">
@@ -248,6 +264,7 @@ export default function Home() {
             onMediaFullscreen={handleMediaFullscreen}
             onSelectPeople={() => setView('select')}
             onNavigateToGallery={handleNavigateToGallery}
+            onViewNewMedia={() => setView('new-media')}
           />
         )}
 

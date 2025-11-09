@@ -51,9 +51,6 @@ export default function Navigation({
         )}
       </button>
       <button onClick={onUploadMedia}>Upload Media</button>
-      <button onClick={onSettings}>
-        ⚙️ Settings
-      </button>
     </nav>
   );
 }
