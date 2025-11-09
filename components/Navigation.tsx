@@ -50,7 +50,27 @@ export default function Navigation({
           </span>
         )}
       </button>
-      <button onClick={onUploadMedia}>Upload Media</button>
+      <button 
+        onClick={onUploadMedia}
+        style={{
+          background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+          color: 'white',
+          fontWeight: '600',
+          boxShadow: '0 4px 12px rgba(102, 126, 234, 0.4)',
+          border: 'none',
+          transition: 'all 0.3s ease',
+        }}
+        onMouseOver={(e) => {
+          e.currentTarget.style.transform = 'translateY(-2px)';
+          e.currentTarget.style.boxShadow = '0 6px 16px rgba(102, 126, 234, 0.6)';
+        }}
+        onMouseOut={(e) => {
+          e.currentTarget.style.transform = 'translateY(0)';
+          e.currentTarget.style.boxShadow = '0 4px 12px rgba(102, 126, 234, 0.4)';
+        }}
+      >
+        ➕ Add Memory
+      </button>
     </nav>
   );
 }
