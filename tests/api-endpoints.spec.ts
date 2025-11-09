@@ -56,4 +56,29 @@ test.describe('Core API Endpoints', () => {
       expect(data).toHaveProperty('pagination');
     }
   });
+
+  test('should load homepage data', async ({ request }) => {
+    const response = await request.get('/api/homepage');
+    
+    // Should return 200, or 503 if database is warming up
+    expect([200, 503]).toContain(response.status());
+    
+    if (response.status() === 200) {
+      const data = await response.json();
+      // Homepage should return statistics and media
+      expect(data).toHaveProperty('totalPhotos');
+      expect(data).toHaveProperty('totalPeople');
+      expect(data).toHaveProperty('totalEvents');
+      expect(data).toHaveProperty('onThisDay');
+      expect(data).toHaveProperty('recentUploads');
+      expect(Array.isArray(data.onThisDay)).toBe(true);
+      expect(Array.isArray(data.recentUploads)).toBe(true);
+    } else if (response.status() === 503) {
+      // Database warming up - should have proper error response
+      const data = await response.json();
+      expect(data).toHaveProperty('error');
+      expect(data).toHaveProperty('databaseWarming');
+      expect(data.databaseWarming).toBe(true);
+    }
+  });
 });

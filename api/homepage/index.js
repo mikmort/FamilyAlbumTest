@@ -1,21 +1,20 @@
-const { query } = require('../shared/db');
+const { query, DatabaseWarmupError } = require('../shared/db');
 const { checkAuthorization } = require('../shared/auth');
 
 module.exports = async function (context, req) {
     context.log('Homepage API called');
 
-    // Check authorization (Read permission required)
-    const { authorized, user, error } = await checkAuthorization(context, 'Read');
-    if (!authorized) {
-        context.res = {
-            status: 403,
-            headers: { 'Content-Type': 'application/json' },
-            body: { error }
-        };
-        return;
-    }
-
     try {
+        // Check authorization (Read permission required)
+        const { authorized, user, error } = await checkAuthorization(context, 'Read');
+        if (!authorized) {
+            context.res = {
+                status: 403,
+                headers: { 'Content-Type': 'application/json' },
+                body: { error }
+            };
+            return;
+        }
         const today = new Date();
         const currentMonth = today.getMonth() + 1; // JavaScript months are 0-indexed
         const currentDay = today.getDate();
@@ -140,6 +139,20 @@ module.exports = async function (context, req) {
         
     } catch (err) {
         context.log.error('Homepage API error:', err);
+        
+        // Check if this is a database warmup error
+        if (err.isWarmupError || err instanceof DatabaseWarmupError) {
+            context.res = {
+                status: 503, // Service Unavailable
+                headers: { 'Content-Type': 'application/json' },
+                body: { 
+                    error: 'Database is warming up. Please wait a moment and try again.',
+                    databaseWarming: true
+                }
+            };
+            return;
+        }
+        
         context.res = {
             status: 500,
             headers: { 'Content-Type': 'application/json' },
