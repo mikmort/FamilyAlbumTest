@@ -340,7 +340,7 @@ export default function ProcessNewFiles() {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               embedding: Array.from(face.descriptor),
-              threshold: 0.75, // Stricter threshold - only show very confident matches (75%)
+              threshold: 0.60, // Stricter threshold - only show very confident matches (60%)
               topN: 5 // Get top 5 to find best unique match
             })
           });
@@ -355,7 +355,7 @@ export default function ProcessNewFiles() {
             // Find the best match that we haven't already suggested
             let bestMatch = null;
             for (const match of identifyData.matches) {
-              if (!seenPersonIds.has(match.personId) && match.similarity >= 0.75) {
+              if (!seenPersonIds.has(match.personId) && match.similarity >= 0.60) {
                 bestMatch = match;
                 break;
               }
