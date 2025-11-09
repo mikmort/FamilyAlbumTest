@@ -14,6 +14,8 @@ import UploadMedia from '@/components/UploadMedia';
 import AdminSettings from '@/components/AdminSettings';
 import AccessRequest from '@/components/AccessRequest';
 import NewMediaView from '@/components/NewMediaView';
+import HomePage from '@/components/HomePage';
+import SettingsMenu from '@/components/SettingsMenu';
 import { Person, Event, MediaItem } from '../lib/types';
 
 interface AuthStatus {
@@ -31,7 +33,7 @@ interface AuthStatus {
 }
 
 export default function Home() {
-  const [view, setView] = useState<'select' | 'gallery' | 'manage-people' | 'manage-events' | 'process-files' | 'upload-media' | 'admin-settings' | 'new-media'>('select');
+  const [view, setView] = useState<'home' | 'select' | 'gallery' | 'manage-people' | 'manage-events' | 'process-files' | 'upload-media' | 'admin-settings' | 'new-media'>('home');
   const [authStatus, setAuthStatus] = useState<AuthStatus | null>(null);
   const [loadingAuth, setLoadingAuth] = useState(true);
   const [newMediaCount, setNewMediaCount] = useState(0);
@@ -43,6 +45,7 @@ export default function Home() {
   const [selectedMedia, setSelectedMedia] = useState<MediaItem | null>(null);
   const [startFullscreen, setStartFullscreen] = useState(false);
   const [mediaList, setMediaList] = useState<MediaItem[]>([]);
+  const [showSettingsMenu, setShowSettingsMenu] = useState(false);
 
   // Wake up database immediately on mount (before auth check)
   // This helps reduce perceived loading time for serverless SQL databases
@@ -138,7 +141,7 @@ export default function Home() {
   };
 
   const handleBack = () => {
-    setView('select');
+    setView('home');
     setSelectedMedia(null);
     setStartFullscreen(false);
   };
@@ -222,20 +225,25 @@ export default function Home() {
 
       <div className="app-header">
         <Navigation
-          onManagePeople={() => setView('manage-people')}
-          onManageEvents={() => setView('manage-events')}
+          onHome={() => setView('home')}
           onSelectPeople={() => setView('select')}
-          onProcessFiles={() => setView('process-files')}
           onUploadMedia={() => setView('upload-media')}
           onNewMedia={() => setView('new-media')}
-          onAdminSettings={isAdmin ? () => setView('admin-settings') : undefined}
-          pendingCount={authStatus?.pendingCount || 0}
+          onSettings={() => setShowSettingsMenu(true)}
           newMediaCount={newMediaCount}
         />
         <UserInfo />
       </div>
 
       <main className="container">
+        {view === 'home' && (
+          <HomePage
+            onMediaClick={handleMediaClick}
+            onMediaFullscreen={handleMediaFullscreen}
+            onSelectPeople={() => setView('select')}
+          />
+        )}
+
         {view === 'select' && (
           <PeopleSelector
             selectedPeople={selectedPeople}
@@ -282,7 +290,7 @@ export default function Home() {
 
         {view === 'manage-people' && (
           <>
-            <button className="btn btn-secondary mb-2" onClick={() => setView('select')}>
+            <button className="btn btn-secondary mb-2" onClick={() => setView('home')}>
               ← Back
             </button>
             <PeopleManager />
@@ -291,7 +299,7 @@ export default function Home() {
 
         {view === 'manage-events' && (
           <>
-            <button className="btn btn-secondary mb-2" onClick={() => setView('select')}>
+            <button className="btn btn-secondary mb-2" onClick={() => setView('home')}>
               ← Back
             </button>
             <EventManager />
@@ -300,7 +308,7 @@ export default function Home() {
 
         {view === 'process-files' && (
           <>
-            <button className="btn btn-secondary mb-2" onClick={() => setView('select')}>
+            <button className="btn btn-secondary mb-2" onClick={() => setView('home')}>
               ← Back
             </button>
             <ProcessNewFiles />
@@ -309,7 +317,7 @@ export default function Home() {
 
         {view === 'upload-media' && (
           <>
-            <button className="btn btn-secondary mb-2" onClick={() => setView('select')}>
+            <button className="btn btn-secondary mb-2" onClick={() => setView('home')}>
               ← Back
             </button>
             <UploadMedia onProcessFiles={() => setView('process-files')} />
@@ -318,7 +326,7 @@ export default function Home() {
 
         {view === 'new-media' && (
           <>
-            <button className="btn btn-secondary mb-2" onClick={() => setView('select')}>
+            <button className="btn btn-secondary mb-2" onClick={() => setView('home')}>
               ← Back
             </button>
             <NewMediaView 
@@ -330,7 +338,7 @@ export default function Home() {
 
         {view === 'admin-settings' && isAdmin && (
           <>
-            <button className="btn btn-secondary mb-2" onClick={() => setView('select')}>
+            <button className="btn btn-secondary mb-2" onClick={() => setView('home')}>
               ← Back
             </button>
             <AdminSettings onRequestsChange={checkAuthStatus} />
@@ -347,6 +355,17 @@ export default function Home() {
             }}
             onMediaChange={setSelectedMedia}
             startFullscreen={startFullscreen}
+          />
+        )}
+
+        {showSettingsMenu && (
+          <SettingsMenu
+            onManagePeople={() => setView('manage-people')}
+            onManageEvents={() => setView('manage-events')}
+            onProcessFiles={() => setView('process-files')}
+            onAdminSettings={isAdmin ? () => setView('admin-settings') : undefined}
+            pendingCount={authStatus?.pendingCount || 0}
+            onClose={() => setShowSettingsMenu(false)}
           />
         )}
       </main>
