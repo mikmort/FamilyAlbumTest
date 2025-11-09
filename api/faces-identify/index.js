@@ -80,10 +80,12 @@ function euclideanSimilarity(embedding1, embedding2) {
   
   const distance = Math.sqrt(sumSquares);
   
-  // face-api.js considers distance < 0.6 as a match
-  // Convert to similarity score: smaller distance = higher similarity
-  // Max realistic distance is ~2 for normalized vectors
-  const similarity = Math.max(0, 1 - (distance / 2));
+  // face-api.js uses Euclidean distance with threshold 0.6
+  // Distance 0.0 = perfect match (100% similarity)
+  // Distance 0.6 = threshold (40% similarity)
+  // Distance 1.0 = poor match (0% similarity)
+  // Convert distance to similarity percentage: 1 - (distance / 1.0)
+  const similarity = Math.max(0, Math.min(1, 1 - distance));
   
   return similarity;
 }
@@ -111,7 +113,7 @@ module.exports = async function (context, req) {
   }
 
   try {
-    const { embedding, threshold = 0.6, topN = 5 } = req.body;
+    const { embedding, threshold = 0.4, topN = 5 } = req.body;
 
     // Validate input
     if (!embedding || !Array.isArray(embedding) || embedding.length !== 128) {
