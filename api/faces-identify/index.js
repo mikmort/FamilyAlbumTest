@@ -167,12 +167,28 @@ module.exports = async function (context, req) {
 
   } catch (err) {
     context.log.error('Error identifying face:', err);
-    context.res = {
-      status: 500,
-      body: {
-        success: false,
-        error: err.message || 'Error identifying face'
-      }
-    };
+    
+    // Import DatabaseWarmupError check from db module
+    const { DatabaseWarmupError, isDatabaseWarmupError } = require('../shared/db');
+    
+    // Check if this is a database warmup error
+    if (err instanceof DatabaseWarmupError || isDatabaseWarmupError(err)) {
+      context.res = {
+        status: 503, // Service Unavailable
+        body: {
+          success: false,
+          error: 'Database is warming up. Please wait a moment and try again.',
+          isWarmup: true
+        }
+      };
+    } else {
+      context.res = {
+        status: 500,
+        body: {
+          success: false,
+          error: err.message || 'Error identifying face'
+        }
+      };
+    }
   }
 };
