@@ -6,7 +6,7 @@
       "direction": "in",
       "name": "req",
       "methods": ["post"],
-      "route": "upload/upload-complete"
+      "route": "uploadComplete"
     },
     {
       "type": "http",
