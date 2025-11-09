@@ -19,13 +19,19 @@ const nextConfig = {
   },
   
   // For local development, rewrite API calls to Azure Functions port
+  // However, this is disabled by default to allow Next.js API routes to work as fallbacks
+  // To enable Azure Functions API, set ENABLE_API_PROXY=true in your environment
   async rewrites() {
-    return [
-      {
-        source: '/api/:path*',
-        destination: 'http://localhost:7071/api/:path*',
-      },
-    ];
+    // Only enable API proxy if explicitly requested
+    if (process.env.ENABLE_API_PROXY === 'true') {
+      return [
+        {
+          source: '/api/:path*',
+          destination: 'http://localhost:7071/api/:path*',
+        },
+      ];
+    }
+    return [];
   },
   
   // Add webpack config to handle browser-only modules

@@ -1,4 +1,28 @@
 import { defineConfig, devices } from '@playwright/test';
+import { execSync } from 'child_process';
+
+/**
+ * Check if Azure Functions Core Tools (func) is available
+ * Returns true if func is installed, false otherwise
+ */
+function isFuncAvailable(): boolean {
+  try {
+    execSync('which func', { stdio: 'pipe' });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+const hasFuncCli = isFuncAvailable();
+
+// Log func availability for debugging
+if (process.env.CI || process.env.COPILOT_AGENT_ACTION) {
+  console.log(`[Playwright Config] Azure Functions Core Tools (func): ${hasFuncCli ? '✅ Available' : '❌ Not Available'}`);
+  if (!hasFuncCli) {
+    console.log('[Playwright Config] API server will be skipped. API endpoint tests will fail.');
+  }
+}
 
 /**
  * Playwright configuration for Family Album web application
@@ -90,18 +114,19 @@ export default defineConfig({
     ]),
   ],
 
-  // Run both Azure Functions API and Next.js dev server before starting tests
+  // Run web servers before starting tests
+  // API server is optional - only starts if Azure Functions Core Tools (func) is available
   webServer: [
-    // Azure Functions API (must start first)
-    {
+    // Azure Functions API (optional - only if func is available)
+    ...(hasFuncCli ? [{
       command: 'npm run setup:api-env && cd api && npm start',
       url: 'http://localhost:7071/api/version',
       reuseExistingServer: !process.env.CI,
       stdout: 'ignore',
       stderr: 'pipe',
       timeout: 120 * 1000,
-    },
-    // Next.js frontend (proxies API calls to Azure Functions)
+    }] : []),
+    // Next.js frontend (always runs)
     {
       command: 'npm run dev',
       url: 'http://localhost:3000',
