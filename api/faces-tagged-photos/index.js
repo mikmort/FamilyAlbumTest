@@ -28,6 +28,7 @@ function calculateSampleSize(totalPhotos) {
  * Get Tagged Photos Endpoint
  * 
  * Returns photos with manual person tags, using intelligent sampling:
+ * - Only includes photos from the last 20 years (recent appearance)
  * - Prioritizes most recent photos (best for current appearance)
  * - Favors solo/duo photos over group shots (better training quality)
  * - Uses logarithmic scaling based on total photos per person
@@ -231,6 +232,18 @@ module.exports = async function (context, req) {
             INNER JOIN PhotoCounts pc ON pp.PFileName = pc.PFileName
             WHERE pp.PersonID = @personId
               AND pc.PeopleCount <= 3  -- Skip group photos
+              AND COALESCE(
+                p.PDateEntered,
+                CASE 
+                  WHEN p.PYear >= 1 AND p.PYear <= 9999 AND p.PMonth >= 1 AND p.PMonth <= 12
+                  THEN DATEFROMPARTS(p.PYear, p.PMonth, 1)
+                  WHEN p.PYear >= 1 AND p.PYear <= 9999 AND (p.PMonth IS NULL OR p.PMonth < 1 OR p.PMonth > 12)
+                  THEN DATEFROMPARTS(p.PYear, 1, 1)
+                  ELSE NULL
+                END,
+                p.PLastModifiedDate,
+                '1900-01-01'
+              ) >= DATEADD(YEAR, -20, GETDATE())  -- Only photos from last 20 years
           )
           SELECT TOP (@sampleSize) PFileName, PersonID
           FROM RankedPhotos
