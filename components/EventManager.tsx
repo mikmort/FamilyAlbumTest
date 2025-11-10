@@ -209,7 +209,6 @@ export default function EventManager() {
               type="date"
               value={formEventDate}
               onChange={(e) => setFormEventDate(e.target.value)}
-              placeholder="Event date (optional)"
             />
           </div>
           <div className="form-group">
