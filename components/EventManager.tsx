@@ -118,7 +118,9 @@ export default function EventManager() {
     setEditingEvent(event);
     setFormName(event.neName);
     setFormDetails(event.neRelation || '');
-    setFormEventDate(event.EventDate || '');
+    // Ensure date is in YYYY-MM-DD format for date input
+    const dateValue = event.EventDate ? event.EventDate.split('T')[0] : '';
+    setFormEventDate(dateValue);
     setIsCreating(false);
   };
 
