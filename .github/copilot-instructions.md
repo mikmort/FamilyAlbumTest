@@ -182,8 +182,9 @@ Tests are configured to use dev mode automatically. See `playwright.config.ts` f
 When creating pull requests, follow these guidelines to ensure clear documentation of changes:
 
 **Screenshots for UX Changes:**
-- **Include screenshots when your changes affect the user interface or user experience AND can be validated with automated tests**
-- Take screenshots showing:
+- **Only suggest screenshots when they can be captured via automated Playwright tests**
+- Screenshots must be generated programmatically during test execution
+- Include screenshots showing:
   - The new or modified UI components
   - Before/after comparisons for UI updates (when applicable)
   - Different states of interactive elements (hover, active, disabled, etc.)
@@ -191,30 +192,39 @@ When creating pull requests, follow these guidelines to ensure clear documentati
 - Place screenshots in the PR description to make visual changes immediately clear to reviewers
 - Use descriptive captions for each screenshot explaining what is shown
 
-**When screenshots are applicable:**
-- New pages or views
-- Modified layouts or styling
-- New or updated React components with visual elements
-- Changes to navigation, menus, or interactive controls
-- Form updates or validation messages
-- Modal dialogs, tooltips, or popups
-- Icon or color scheme changes
-- Responsive design adjustments
+**How to capture screenshots with Playwright:**
+```typescript
+// Example: Capture screenshot during test
+test('should display new feature', async ({ page }) => {
+  await page.goto('http://localhost:3000/feature');
+  await page.screenshot({ path: 'screenshots/new-feature.png' });
+  // ... rest of test
+});
+```
 
-**When screenshots are NOT required:**
+**When to include screenshots:**
+- New pages or views (with Playwright test)
+- Modified layouts or styling (with Playwright test)
+- New or updated React components with visual elements (with Playwright test)
+- Changes to navigation, menus, or interactive controls (with Playwright test)
+- Form updates or validation messages (with Playwright test)
+- Modal dialogs, tooltips, or popups (with Playwright test)
+- Icon or color scheme changes (with Playwright test)
+- Responsive design adjustments (with Playwright test)
+
+**When NOT to include screenshots:**
 - API-only changes (backend logic, database queries)
 - Configuration file updates
 - Documentation-only changes
 - Build script or tooling modifications
 - Changes without visual impact
+- **UI changes that cannot be validated with automated Playwright tests**
 
-**How to capture screenshots:**
-- **Only include screenshots if they can be captured in automated tests**
-- Use Playwright to capture screenshots during test execution: `await page.screenshot({ path: 'feature.png' })`
-- Do not create manual visualizations or mockups
+**Important:**
+- Do not create manual screenshots or mockups
+- Do not suggest screenshots for changes that lack automated test coverage
 - Screenshots should reflect the actual working product as validated by tests
-- Include full-page screenshots for layout changes, or focused screenshots for component changes
-- Ensure the test that captures the screenshot is included in the PR
+- Always include the Playwright test file that captures the screenshot in the PR
 
 ## API Endpoints
 
