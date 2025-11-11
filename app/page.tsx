@@ -407,6 +407,16 @@ export default function Home() {
               setSelectedMedia(null);
               setStartFullscreen(false);
             }}
+            onUpdate={(updatedMedia) => {
+              // Update the media in the list
+              setMediaList(prevList => 
+                prevList.map(item => 
+                  item.PFileName === updatedMedia.PFileName ? updatedMedia : item
+                )
+              );
+              // Update selectedMedia so it has the latest data
+              setSelectedMedia(updatedMedia);
+            }}
             onMediaChange={setSelectedMedia}
             startFullscreen={startFullscreen}
           />
