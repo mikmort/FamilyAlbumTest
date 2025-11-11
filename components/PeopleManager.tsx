@@ -244,11 +244,12 @@ export default function PeopleManager() {
             />
           </div>
           <div className="form-group">
-            <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', justifyContent: 'flex-start' }}>
               <input
                 type="checkbox"
                 checked={formIsFamilyMember}
                 onChange={(e) => setFormIsFamilyMember(e.target.checked)}
+                style={{ margin: 0 }}
               />
               Is Family Member
             </label>
