@@ -35,6 +35,9 @@ export default function MediaDetailModal({
   const [selectedEvent, setSelectedEvent] = useState<number | ''>(() => {
     return media.Event?.ID || '';
   });
+  const [currentEventName, setCurrentEventName] = useState<string | null>(() => {
+    return media.Event?.neName || null;
+  });
   const computeOrderedTaggedPeople = (
     tagged: Array<{ ID: number; neName: string; neRelation?: string }> | undefined,
     peopleList: string | undefined
@@ -61,6 +64,10 @@ export default function MediaDetailModal({
   useEffect(() => {
     if (media.Event?.ID) {
       setSelectedEvent(media.Event.ID);
+      setCurrentEventName(media.Event.neName);
+    } else {
+      setSelectedEvent('');
+      setCurrentEventName(null);
     }
   }, [media.Event]);
   
@@ -104,6 +111,7 @@ export default function MediaDetailModal({
     setMonth(media.PMonth || '');
     setYear(media.PYear || '');
     setSelectedEvent(media.Event?.ID || '');
+    setCurrentEventName(media.Event?.neName || null);
     setTaggedPeople(computeOrderedTaggedPeople(media.TaggedPeople, media.PPeopleList));
     setEditing(false);
   }, [media.PFileName]);
@@ -471,6 +479,15 @@ export default function MediaDetailModal({
       }
 
       const data = await response.json();
+      
+      // Update local event name from response
+      if (data.success && data.media) {
+        if (data.media.Event) {
+          setCurrentEventName(data.media.Event.neName);
+        } else {
+          setCurrentEventName(null);
+        }
+      }
       
       if (data.success && onUpdate) {
         // Update parent with new data
@@ -1200,7 +1217,17 @@ export default function MediaDetailModal({
                     <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.5rem' }}>
                       <select
                         value={selectedEvent}
-                        onChange={(e) => setSelectedEvent(e.target.value ? parseInt(e.target.value) : '')}
+                        onChange={(e) => {
+                          const newEventId = e.target.value ? parseInt(e.target.value) : '';
+                          setSelectedEvent(newEventId);
+                          // Update event name preview
+                          if (newEventId) {
+                            const event = allEvents.find(ev => ev.ID === newEventId);
+                            setCurrentEventName(event?.neName || null);
+                          } else {
+                            setCurrentEventName(null);
+                          }
+                        }}
                         style={{ flex: 1 }}
                       >
                         <option value="">-- No Event --</option>
@@ -1261,7 +1288,7 @@ export default function MediaDetailModal({
                   </>
                 )
               ) : (
-                <p>{media.Event?.neName || 'Not set'}</p>
+                <p>{currentEventName || 'Not set'}</p>
               )}
             </div>
 
