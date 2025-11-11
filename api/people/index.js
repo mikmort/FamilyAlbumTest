@@ -125,9 +125,15 @@ module.exports = async function (context, req) {
                 return;
             }
 
-            // Auto-set IsFamilyMember for Morton family members
+            // Auto-set IsFamilyMember for Morton family members and related families
             let isFamilyValue = isFamilyMember || false;
-            if (personName && (personName.includes(' Morton') || personName.startsWith('Morton '))) {
+            if (personName && (
+                personName.includes(' Morton') || personName.startsWith('Morton ') ||
+                personName.includes(' Moss') || personName.startsWith('Moss ') ||
+                personName.includes(' Kaplan') || personName.startsWith('Kaplan ') ||
+                personName.includes(' Hodges') || personName.startsWith('Hodges ') ||
+                personName.includes(' Kaplan-Moss') || personName.startsWith('Kaplan-Moss ')
+            )) {
                 isFamilyValue = true;
             }
 
@@ -169,9 +175,15 @@ module.exports = async function (context, req) {
                 return;
             }
 
-            // Auto-set isFamilyMember if last name is Morton
+            // Auto-set isFamilyMember if last name is Morton or related families
             let isFamilyValue = isFamilyMember;
-            if (name && (name.includes(' Morton') || name.startsWith('Morton '))) {
+            if (name && (
+                name.includes(' Morton') || name.startsWith('Morton ') ||
+                name.includes(' Moss') || name.startsWith('Moss ') ||
+                name.includes(' Kaplan') || name.startsWith('Kaplan ') ||
+                name.includes(' Hodges') || name.startsWith('Hodges ') ||
+                name.includes(' Kaplan-Moss') || name.startsWith('Kaplan-Moss ')
+            )) {
                 isFamilyValue = true;
             }
 
