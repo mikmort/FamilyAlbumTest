@@ -75,51 +75,71 @@ module.exports = async function (context, req) {
         const stats = await query(statsQuery);
         const { totalPhotos, totalPeople, totalEvents } = stats[0] || { totalPhotos: 0, totalPeople: 0, totalEvents: 0 };
 
-        // Get a featured person (random person with photos)
+        // Calculate week number for consistent randomization across all users
+        // This ensures the same featured person/event is shown to everyone during the same week
+        const weeksSinceEpoch = Math.floor(Date.now() / (7 * 24 * 60 * 60 * 1000));
+
+        // Get a featured person (random family member with photos, consistent per week)
         const featuredPersonQuery = `
-            SELECT TOP 1
-                ne.ID,
-                ne.neName,
-                ne.neRelation,
-                (SELECT COUNT(*) FROM dbo.NamePhoto np WHERE np.npID = ne.ID) as neCount
-            FROM dbo.NameEvent ne
-            WHERE ne.neType = 'N'
-            AND EXISTS (SELECT 1 FROM dbo.NamePhoto np WHERE np.npID = ne.ID)
-            ORDER BY NEWID()
+            WITH FamilyMembers AS (
+                SELECT 
+                    ne.ID,
+                    ne.neName,
+                    ne.neRelation,
+                    (SELECT COUNT(*) FROM dbo.NamePhoto np WHERE np.npID = ne.ID) as neCount,
+                    ROW_NUMBER() OVER (ORDER BY CHECKSUM(ne.ID + @weekSeed)) as RowNum
+                FROM dbo.NameEvent ne
+                WHERE ne.neType = 'N'
+                AND ne.IsFamilyMember = 1
+                AND EXISTS (SELECT 1 FROM dbo.NamePhoto np WHERE np.npID = ne.ID)
+            )
+            SELECT TOP 1 ID, neName, neRelation, neCount
+            FROM FamilyMembers
+            ORDER BY RowNum
         `;
         
-        const featuredPersonResult = await query(featuredPersonQuery);
+        const featuredPersonResult = await query(featuredPersonQuery, { weekSeed: weeksSinceEpoch });
         const featuredPerson = featuredPersonResult.length > 0 ? featuredPersonResult[0] : null;
 
-        // Get a featured event
+        // Get a featured event (consistent per week)
         const featuredEventQuery = `
-            SELECT TOP 1
-                ne.ID,
-                ne.neName,
-                ne.neRelation,
-                (SELECT COUNT(*) FROM dbo.NamePhoto np WHERE np.npID = ne.ID) as neCount
-            FROM dbo.NameEvent ne
-            WHERE ne.neType = 'E'
-            AND EXISTS (SELECT 1 FROM dbo.NamePhoto np WHERE np.npID = ne.ID)
-            ORDER BY NEWID()
+            WITH RankedEvents AS (
+                SELECT 
+                    ne.ID,
+                    ne.neName,
+                    ne.neRelation,
+                    (SELECT COUNT(*) FROM dbo.NamePhoto np WHERE np.npID = ne.ID) as neCount,
+                    ROW_NUMBER() OVER (ORDER BY CHECKSUM(ne.ID + @weekSeed)) as RowNum
+                FROM dbo.NameEvent ne
+                WHERE ne.neType = 'E'
+                AND EXISTS (SELECT 1 FROM dbo.NamePhoto np WHERE np.npID = ne.ID)
+            )
+            SELECT TOP 1 ID, neName, neRelation, neCount
+            FROM RankedEvents
+            ORDER BY RowNum
         `;
         
-        const featuredEventResult = await query(featuredEventQuery);
+        const featuredEventResult = await query(featuredEventQuery, { weekSeed: weeksSinceEpoch });
         const featuredEvent = featuredEventResult.length > 0 ? featuredEventResult[0] : null;
 
-        // Get a random suggestion (event the user might not have visited recently)
+        // Get a random suggestion (event the user might not have visited recently, consistent per week)
         const randomSuggestionQuery = `
-            SELECT TOP 1
-                ne.ID,
-                ne.neName,
-                ne.neRelation
-            FROM dbo.NameEvent ne
-            WHERE ne.neType = 'E'
-            AND EXISTS (SELECT 1 FROM dbo.NamePhoto np WHERE np.npID = ne.ID)
-            ORDER BY NEWID()
+            WITH RankedSuggestions AS (
+                SELECT 
+                    ne.ID,
+                    ne.neName,
+                    ne.neRelation,
+                    ROW_NUMBER() OVER (ORDER BY CHECKSUM(ne.ID + @weekSeed + 1000)) as RowNum
+                FROM dbo.NameEvent ne
+                WHERE ne.neType = 'E'
+                AND EXISTS (SELECT 1 FROM dbo.NamePhoto np WHERE np.npID = ne.ID)
+            )
+            SELECT TOP 1 ID, neName, neRelation
+            FROM RankedSuggestions
+            ORDER BY RowNum
         `;
         
-        const randomSuggestionResult = await query(randomSuggestionQuery);
+        const randomSuggestionResult = await query(randomSuggestionQuery, { weekSeed: weeksSinceEpoch });
         const randomSuggestion = randomSuggestionResult.length > 0 ? randomSuggestionResult[0] : null;
 
         // Helper function to transform media items with URLs

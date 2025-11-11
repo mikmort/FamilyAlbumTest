@@ -7,6 +7,7 @@ export interface Person {
   neDateLastModified: Date;
   neCount: number;
   Birthday?: string | null; // ISO date string (YYYY-MM-DD)
+  IsFamilyMember?: boolean; // True for family members, false for acquaintances
 }
 
 export interface Event {

@@ -40,7 +40,8 @@ module.exports = async function (context, req) {
                         neType,
                         neDateLastModified,
                         ISNULL(neCount, 0) as neCount,
-                        Birthday
+                        Birthday,
+                        IsFamilyMember
                     FROM dbo.NameEvent WITH (NOLOCK)
                     WHERE ID = @id AND neType = 'N'
                 `;
@@ -87,7 +88,8 @@ module.exports = async function (context, req) {
                         neType,
                         neDateLastModified,
                         ISNULL(neCount, 0) as neCount,
-                        Birthday
+                        Birthday,
+                        IsFamilyMember
                     FROM dbo.NameEvent WITH (NOLOCK)
                     WHERE neType = 'N'
                     ORDER BY neName
@@ -109,7 +111,7 @@ module.exports = async function (context, req) {
 
         // POST /api/people - Create new person
         if (method === 'POST') {
-            const { name, neName, relation, neRelation, birthday } = req.body;
+            const { name, neName, relation, neRelation, birthday, isFamilyMember } = req.body;
             
             // Accept both 'name' and 'neName' for backwards compatibility
             const personName = name || neName;
@@ -123,16 +125,23 @@ module.exports = async function (context, req) {
                 return;
             }
 
+            // Auto-set IsFamilyMember for Morton family members
+            let isFamilyValue = isFamilyMember || false;
+            if (personName && (personName.includes(' Morton') || personName.startsWith('Morton '))) {
+                isFamilyValue = true;
+            }
+
             const insertQuery = `
-                INSERT INTO dbo.NameEvent (neName, neRelation, neType, neCount, Birthday)
-                OUTPUT INSERTED.ID, INSERTED.neName, INSERTED.neRelation, INSERTED.neType, INSERTED.neCount as photoCount, INSERTED.Birthday
-                VALUES (@name, @relation, 'N', 0, @birthday)
+                INSERT INTO dbo.NameEvent (neName, neRelation, neType, neCount, Birthday, IsFamilyMember)
+                OUTPUT INSERTED.ID, INSERTED.neName, INSERTED.neRelation, INSERTED.neType, INSERTED.neCount as photoCount, INSERTED.Birthday, INSERTED.IsFamilyMember
+                VALUES (@name, @relation, 'N', 0, @birthday, @isFamilyMember)
             `;
 
             const result = await query(insertQuery, { 
                 name: personName,
                 relation: personRelation || null,
-                birthday: birthday || null
+                birthday: birthday || null,
+                isFamilyMember: isFamilyValue
             });
 
             // Invalidate people cache
@@ -150,7 +159,7 @@ module.exports = async function (context, req) {
 
         // PUT /api/people - Update person
         if (method === 'PUT') {
-            const { id, name, relation, birthday } = req.body;
+            const { id, name, relation, birthday, isFamilyMember } = req.body;
 
             if (!id || !name) {
                 context.res = {
@@ -160,9 +169,15 @@ module.exports = async function (context, req) {
                 return;
             }
 
+            // Auto-set isFamilyMember if last name is Morton
+            let isFamilyValue = isFamilyMember;
+            if (name && (name.includes(' Morton') || name.startsWith('Morton '))) {
+                isFamilyValue = true;
+            }
+
             const updateQuery = `
                 UPDATE dbo.NameEvent 
-                SET neName = @name, neRelation = @relation, Birthday = @birthday
+                SET neName = @name, neRelation = @relation, Birthday = @birthday, IsFamilyMember = @isFamilyMember
                 WHERE ID = @id
             `;
 
@@ -170,11 +185,12 @@ module.exports = async function (context, req) {
                 id, 
                 name, 
                 relation: relation || null,
-                birthday: birthday || null
+                birthday: birthday || null,
+                isFamilyMember: isFamilyValue ?? null
             });
 
             const selectQuery = `
-                SELECT ID, neName, neRelation, ISNULL(neCount, 0) as neCount, Birthday
+                SELECT ID, neName, neRelation, ISNULL(neCount, 0) as neCount, Birthday, IsFamilyMember
                 FROM dbo.NameEvent
                 WHERE ID = @id
             `;
