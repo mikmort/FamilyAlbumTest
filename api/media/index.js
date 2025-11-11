@@ -1659,11 +1659,30 @@ module.exports = async function (context, req) {
                 return;
             }
 
+            // Fetch event data if exists
+            const eventQuery = `
+                SELECT ne.ID, ne.neName
+                FROM dbo.NamePhoto np
+                INNER JOIN dbo.NameEvent ne ON np.npID = ne.ID
+                WHERE np.npFileName = @filename AND ne.neType = 'E'
+            `;
+            const eventResult = await query(eventQuery, { filename: dbFileName });
+            
+            const mediaData = result[0];
+            if (eventResult.length > 0) {
+                mediaData.Event = {
+                    ID: eventResult[0].ID,
+                    neName: eventResult[0].neName
+                };
+            } else {
+                mediaData.Event = null;
+            }
+
             context.res = {
                 status: 200,
                 body: {
                     success: true,
-                    media: result[0]
+                    media: mediaData
                 }
             };
             return;
