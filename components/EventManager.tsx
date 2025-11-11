@@ -14,6 +14,7 @@ export default function EventManager() {
   // Form state
   const [formName, setFormName] = useState('');
   const [formDetails, setFormDetails] = useState('');
+  const [formEventDate, setFormEventDate] = useState('');
 
   useEffect(() => {
     fetchEvents();
@@ -44,7 +45,11 @@ export default function EventManager() {
       const response = await fetch('/api/events', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: formName, details: formDetails }),
+        body: JSON.stringify({ 
+          name: formName, 
+          details: formDetails,
+          eventDate: formEventDate || undefined 
+        }),
       });
 
       if (!response.ok) throw new Error('Failed to create event');
@@ -53,6 +58,7 @@ export default function EventManager() {
       setIsCreating(false);
       setFormName('');
       setFormDetails('');
+      setFormEventDate('');
     } catch (err) {
       alert('Error creating event: ' + (err instanceof Error ? err.message : 'Unknown error'));
     }
@@ -71,7 +77,8 @@ export default function EventManager() {
         body: JSON.stringify({ 
           id: editingEvent.ID, 
           name: formName, 
-          details: formDetails 
+          details: formDetails,
+          eventDate: formEventDate || undefined
         }),
       });
 
@@ -81,6 +88,7 @@ export default function EventManager() {
       setEditingEvent(null);
       setFormName('');
       setFormDetails('');
+      setFormEventDate('');
     } catch (err) {
       alert('Error updating event: ' + (err instanceof Error ? err.message : 'Unknown error'));
     }
@@ -110,6 +118,9 @@ export default function EventManager() {
     setEditingEvent(event);
     setFormName(event.neName);
     setFormDetails(event.neRelation || '');
+    // Ensure date is in YYYY-MM-DD format for date input
+    const dateValue = event.EventDate ? event.EventDate.split('T')[0] : '';
+    setFormEventDate(dateValue);
     setIsCreating(false);
   };
 
@@ -118,6 +129,7 @@ export default function EventManager() {
     setEditingEvent(null);
     setFormName('');
     setFormDetails('');
+    setFormEventDate('');
   };
 
   const cancelForm = () => {
@@ -125,6 +137,7 @@ export default function EventManager() {
     setEditingEvent(null);
     setFormName('');
     setFormDetails('');
+    setFormEventDate('');
   };
 
   const filteredEvents = events.filter(e => 
@@ -191,6 +204,14 @@ export default function EventManager() {
             />
           </div>
           <div className="form-group">
+            <label>Event Date</label>
+            <input
+              type="date"
+              value={formEventDate}
+              onChange={(e) => setFormEventDate(e.target.value)}
+            />
+          </div>
+          <div className="form-group">
             <label>Event Details</label>
             <textarea
               value={formDetails}
@@ -243,13 +264,22 @@ export default function EventManager() {
                   <tr key={event.ID}>
                     <td className="name-cell">{event.neName}</td>
                     <td className="relation-cell">
-                      {event.neRelation ? (
-                        <span className="event-details-preview">
+                      {event.EventDate ? (
+                        <span className="event-date-badge">
+                          {new Date(event.EventDate).toLocaleDateString('en-US', { 
+                            year: 'numeric', 
+                            month: 'short', 
+                            day: 'numeric' 
+                          })}
+                        </span>
+                      ) : '—'}
+                      {event.neRelation && (
+                        <span className="event-details-preview" style={{ display: 'block', marginTop: event.EventDate ? '4px' : '0' }}>
                           {event.neRelation.length > 100 
                             ? event.neRelation.substring(0, 100) + '...' 
                             : event.neRelation}
                         </span>
-                      ) : '—'}
+                      )}
                     </td>
                     <td className="count-cell">{event.neCount || 0}</td>
                     <td className="actions-cell">

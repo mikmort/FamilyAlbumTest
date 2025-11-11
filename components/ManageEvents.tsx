@@ -8,6 +8,7 @@ type EventItem = {
     neType?: string
     neDateLastModified?: string | null
     neCount?: number
+    EventDate?: string | null
 }
 
 export default function ManageEvents() {
@@ -18,11 +19,13 @@ export default function ManageEvents() {
     const [newName, setNewName] = useState('')
     const [newDate, setNewDate] = useState('')
     const [newDesc, setNewDesc] = useState('')
+    const [newEventDate, setNewEventDate] = useState('')
 
     const [editingId, setEditingId] = useState<number | null>(null)
     const [editName, setEditName] = useState('')
     const [editDate, setEditDate] = useState('')
     const [editDesc, setEditDesc] = useState('')
+    const [editEventDate, setEditEventDate] = useState('')
 
     useEffect(() => {
         fetchEvents()
@@ -52,6 +55,7 @@ export default function ManageEvents() {
             const payload: any = { name: newName.trim() }
             // If user provided a description, send as relation (neRelation)
             if (newDesc) payload.relation = newDesc
+            if (newEventDate) payload.eventDate = newEventDate
 
             const res = await fetch('/api/events', {
                 method: 'POST',
@@ -68,11 +72,13 @@ export default function ManageEvents() {
                 neType: 'E',
                 neDateLastModified: created.neDateLastModified ?? null,
                 neCount: created.photoCount ?? created.neCount ?? 0,
+                EventDate: created.eventDate ?? created.EventDate ?? newEventDate ?? null,
             }
             setEvents(prev => [ev, ...prev])
             setNewName('')
             setNewDate('')
             setNewDesc('')
+            setNewEventDate('')
         } catch (err: any) {
             setError(err?.message ?? 'Create error')
         }
@@ -83,6 +89,7 @@ export default function ManageEvents() {
         setEditName(ev.neName)
         setEditDate(ev.neDateLastModified ?? '')
         setEditDesc(ev.neRelation ?? '')
+        setEditEventDate(ev.EventDate ?? '')
     }
 
     function cancelEdit() {
@@ -90,6 +97,7 @@ export default function ManageEvents() {
         setEditName('')
         setEditDate('')
         setEditDesc('')
+        setEditEventDate('')
     }
 
     async function handleUpdate(e: FormEvent) {
@@ -99,6 +107,7 @@ export default function ManageEvents() {
         try {
             const payload: any = { id: editingId, name: editName }
             if (editDesc) payload.relation = editDesc
+            if (editEventDate) payload.eventDate = editEventDate
 
             console.log('🔍 Updating event:', payload);
 
@@ -130,6 +139,7 @@ export default function ManageEvents() {
                 neType: 'E',
                 neDateLastModified: updated.event?.neDateLastModified ?? null,
                 neCount: updated.event?.neCount ?? 0,
+                EventDate: updated.event?.EventDate ?? editEventDate ?? null,
             }
             setEvents(prev => prev.map(x => (x.id === editingId ? ev : x)))
             cancelEdit()
@@ -166,23 +176,49 @@ export default function ManageEvents() {
         <div style={{ maxWidth: 900, margin: '0 auto', padding: 16 }}>
             <h2>Manage Events</h2>
 
-            <section style={{ marginBottom: 24 }}>
-                <h3>Create Event</h3>
-                <form onSubmit={handleCreate} style={{ display: 'grid', gap: 8 }}>
-                    <input
-                        placeholder="Event name"
-                        value={newName}
-                        onChange={e => setNewName(e.target.value)}
-                        required
-                    />
-                    <input
-                        placeholder="Description (optional)"
-                        value={newDesc}
-                        onChange={e => setNewDesc(e.target.value)}
-                    />
+            <section style={{ marginBottom: 24, padding: 16, backgroundColor: '#f5f5f5', borderRadius: 8 }}>
+                <h3 style={{ marginTop: 0 }}>Create New Event</h3>
+                <form onSubmit={handleCreate} style={{ display: 'grid', gap: 10 }}>
                     <div>
-                        <button type="submit">Create</button>
-                        <button type="button" onClick={() => { setNewName(''); setNewDate(''); setNewDesc('') }} style={{ marginLeft: 8 }}>
+                        <label style={{ display: 'block', marginBottom: 4, fontWeight: 500, fontSize: 13 }}>
+                            Event Name *
+                        </label>
+                        <input
+                            placeholder="e.g., Summer Vacation 2024"
+                            value={newName}
+                            onChange={e => setNewName(e.target.value)}
+                            required
+                            style={{ width: '100%', padding: 8 }}
+                        />
+                    </div>
+                    <div>
+                        <label style={{ display: 'block', marginBottom: 4, fontWeight: 500, fontSize: 13 }}>
+                            📅 Event Date
+                        </label>
+                        <input
+                            type="date"
+                            placeholder="Event date (optional)"
+                            value={newEventDate}
+                            onChange={e => setNewEventDate(e.target.value)}
+                            style={{ width: '100%', padding: 8 }}
+                        />
+                    </div>
+                    <div>
+                        <label style={{ display: 'block', marginBottom: 4, fontWeight: 500, fontSize: 13 }}>
+                            Description
+                        </label>
+                        <input
+                            placeholder="Optional description"
+                            value={newDesc}
+                            onChange={e => setNewDesc(e.target.value)}
+                            style={{ width: '100%', padding: 8 }}
+                        />
+                    </div>
+                    <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
+                        <button type="submit" style={{ padding: '8px 16px', fontWeight: 500 }}>
+                            ➕ Create Event
+                        </button>
+                        <button type="button" onClick={() => { setNewName(''); setNewDate(''); setNewDesc(''); setNewEventDate('') }} style={{ padding: '8px 16px' }}>
                             Clear
                         </button>
                     </div>
@@ -199,26 +235,91 @@ export default function ManageEvents() {
                     {events.map(ev => (
                         <li key={ev.id} style={{ border: '1px solid #ddd', padding: 12, marginBottom: 8 }}>
                             {editingId === ev.id ? (
-                                <form onSubmit={handleUpdate} style={{ display: 'grid', gap: 8 }}>
-                                    <input value={editName} onChange={e => setEditName(e.target.value)} required />
-                                    <input value={editDesc ?? ''} onChange={e => setEditDesc(e.target.value)} />
+                                <form onSubmit={handleUpdate} style={{ display: 'grid', gap: 10 }}>
                                     <div>
-                                        <button type="submit">Save</button>
-                                        <button type="button" onClick={cancelEdit} style={{ marginLeft: 8 }}>Cancel</button>
+                                        <label style={{ display: 'block', marginBottom: 4, fontWeight: 500, fontSize: 13 }}>
+                                            Event Name *
+                                        </label>
+                                        <input 
+                                            value={editName} 
+                                            onChange={e => setEditName(e.target.value)} 
+                                            placeholder="Event name" 
+                                            required 
+                                            style={{ width: '100%', padding: 8 }}
+                                        />
+                                    </div>
+                                    <div>
+                                        <label style={{ display: 'block', marginBottom: 4, fontWeight: 500, fontSize: 13 }}>
+                                            📅 Event Date
+                                        </label>
+                                        <input 
+                                            type="date" 
+                                            value={editEventDate ?? ''} 
+                                            onChange={e => setEditEventDate(e.target.value)} 
+                                            placeholder="Event date"
+                                            style={{ width: '100%', padding: 8 }}
+                                        />
+                                    </div>
+                                    <div>
+                                        <label style={{ display: 'block', marginBottom: 4, fontWeight: 500, fontSize: 13 }}>
+                                            Description
+                                        </label>
+                                        <input 
+                                            value={editDesc ?? ''} 
+                                            onChange={e => setEditDesc(e.target.value)} 
+                                            placeholder="Description" 
+                                            style={{ width: '100%', padding: 8 }}
+                                        />
+                                    </div>
+                                    <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
+                                        <button type="submit" style={{ padding: '8px 16px', fontWeight: 500 }}>
+                                            ✓ Save
+                                        </button>
+                                        <button type="button" onClick={cancelEdit} style={{ padding: '8px 16px' }}>
+                                            Cancel
+                                        </button>
                                     </div>
                                 </form>
                             ) : (
                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                    <div>
-                                        <strong>{ev.neName}</strong>
-                                        <div style={{ fontSize: 12, color: '#555' }}>
-                                            {ev.neDateLastModified ? new Date(ev.neDateLastModified).toLocaleDateString() : 'No date'}
-                                            {ev.neRelation ? ` · ${ev.neRelation}` : ''}
+                                    <div style={{ flex: 1 }}>
+                                        <div style={{ marginBottom: 4 }}>
+                                            <strong style={{ fontSize: 16 }}>{ev.neName}</strong>
+                                            {ev.EventDate && (
+                                                <span style={{ 
+                                                    marginLeft: 12, 
+                                                    padding: '2px 8px', 
+                                                    backgroundColor: '#e3f2fd', 
+                                                    borderRadius: 4, 
+                                                    fontSize: 13,
+                                                    color: '#1976d2',
+                                                    fontWeight: 500
+                                                }}>
+                                                    📅 {new Date(ev.EventDate).toLocaleDateString('en-US', { 
+                                                        year: 'numeric', 
+                                                        month: 'short', 
+                                                        day: 'numeric' 
+                                                    })}
+                                                </span>
+                                            )}
+                                        </div>
+                                        <div style={{ fontSize: 13, color: '#666' }}>
+                                            {ev.neRelation && <span>{ev.neRelation} · </span>}
+                                            <span>{ev.neCount || 0} photo{(ev.neCount || 0) !== 1 ? 's' : ''}</span>
+                                            {!ev.EventDate && <span style={{ color: '#999', fontStyle: 'italic' }}> · No date set</span>}
                                         </div>
                                     </div>
-                                    <div>
-                                        <button onClick={() => startEdit(ev)}>Edit</button>
-                                        <button onClick={() => handleDelete(ev.id)} style={{ marginLeft: 8, color: 'red' }}>Delete</button>
+                                    <div style={{ display: 'flex', gap: 8 }}>
+                                        <button onClick={() => startEdit(ev)} style={{ 
+                                            padding: '6px 12px',
+                                            cursor: 'pointer'
+                                        }}>Edit</button>
+                                        <button onClick={() => handleDelete(ev.id)} style={{ 
+                                            marginLeft: 4,
+                                            padding: '6px 12px',
+                                            color: 'red',
+                                            cursor: 'pointer'
+                                        }}>Delete</button>
                                     </div>
                                 </div>
                             )}

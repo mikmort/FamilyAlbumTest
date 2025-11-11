@@ -11,8 +11,8 @@ interface PeopleSelectorProps {
   showNoPeople: boolean;
   sortOrder: 'asc' | 'desc';
   exclusiveFilter: boolean;
-  onSelectedPeopleChange: (peopleIds: number[]) => void;
-  onSelectedEventChange: (eventId: number | null) => void;
+  onSelectedPeopleChange: (peopleIds: number[], peopleNames?: string[]) => void;
+  onSelectedEventChange: (eventId: number | null, eventName?: string | null) => void;
   onShowNoPeopleChange: (show: boolean) => void;
   onSortOrderChange: (order: 'asc' | 'desc') => void;
   onExclusiveFilterChange: (exclusive: boolean) => void;
@@ -185,9 +185,13 @@ export default function PeopleSelector({
 
   const togglePerson = (personId: number) => {
     if (selectedPeople.includes(personId)) {
-      onSelectedPeopleChange(selectedPeople.filter((id) => id !== personId));
+      const newIds = selectedPeople.filter((id) => id !== personId);
+      const newNames = people.filter(p => newIds.includes(p.ID)).map(p => p.neName);
+      onSelectedPeopleChange(newIds, newNames);
     } else if (selectedPeople.length < 5) {
-      onSelectedPeopleChange([...selectedPeople, personId]);
+      const newIds = [...selectedPeople, personId];
+      const newNames = people.filter(p => newIds.includes(p.ID)).map(p => p.neName);
+      onSelectedPeopleChange(newIds, newNames);
     }
   };
 
@@ -499,7 +503,7 @@ export default function PeopleSelector({
               <div 
                 className="autocomplete-item"
                 onClick={() => {
-                  onSelectedEventChange(null);
+                  onSelectedEventChange(null, null);
                   setEventSearch('');
                   setEventDropdownOpen(false);
                 }}
@@ -516,7 +520,7 @@ export default function PeopleSelector({
                     key={event.ID}
                     className="autocomplete-item autocomplete-item-columns"
                     onClick={() => {
-                      onSelectedEventChange(event.ID);
+                      onSelectedEventChange(event.ID, event.neName);
                       setEventSearch('');
                       setEventDropdownOpen(false);
                     }}
@@ -535,7 +539,7 @@ export default function PeopleSelector({
                 {getSelectedEventName()}
                 <button
                   type="button"
-                  onClick={() => onSelectedEventChange(null)}
+                  onClick={() => onSelectedEventChange(null, null)}
                   className="tag-remove"
                 >
                   ×
@@ -569,8 +573,8 @@ export default function PeopleSelector({
         <button
           className="btn btn-secondary"
           onClick={() => {
-            onSelectedPeopleChange([]);
-            onSelectedEventChange(null);
+            onSelectedPeopleChange([], []);
+            onSelectedEventChange(null, null);
             onShowNoPeopleChange(false);
           }}
         >

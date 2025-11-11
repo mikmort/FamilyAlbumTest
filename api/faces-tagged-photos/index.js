@@ -1,5 +1,5 @@
 const { checkAuthorization } = require('../shared/auth');
-const { query } = require('../shared/db');
+const { query, DatabaseWarmupError, isDatabaseWarmupError } = require('../shared/db');
 const { getBlobSasUrl } = require('../shared/storage');
 
 /**
@@ -14,6 +14,8 @@ const { getBlobSasUrl } = require('../shared/storage');
  * - 5000+ photos: 60 (1-2%)
  */
 function calculateSampleSize(totalPhotos) {
+  // Ensure we always return at least 1 to avoid division by zero
+  if (totalPhotos <= 0) return 1;
   if (totalPhotos <= 10) return totalPhotos;
   if (totalPhotos <= 20) return 10;
   
@@ -26,7 +28,9 @@ function calculateSampleSize(totalPhotos) {
  * Get Tagged Photos Endpoint
  * 
  * Returns photos with manual person tags, using intelligent sampling:
- * - Distributes samples across photo timeline (using dates)
+ * - Only includes photos from the last 20 years (recent appearance)
+ * - Prioritizes most recent photos (best for current appearance)
+ * - Favors solo/duo photos over group shots (better training quality)
  * - Uses logarithmic scaling based on total photos per person
  * - Minimum 5 photos, scales up to 60 for people with thousands of photos
  * 
@@ -71,6 +75,10 @@ module.exports = async function (context, req) {
   try {
     const smartSample = req.query.smartSample !== 'false'; // Default true
     const maxPerPerson = req.query.maxPerPerson ? parseInt(req.query.maxPerPerson) : null;
+    
+    // Batch pagination support for processing all persons
+    const batch = req.query.batch ? parseInt(req.query.batch) : 0;
+    const batchSize = req.query.batchSize ? parseInt(req.query.batchSize) : 100;
 
     // Common CTE definition (without WITH keyword - we'll add it per query)
     const photoPersonPairsCTE = `
@@ -100,38 +108,91 @@ module.exports = async function (context, req) {
 
     if (smartSample && !maxPerPerson) {
       // Step 1: Get counts per person to calculate sample sizes
+      // OPTIMIZATION: Add pagination directly in the count query to avoid fetching all 360 people every time
+      const queryStartIdx = batch * batchSize + 1; // SQL ROW_NUMBER() is 1-based
+      const queryEndIdx = (batch + 1) * batchSize;
+      
       const countQuery = `
-        WITH ${photoPersonPairsCTE}
+        WITH ${photoPersonPairsCTE},
+        PersonCounts AS (
+          SELECT 
+            ne.ID as PersonID,
+            ne.neName as PersonName,
+            COUNT(DISTINCT pp.PFileName) as TotalPhotos,
+            ROW_NUMBER() OVER (ORDER BY ne.neName) as RowNum
+          FROM PhotoPersonPairs pp
+          INNER JOIN dbo.NameEvent ne ON pp.PersonID = ne.ID
+          WHERE ne.neType = 'N' -- Only people, not events
+          GROUP BY ne.ID, ne.neName
+        )
         SELECT 
-          ne.ID as PersonID,
-          ne.neName as PersonName,
-          COUNT(DISTINCT pp.PFileName) as TotalPhotos
-        FROM PhotoPersonPairs pp
-        INNER JOIN dbo.NameEvent ne ON pp.PersonID = ne.ID
-        WHERE ne.neType = 'N' -- Only people, not events
-        GROUP BY ne.ID, ne.neName
-        ORDER BY ne.neName
+          PersonID,
+          PersonName,
+          TotalPhotos,
+          (SELECT COUNT(*) FROM PersonCounts) as TotalPersons
+        FROM PersonCounts
+        WHERE RowNum >= @startIdx AND RowNum <= @endIdx
+        ORDER BY PersonName
       `;
       
-      const counts = await query(countQuery);
+      const counts = await query(countQuery, { startIdx: queryStartIdx, endIdx: queryEndIdx });
       
       if (!counts || counts.length === 0) {
+        // Get total persons count even if this batch is empty
+        const totalPersonsQuery = `
+          WITH ${photoPersonPairsCTE}
+          SELECT COUNT(DISTINCT pp.PersonID) as TotalCount
+          FROM PhotoPersonPairs pp
+          INNER JOIN dbo.NameEvent ne ON pp.PersonID = ne.ID
+          WHERE ne.neType = 'N'
+        `;
+        const totalResult = await query(totalPersonsQuery);
+        const totalPersons = totalResult && totalResult[0] ? totalResult[0].TotalCount : 0;
+        
         context.res = {
           status: 200,
           body: {
             success: true,
             photos: [],
-            message: 'No tagged photos found'
+            message: 'No more tagged photos in this batch',
+            batch: {
+              current: batch,
+              size: batchSize,
+              totalPersons: totalPersons,
+              totalBatches: Math.ceil(totalPersons / batchSize),
+              hasMore: false
+            }
           }
         };
         return;
       }
 
-      // Step 2: For each person, calculate sample size and get distributed samples
+      // Get total persons from first row (all rows have same TotalPersons)
+      const totalPersons = counts[0].TotalPersons || counts.length;
+      const totalBatches = Math.ceil(totalPersons / batchSize);
+      const hasMore = (batch + 1) * batchSize < totalPersons;
+      
+      context.log(`Processing batch ${batch}: ${counts.length} persons in this batch, ${totalPersons} total (hasMore: ${hasMore})`);
+
+      // Step 2: For each person in this batch, calculate sample size and get distributed samples
       const allPhotos = [];
       const samplingStats = {};
+      
+      // Conservative limits to prevent timeout
+      const MAX_TOTAL_PHOTOS = 2000;
+      let currentPhotoCount = 0;
+      let processedPersons = 0;
+
+      context.log(`Starting smart sampling: ${totalPersons} persons total (batch ${batch}: processing ${counts.length} persons)`);
 
       for (const personCount of counts) {
+        // Stop if we've reached photo limit
+        if (currentPhotoCount >= MAX_TOTAL_PHOTOS) {
+          context.log(`Reached photo limit (${currentPhotoCount}/${MAX_TOTAL_PHOTOS})`);
+          break;
+        }
+        
+        
         const sampleSize = calculateSampleSize(personCount.TotalPhotos);
         samplingStats[personCount.PersonID] = {
           name: personCount.PersonName,
@@ -139,78 +200,118 @@ module.exports = async function (context, req) {
           sampled: sampleSize
         };
 
-        // Get photos distributed across timeline
-        // Use a simpler approach: calculate bucket size and take one photo per bucket
-        const sampleQuery = `
+        try {
+          // Get most recent photos prioritizing fewer people in photos (better for training)
+          const sampleQuery = `
           WITH ${photoPersonPairsCTE},
-          PhotosWithDates AS (
+          PhotoCounts AS (
+            -- Count how many people are in each photo
+            SELECT PFileName, COUNT(*) as PeopleCount
+            FROM PhotoPersonPairs
+            GROUP BY PFileName
+          ),
+          RankedPhotos AS (
             SELECT 
               pp.PFileName,
               pp.PersonID,
+              pc.PeopleCount,
               COALESCE(
                 p.PDateEntered,
-                DATEFROMPARTS(ISNULL(p.PYear, 2000), ISNULL(p.PMonth, 1), 1),
-                p.PLastModifiedDate,
-                '1900-01-01'
-              ) as PhotoDate,
-              -- Count number of people tagged in this photo (for prioritizing solo/couple photos)
-              (SELECT COUNT(*) FROM PhotoPersonPairs pp2 WHERE pp2.PFileName = pp.PFileName) as PeopleCount,
-              ROW_NUMBER() OVER (ORDER BY 
-                -- First prioritize by people count (fewer people = better training data)
-                (SELECT COUNT(*) FROM PhotoPersonPairs pp2 WHERE pp2.PFileName = pp.PFileName),
-                -- Then by date for distribution
-                COALESCE(
-                  p.PDateEntered,
-                  DATEFROMPARTS(ISNULL(p.PYear, 2000), ISNULL(p.PMonth, 1), 1),
-                  p.PLastModifiedDate,
-                  '1900-01-01'
-                )
-              ) as RowNum
+                CASE 
+                  WHEN p.PYear >= 1 AND p.PYear <= 9999 AND p.PMonth >= 1 AND p.PMonth <= 12
+                  THEN DATEFROMPARTS(p.PYear, p.PMonth, 1)
+                  WHEN p.PYear >= 1 AND p.PYear <= 9999 AND (p.PMonth IS NULL OR p.PMonth < 1 OR p.PMonth > 12)
+                  THEN DATEFROMPARTS(p.PYear, 1, 1)
+                  ELSE NULL
+                END,
+                p.PLastModifiedDate
+              ) as PhotoDate
             FROM PhotoPersonPairs pp
             INNER JOIN dbo.Pictures p ON pp.PFileName = p.PFileName
+            INNER JOIN PhotoCounts pc ON pp.PFileName = pc.PFileName
             WHERE pp.PersonID = @personId
-              AND (SELECT COUNT(*) FROM PhotoPersonPairs pp2 WHERE pp2.PFileName = pp.PFileName) <= 3  -- Skip group photos
-          ),
-          TotalCount AS (
-            SELECT COUNT(*) as Total FROM PhotosWithDates
+              AND pc.PeopleCount <= 3  -- Skip group photos
+              AND COALESCE(
+                p.PDateEntered,
+                CASE 
+                  WHEN p.PYear >= 1 AND p.PYear <= 9999 AND p.PMonth >= 1 AND p.PMonth <= 12
+                  THEN DATEFROMPARTS(p.PYear, p.PMonth, 1)
+                  WHEN p.PYear >= 1 AND p.PYear <= 9999 AND (p.PMonth IS NULL OR p.PMonth < 1 OR p.PMonth > 12)
+                  THEN DATEFROMPARTS(p.PYear, 1, 1)
+                  ELSE NULL
+                END,
+                p.PLastModifiedDate
+              ) IS NOT NULL  -- Must have a date
+              AND COALESCE(
+                p.PDateEntered,
+                CASE 
+                  WHEN p.PYear >= 1 AND p.PYear <= 9999 AND p.PMonth >= 1 AND p.PMonth <= 12
+                  THEN DATEFROMPARTS(p.PYear, p.PMonth, 1)
+                  WHEN p.PYear >= 1 AND p.PYear <= 9999 AND (p.PMonth IS NULL OR p.PMonth < 1 OR p.PMonth > 12)
+                  THEN DATEFROMPARTS(p.PYear, 1, 1)
+                  ELSE NULL
+                END,
+                p.PLastModifiedDate
+              ) >= DATEADD(YEAR, -20, GETDATE())  -- Only last 20 years
           )
           SELECT TOP (@sampleSize) PFileName, PersonID
-          FROM PhotosWithDates, TotalCount
-          WHERE (RowNum - 1) % (CASE WHEN Total < @sampleSize THEN 1 ELSE Total / @sampleSize END) = 0
-          ORDER BY PhotoDate
+          FROM RankedPhotos
+          ORDER BY 
+            PeopleCount ASC,  -- Prioritize solo/duo photos
+            PhotoDate DESC    -- Then most recent first
         `;
 
-        const personPhotos = await query(sampleQuery, {
-          personId: personCount.PersonID,
-          sampleSize: sampleSize
-        });
+          const personPhotos = await query(sampleQuery, {
+            personId: personCount.PersonID,
+            sampleSize: sampleSize
+          });
 
-        // Add person name to each photo
-        personPhotos.forEach(photo => {
-          photo.PersonName = personCount.PersonName;
-          allPhotos.push(photo);
-        });
+          // Add person name to each photo
+          personPhotos.forEach(photo => {
+            photo.PersonName = personCount.PersonName;
+            allPhotos.push(photo);
+          });
+          
+          currentPhotoCount += personPhotos.length;
+          processedPersons++;
+          
+        } catch (queryError) {
+          context.log.error(`Error querying photos for person ${personCount.PersonName}:`, queryError);
+          // Continue to next person instead of failing completely
+          continue;
+        }
       }
 
-      context.log(`Smart sampling: ${allPhotos.length} photos from ${counts.length} people`);
+      context.log(`Smart sampling: ${allPhotos.length} photos from ${processedPersons} people (limit: ${MAX_TOTAL_PHOTOS})`);
       
-      // Generate SAS URLs
-      const photosWithUrls = await Promise.all(allPhotos.map(async (photo) => {
-        try {
-          const sasUrl = await getBlobSasUrl('family-album-media', photo.PFileName);
-          return {
-            PFileName: photo.PFileName,
-            PersonID: photo.PersonID,
-            PersonName: photo.PersonName,
-            url: sasUrl
-          };
-        } catch (err) {
-          context.log.error(`Error generating SAS URL for ${photo.PFileName}:`, err);
-          return null;
-        }
-      }));
+      // Generate SAS URLs in smaller batches to avoid overwhelming the system
+      const BATCH_SIZE = 50;
+      const photosWithUrls = [];
+      
+      for (let i = 0; i < allPhotos.length; i += BATCH_SIZE) {
+        const batch = allPhotos.slice(i, i + BATCH_SIZE);
+        const batchResults = await Promise.all(batch.map(async (photo) => {
+          try {
+            const sasUrl = await getBlobSasUrl('family-album-media', photo.PFileName);
+            return {
+              PFileName: photo.PFileName,
+              PersonID: photo.PersonID,
+              PersonName: photo.PersonName,
+              url: sasUrl
+            };
+          } catch (err) {
+            context.log.error(`Error generating SAS URL for ${photo.PFileName}:`, err);
+            return null;
+          }
+        }));
+        
+        photosWithUrls.push(...batchResults);
+        context.log(`Processed SAS URLs batch ${Math.floor(i / BATCH_SIZE) + 1}/${Math.ceil(allPhotos.length / BATCH_SIZE)}`);
+      }
 
       const validPhotos = photosWithUrls.filter(p => p !== null);
+      
+      context.log(`Returning ${validPhotos.length} photos with SAS URLs`);
 
       context.res = {
         status: 200,
@@ -219,7 +320,17 @@ module.exports = async function (context, req) {
           photos: validPhotos,
           totalCount: validPhotos.length,
           samplingStats: samplingStats,
-          smartSample: true
+          smartSample: true,
+          limited: currentPhotoCount >= MAX_TOTAL_PHOTOS,
+          personsProcessed: processedPersons,
+          totalPersons: totalPersons,
+          batch: {
+            current: batch,
+            size: batchSize,
+            totalPersons: totalPersons,
+            totalBatches: totalBatches,
+            hasMore: hasMore
+          }
         }
       };
       return;
@@ -228,16 +339,23 @@ module.exports = async function (context, req) {
       // Fixed limit per person (legacy mode) - prioritize photos with fewer people
       sqlQuery = `
         WITH ${photoPersonPairsCTE},
+        PhotoCounts AS (
+          -- Count how many people are in each photo
+          SELECT PFileName, COUNT(*) as PeopleCount
+          FROM PhotoPersonPairs
+          GROUP BY PFileName
+        ),
         PhotosWithPeopleCount AS (
           SELECT 
             pp.PFileName as PFileName,
             ne.ID as PersonID,
             ne.neName as PersonName,
-            (SELECT COUNT(*) FROM PhotoPersonPairs pp2 WHERE pp2.PFileName = pp.PFileName) as PeopleCount
+            pc.PeopleCount
           FROM PhotoPersonPairs pp
           INNER JOIN dbo.NameEvent ne ON pp.PersonID = ne.ID
+          INNER JOIN PhotoCounts pc ON pp.PFileName = pc.PFileName
           WHERE ne.neType = 'N' -- Only people, not events
-            AND (SELECT COUNT(*) FROM PhotoPersonPairs pp2 WHERE pp2.PFileName = pp.PFileName) <= 3  -- Skip group photos
+            AND pc.PeopleCount <= 3  -- Skip group photos
         ),
         RankedPhotos AS (
           SELECT 
@@ -258,16 +376,23 @@ module.exports = async function (context, req) {
       // Get all tagged photos (no sampling) - but still prioritize photos with fewer people
       sqlQuery = `
         WITH ${photoPersonPairsCTE},
+        PhotoCounts AS (
+          -- Count how many people are in each photo
+          SELECT PFileName, COUNT(*) as PeopleCount
+          FROM PhotoPersonPairs
+          GROUP BY PFileName
+        ),
         PhotosWithPeopleCount AS (
           SELECT 
             pp.PFileName as PFileName,
             ne.ID as PersonID,
             ne.neName as PersonName,
-            (SELECT COUNT(*) FROM PhotoPersonPairs pp2 WHERE pp2.PFileName = pp.PFileName) as PeopleCount
+            pc.PeopleCount
           FROM PhotoPersonPairs pp
           INNER JOIN dbo.NameEvent ne ON pp.PersonID = ne.ID
+          INNER JOIN PhotoCounts pc ON pp.PFileName = pc.PFileName
           WHERE ne.neType = 'N' -- Only people, not events
-            AND (SELECT COUNT(*) FROM PhotoPersonPairs pp2 WHERE pp2.PFileName = pp.PFileName) <= 3  -- Skip group photos
+            AND pc.PeopleCount <= 3  -- Skip group photos
         )
         SELECT PFileName, PersonID, PersonName, PeopleCount
         FROM PhotosWithPeopleCount
@@ -324,12 +449,25 @@ module.exports = async function (context, req) {
 
   } catch (err) {
     context.log.error('Error fetching tagged photos:', err);
-    context.res = {
-      status: 500,
-      body: {
-        success: false,
-        error: err.message || 'Error fetching tagged photos'
-      }
-    };
+    
+    // Check if this is a database warmup error
+    if (err instanceof DatabaseWarmupError || isDatabaseWarmupError(err)) {
+      context.res = {
+        status: 503, // Service Unavailable
+        body: {
+          success: false,
+          error: 'Database is warming up. Please wait a moment and try again.',
+          isWarmup: true
+        }
+      };
+    } else {
+      context.res = {
+        status: 500,
+        body: {
+          success: false,
+          error: err.message || 'Error fetching tagged photos'
+        }
+      };
+    }
   }
 };

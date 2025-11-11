@@ -48,6 +48,7 @@ export default function AdminSettings({ onRequestsChange }: AdminSettingsProps) 
   const [trainingStatus, setTrainingStatus] = useState<string>('');
   const [trainingResult, setTrainingResult] = useState<any>(null);
   const [incompleteSession, setIncompleteSession] = useState<any>(null);
+  const [faceModel, setFaceModel] = useState<'face-api-js' | 'insightface'>('insightface'); // Default to better model
   
   // Add user form state
   const [newEmail, setNewEmail] = useState('');
@@ -287,10 +288,14 @@ export default function AdminSettings({ onRequestsChange }: AdminSettingsProps) 
     setTrainingResult(null);
 
     try {
-      // Step 1: Load face-api.js models (client-side)
-      if (!areModelsLoaded()) {
-        setTrainingStatus('Loading face recognition models (first time only, ~6MB)...');
-        await loadFaceModels();
+      // Step 1: Load models if using face-api.js (client-side)
+      if (faceModel === 'face-api-js') {
+        if (!areModelsLoaded()) {
+          setTrainingStatus('Loading face-api.js models (first time only, ~6MB)...');
+          await loadFaceModels();
+        }
+      } else {
+        setTrainingStatus('Using InsightFace (Python API) for state-of-the-art recognition...');
       }
       
       if (isPaused) {
@@ -335,22 +340,60 @@ export default function AdminSettings({ onRequestsChange }: AdminSettingsProps) 
       }
 
       // Step 3: Get photos with manual tags using smart sampling
+      // Fetch all batches automatically until hasMore=false
       setTrainingStatus(
         resumeFromCheckpoint
           ? 'Fetching remaining photos to process...'
           : 'Fetching tagged photos with intelligent sampling...'
       );
       
-      // Query for photos with manual tags using smart sampling
-      const photosResponse = await fetch(`/api/faces-tagged-photos?smartSample=true`);
-      if (!photosResponse.ok) {
-        const errorText = await photosResponse.text();
-        console.error('Failed to fetch tagged photos:', photosResponse.status, errorText);
-        throw new Error(`Failed to fetch tagged photos: ${photosResponse.status} - ${errorText.substring(0, 200)}`);
-      }
+      let photos: any[] = [];
+      let currentBatch = 0;
+      let batchInfo: any = null;
       
-      const photosData = await photosResponse.json();
-      let photos = photosData.photos || [];
+      do {
+        if (isPaused) {
+          setTrainingStatus('Training cancelled by user');
+          setIsTraining(false);
+          return;
+        }
+        
+        // Fetch next batch (50 people per batch to keep request time under 30 seconds)
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 60000); // 60 second timeout
+        
+        try {
+          const batchResponse = await fetch(`/api/faces-tagged-photos?smartSample=true&batch=${currentBatch}&batchSize=50`, {
+            signal: controller.signal
+          });
+          clearTimeout(timeoutId);
+          
+          if (!batchResponse.ok) {
+            const errorText = await batchResponse.text();
+            console.error('Failed to fetch tagged photos batch:', batchResponse.status, errorText);
+            throw new Error(`Failed to fetch tagged photos batch ${currentBatch}: ${batchResponse.status} - ${errorText.substring(0, 200)}`);
+          }
+          
+          const batchData = await batchResponse.json();
+          batchInfo = batchData.batch;
+          
+          if (batchData.photos && batchData.photos.length > 0) {
+            photos.push(...batchData.photos);
+            setTrainingStatus(
+              `Fetching batch ${currentBatch + 1}/${batchInfo?.totalBatches || '?'}: ` +
+              `${photos.length} photos from ${batchInfo?.totalPersons || '?'} people...`
+            );
+          }
+        } catch (fetchError: any) {
+          clearTimeout(timeoutId);
+          if (fetchError.name === 'AbortError') {
+            throw new Error(`Request timeout: batch ${currentBatch} took longer than 60 seconds`);
+          }
+          throw fetchError;
+        }
+        
+        currentBatch++;
+      } while (batchInfo?.hasMore === true);
       
       // Filter out already processed photos if resuming
       if (resumeFromCheckpoint && processedPhotos.size > 0) {
@@ -391,9 +434,12 @@ export default function AdminSettings({ onRequestsChange }: AdminSettingsProps) 
       const totalPhotos = photos.length;
       const totalPeople = Object.keys(photosByPerson).length;
       const alreadyProcessed = resumeFromCheckpoint ? processedPhotos.size : 0;
+      const totalBatches = batchInfo?.totalBatches || 1;
+      const totalPersonsInDB = batchInfo?.totalPersons || totalPeople;
 
       setTrainingStatus(
-        `Processing ${photos.length} photos for ${totalPeople} people...` +
+        `Fetched ${totalBatches} batch${totalBatches > 1 ? 'es' : ''}: ` +
+        `${photos.length} photos for ${totalPeople} people (${totalPersonsInDB} total in DB)...` +
         (alreadyProcessed > 0 ? ` (${alreadyProcessed} already done)` : '')
       );
 
@@ -437,19 +483,54 @@ export default function AdminSettings({ onRequestsChange }: AdminSettingsProps) 
 
           // Load image with SAS token
           const imageUrl = photo.url;
-          const img = await loadImage(imageUrl);
+          
+          let embeddingArray: number[];
+          let modelVersion: string;
+          let embeddingDimensions: number;
+          
+          if (faceModel === 'insightface') {
+            // Use Python API for InsightFace (512-dim, better accuracy)
+            const generateResponse = await fetch('/api/generate-embeddings', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ imageUrl })
+            });
+            
+            if (!generateResponse.ok) {
+              const errorText = await generateResponse.text();
+              console.error(`InsightFace failed for ${photo.PFileName}:`, errorText);
+              errorCount++;
+              continue;
+            }
+            
+            const generateData = await generateResponse.json();
+            
+            if (!generateData.success) {
+              console.warn(`No face detected (InsightFace) in ${photo.PFileName} for ${photo.PersonName}`);
+              errorCount++;
+              continue;
+            }
+            
+            embeddingArray = generateData.embedding;
+            modelVersion = 'insightface-arcface';
+            embeddingDimensions = 512;
+            
+          } else {
+            // Use face-api.js (128-dim, browser-based)
+            const img = await loadImage(imageUrl);
+            const faceResult = await detectFaceWithEmbedding(img);
 
-          // Detect face and generate embedding
-          const faceResult = await detectFaceWithEmbedding(img);
+            if (!faceResult) {
+              console.warn(`No face detected in ${photo.PFileName} for ${photo.PersonName}`);
+              errorCount++;
+              continue;
+            }
 
-          if (!faceResult) {
-            console.warn(`No face detected in ${photo.PFileName} for ${photo.PersonName}`);
-            errorCount++;
-            continue;
+            // Convert Float32Array to regular array for JSON
+            embeddingArray = Array.from(faceResult.descriptor);
+            modelVersion = 'face-api-js';
+            embeddingDimensions = 128;
           }
-
-          // Convert Float32Array to regular array for JSON
-          const embeddingArray = Array.from(faceResult.descriptor);
 
           // Send embedding to server
           const addResponse = await fetch('/api/faces-add-embedding', {
@@ -458,7 +539,9 @@ export default function AdminSettings({ onRequestsChange }: AdminSettingsProps) 
             body: JSON.stringify({
               personId: photo.PersonID,
               photoFileName: photo.PFileName,
-              embedding: embeddingArray
+              embedding: embeddingArray,
+              modelVersion,
+              embeddingDimensions
             })
           });
 
@@ -585,11 +668,48 @@ export default function AdminSettings({ onRequestsChange }: AdminSettingsProps) 
           Train the face recognition AI on confirmed face tags to improve accuracy and performance.
         </p>
         <p style={{ color: '#666', fontSize: '0.9rem', marginBottom: '0.5rem', fontStyle: 'italic' }}>
-          Uses intelligent sampling: samples are distributed across each person's timeline to capture aging and appearance changes.
+          Uses intelligent sampling: prioritizes most recent photos and solo/duo shots for optimal training quality.
         </p>
         <p style={{ color: '#007bff', fontSize: '0.9rem', marginBottom: '1rem', fontWeight: '500' }}>
           💡 Smart sampling: 5-10 photos for people with few photos, up to 60 photos for those with thousands. Logarithmic scaling ensures efficiency!
         </p>
+        
+        {/* Model Selection */}
+        <div style={{ marginBottom: '1rem' }}>
+          <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '600', color: '#333' }}>
+            Face Recognition Model:
+          </label>
+          <div style={{ display: 'flex', gap: '1rem' }}>
+            <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer', padding: '0.5rem', border: '2px solid', borderColor: faceModel === 'insightface' ? '#007bff' : '#ddd', borderRadius: '8px', background: faceModel === 'insightface' ? '#e7f3ff' : 'white' }}>
+              <input
+                type="radio"
+                value="insightface"
+                checked={faceModel === 'insightface'}
+                onChange={(e) => setFaceModel(e.target.value as 'insightface' | 'face-api-js')}
+                disabled={isTraining}
+                style={{ marginRight: '0.5rem' }}
+              />
+              <div>
+                <div style={{ fontWeight: '600', color: '#007bff' }}>InsightFace (Recommended)</div>
+                <div style={{ fontSize: '0.85rem', color: '#666' }}>512-dim ArcFace · 99.8% accuracy · Better across ages</div>
+              </div>
+            </label>
+            <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer', padding: '0.5rem', border: '2px solid', borderColor: faceModel === 'face-api-js' ? '#007bff' : '#ddd', borderRadius: '8px', background: faceModel === 'face-api-js' ? '#e7f3ff' : 'white' }}>
+              <input
+                type="radio"
+                value="face-api-js"
+                checked={faceModel === 'face-api-js'}
+                onChange={(e) => setFaceModel(e.target.value as 'insightface' | 'face-api-js')}
+                disabled={isTraining}
+                style={{ marginRight: '0.5rem' }}
+              />
+              <div>
+                <div style={{ fontWeight: '600', color: '#666' }}>face-api.js (Legacy)</div>
+                <div style={{ fontSize: '0.85rem', color: '#666' }}>128-dim FaceNet · Browser-based · Faster but less accurate</div>
+              </div>
+            </label>
+          </div>
+        </div>
         
         {/* Checkpoint Resume Banner */}
         {incompleteSession && !isTraining && (

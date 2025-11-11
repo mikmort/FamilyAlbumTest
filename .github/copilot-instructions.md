@@ -57,11 +57,20 @@ if (!authorized) {
 
 When developing and testing with GitHub Copilot or Playwright, you can enable **Dev Mode** to bypass RBAC:
 
-1. Set `DEV_MODE=true` in your `.env.local` file
-2. Optionally set `DEV_USER_EMAIL` and `DEV_USER_ROLE` to simulate a specific user
-3. Dev mode is automatically disabled in production
+1. Run the setup script: `node scripts/setup-env.js` (automatically creates `.env.local` with dev mode)
+2. Or manually set `DEV_MODE=true` in your `.env.local` file
+3. Optionally set `DEV_USER_EMAIL` and `DEV_USER_ROLE` to simulate a specific user
+4. Dev mode is automatically disabled in production
 
 Dev mode allows automated testing without requiring actual OAuth authentication.
+
+**For GitHub Copilot and Coding Agents:**
+- Dev mode is pre-configured in `playwright.config.ts`
+- GitHub Secrets are automatically available as environment variables
+- Run `node scripts/setup-env.js` to create `.env.local` from secrets
+- Tests can run with or without Azure credentials (limited functionality without)
+
+See [docs/DEV_MODE_TESTING.md](docs/DEV_MODE_TESTING.md) and [docs/GITHUB_SECRETS_SETUP.md](docs/GITHUB_SECRETS_SETUP.md) for details.
 
 **Local Development Note**: This application uses Azure Static Web Apps architecture where the API (Azure Functions) runs separately from the frontend (Next.js). For full local testing:
 - Frontend: `npm run dev` (runs on port 3000)
@@ -70,14 +79,36 @@ Dev mode allows automated testing without requiring actual OAuth authentication.
 
 ### Database Schema
 
-Main tables:
+**⚠️ CRITICAL: Always check `/database/CURRENT_SCHEMA.md` before writing SQL queries or making schema changes!**
+
+This file is auto-generated from the production Azure SQL database and represents the **authoritative source of truth** for the current database structure.
+
+Main tables (see CURRENT_SCHEMA.md for complete, up-to-date details):
 - **Users**: User accounts with roles and permissions
 - **NameEvent**: People (neType='N') and events (neType='E')
 - **Pictures**: Photos and videos with metadata
 - **NamePhoto**: Many-to-many relationship between people/events and media
 - **UnindexedFiles**: Staging area for newly uploaded files
+- **FaceEmbeddings**: Face embeddings for AI recognition
+- **FaceTrainingProgress**: Training session tracking
+- **ApprovalTokens**: Email-based approval workflow
+- **UserLastViewed**: User activity tracking
+
+**When making schema changes:**
+1. Create a migration script in `/database/`
+2. Apply the change to the database
+3. Regenerate documentation: `node scripts/get-schema.js > database/CURRENT_SCHEMA.md`
+4. Commit both the migration script AND the updated CURRENT_SCHEMA.md
+5. Update `/database/README.md` if adding new tables or major changes
 
 Database connection is managed in `/api/shared/db.js`.
+
+**Database Access for Coding Agents:**
+- Database credentials are stored as GitHub repository secrets
+- The `scripts/get-schema.js` script automatically uses GitHub secrets when available
+- In coding agent sessions, environment variables are populated from GitHub secrets
+- Local development uses `api/local.settings.json` as fallback
+- Never commit database credentials to the repository
 
 ### Blob Storage
 
@@ -95,6 +126,7 @@ Storage utilities are in `/api/shared/storage.js`.
 ```bash
 # Install dependencies
 npm install
+cd api && npm install && cd ..
 
 # Copy environment template
 cp .env.local.template .env.local
@@ -105,9 +137,17 @@ cp .env.local.template .env.local
 # DEV_USER_EMAIL=test@example.com
 # DEV_USER_ROLE=Full
 
-# Run development server
+# Setup Azure Functions configuration
+npm run setup:api-env
+
+# Run development server (Next.js only - API calls will fail)
 npm run dev
+
+# OR run full stack (Next.js + Azure Functions) - RECOMMENDED
+npm run dev:full
 ```
+
+**Note**: For full functionality, install [Azure Functions Core Tools](https://github.com/Azure/azure-functions-core-tools) and use `npm run dev:full`. See [docs/LOCAL_AZURE_FUNCTIONS.md](docs/LOCAL_AZURE_FUNCTIONS.md) for complete setup guide.
 
 ### Building and Linting
 
@@ -136,6 +176,55 @@ npx playwright test tests/media-gallery.spec.ts
 ```
 
 Tests are configured to use dev mode automatically. See `playwright.config.ts` for configuration.
+
+### Pull Request Requirements
+
+When creating pull requests, follow these guidelines to ensure clear documentation of changes:
+
+**Screenshots for UX Changes:**
+- **Only suggest screenshots when they can be captured via automated Playwright tests**
+- Screenshots must be generated programmatically during test execution
+- Include screenshots showing:
+  - The new or modified UI components
+  - Before/after comparisons for UI updates (when applicable)
+  - Different states of interactive elements (hover, active, disabled, etc.)
+  - Mobile/responsive views if the change affects responsive behavior
+- Place screenshots in the PR description to make visual changes immediately clear to reviewers
+- Use descriptive captions for each screenshot explaining what is shown
+
+**How to capture screenshots with Playwright:**
+```typescript
+// Example: Capture screenshot during test
+test('should display new feature', async ({ page }) => {
+  await page.goto('http://localhost:3000/feature');
+  await page.screenshot({ path: 'screenshots/new-feature.png' });
+  // ... rest of test
+});
+```
+
+**When to include screenshots:**
+- New pages or views (with Playwright test)
+- Modified layouts or styling (with Playwright test)
+- New or updated React components with visual elements (with Playwright test)
+- Changes to navigation, menus, or interactive controls (with Playwright test)
+- Form updates or validation messages (with Playwright test)
+- Modal dialogs, tooltips, or popups (with Playwright test)
+- Icon or color scheme changes (with Playwright test)
+- Responsive design adjustments (with Playwright test)
+
+**When NOT to include screenshots:**
+- API-only changes (backend logic, database queries)
+- Configuration file updates
+- Documentation-only changes
+- Build script or tooling modifications
+- Changes without visual impact
+- **UI changes that cannot be validated with automated Playwright tests**
+
+**Important:**
+- Do not create manual screenshots or mockups
+- Do not suggest screenshots for changes that lack automated test coverage
+- Screenshots should reflect the actual working product as validated by tests
+- Always include the Playwright test file that captures the screenshot in the PR
 
 ## API Endpoints
 
@@ -197,10 +286,29 @@ Tests are configured to use dev mode automatically. See `playwright.config.ts` f
 - Handle database connection errors gracefully
 
 ### Database Queries
+- **ALWAYS check `/database/CURRENT_SCHEMA.md` before writing SQL queries**
 - Always use parameterized queries via the `query()` function
 - Never concatenate user input into SQL strings
 - Use transactions for multi-step operations
 - Consider performance for large datasets
+- Test queries against actual database schema, not assumptions
+
+### Database Schema Changes
+When modifying the database schema:
+1. Create a migration script in `/database/` with a descriptive name
+2. Test the migration on development database first
+3. Apply the migration to production database
+4. **Immediately regenerate schema documentation:**
+   ```bash
+   node scripts/get-schema.js > database/CURRENT_SCHEMA.md
+   ```
+5. Commit both the migration script AND updated CURRENT_SCHEMA.md:
+   ```bash
+   git add database/your-migration.sql database/CURRENT_SCHEMA.md
+   git commit -m "Add [feature]: schema change and regenerate docs"
+   ```
+6. Update `/database/README.md` if adding new tables or major structural changes
+7. Update TypeScript types in `/lib/types.ts` to match new schema
 
 ### Error Handling
 - Return appropriate HTTP status codes (200, 400, 401, 403, 404, 500)

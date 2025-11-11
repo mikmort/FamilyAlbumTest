@@ -14,6 +14,8 @@ import UploadMedia from '@/components/UploadMedia';
 import AdminSettings from '@/components/AdminSettings';
 import AccessRequest from '@/components/AccessRequest';
 import NewMediaView from '@/components/NewMediaView';
+import HomePage from '@/components/HomePage';
+import SettingsMenu from '@/components/SettingsMenu';
 import { Person, Event, MediaItem } from '../lib/types';
 
 interface AuthStatus {
@@ -31,18 +33,31 @@ interface AuthStatus {
 }
 
 export default function Home() {
-  const [view, setView] = useState<'select' | 'gallery' | 'manage-people' | 'manage-events' | 'process-files' | 'upload-media' | 'admin-settings' | 'new-media'>('select');
+  const [view, setView] = useState<'home' | 'select' | 'gallery' | 'manage-people' | 'manage-events' | 'process-files' | 'upload-media' | 'admin-settings' | 'new-media'>('home');
   const [authStatus, setAuthStatus] = useState<AuthStatus | null>(null);
   const [loadingAuth, setLoadingAuth] = useState(true);
   const [newMediaCount, setNewMediaCount] = useState(0);
   const [selectedPeople, setSelectedPeople] = useState<number[]>([]);
+  const [selectedPeopleNames, setSelectedPeopleNames] = useState<string[]>([]);
   const [selectedEvent, setSelectedEvent] = useState<number | null>(null);
+  const [selectedEventName, setSelectedEventName] = useState<string | null>(null);
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
   const [showNoPeople, setShowNoPeople] = useState(false);
   const [exclusiveFilter, setExclusiveFilter] = useState(false);
+  const [recentDays, setRecentDays] = useState<number | null>(null);
   const [selectedMedia, setSelectedMedia] = useState<MediaItem | null>(null);
   const [startFullscreen, setStartFullscreen] = useState(false);
   const [mediaList, setMediaList] = useState<MediaItem[]>([]);
+  const [showSettingsMenu, setShowSettingsMenu] = useState(false);
+
+  // Wake up database immediately on mount (before auth check)
+  // This helps reduce perceived loading time for serverless SQL databases
+  useEffect(() => {
+    // Fire and forget - we don't wait for this to complete
+    fetch('/api/db-warmup').catch(() => {
+      // Ignore errors - this is just a warmup hint
+    });
+  }, []);
 
   // Check authorization on mount
   useEffect(() => {
@@ -129,9 +144,10 @@ export default function Home() {
   };
 
   const handleBack = () => {
-    setView('select');
+    setView('home');
     setSelectedMedia(null);
     setStartFullscreen(false);
+    setRecentDays(null);
   };
 
   const handleMediaClick = (media: MediaItem, allMedia: MediaItem[]) => {
@@ -150,6 +166,21 @@ export default function Home() {
     setSelectedMedia(media);
     setMediaList(allMedia);
     setStartFullscreen(true);
+  };
+
+  const handleNavigateToGallery = (peopleIds: number[], eventId: number | null) => {
+    setSelectedPeople(peopleIds);
+    setSelectedEvent(eventId);
+    setRecentDays(null);
+    setView('gallery');
+  };
+
+  const handleViewRecentUploads = () => {
+    setSelectedPeople([]);
+    setSelectedEvent(null);
+    setShowNoPeople(false);
+    setRecentDays(60);
+    setView('gallery');
   };
 
   // Show database warming message
@@ -213,20 +244,44 @@ export default function Home() {
 
       <div className="app-header">
         <Navigation
-          onManagePeople={() => setView('manage-people')}
-          onManageEvents={() => setView('manage-events')}
+          onHome={() => setView('home')}
           onSelectPeople={() => setView('select')}
-          onProcessFiles={() => setView('process-files')}
           onUploadMedia={() => setView('upload-media')}
           onNewMedia={() => setView('new-media')}
-          onAdminSettings={isAdmin ? () => setView('admin-settings') : undefined}
-          pendingCount={authStatus?.pendingCount || 0}
+          onSettings={() => setShowSettingsMenu(true)}
           newMediaCount={newMediaCount}
         />
-        <UserInfo />
+        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+          <button
+            onClick={() => setShowSettingsMenu(true)}
+            style={{
+              background: '#3498db',
+              color: 'white',
+              border: 'none',
+              padding: '0.5rem 1rem',
+              borderRadius: '4px',
+              fontSize: '14px',
+              cursor: 'pointer',
+            }}
+          >
+            ⚙️ Settings
+          </button>
+          <UserInfo />
+        </div>
       </div>
 
       <main className="container">
+        {view === 'home' && (
+          <HomePage
+            onMediaClick={handleMediaClick}
+            onMediaFullscreen={handleMediaFullscreen}
+            onSelectPeople={() => setView('select')}
+            onNavigateToGallery={handleNavigateToGallery}
+            onViewNewMedia={() => setView('new-media')}
+            onViewRecentUploads={handleViewRecentUploads}
+          />
+        )}
+
         {view === 'select' && (
           <PeopleSelector
             selectedPeople={selectedPeople}
@@ -234,8 +289,14 @@ export default function Home() {
             showNoPeople={showNoPeople}
             sortOrder={sortOrder}
             exclusiveFilter={exclusiveFilter}
-            onSelectedPeopleChange={setSelectedPeople}
-            onSelectedEventChange={setSelectedEvent}
+            onSelectedPeopleChange={(ids, names) => {
+              setSelectedPeople(ids);
+              setSelectedPeopleNames(names || []);
+            }}
+            onSelectedEventChange={(id, name) => {
+              setSelectedEvent(id);
+              setSelectedEventName(name || null);
+            }}
             onShowNoPeopleChange={setShowNoPeople}
             onSortOrderChange={setSortOrder}
             onExclusiveFilterChange={setExclusiveFilter}
@@ -247,7 +308,7 @@ export default function Home() {
           <div className="gallery-view">
             <div className="gallery-controls">
               <button className="btn btn-secondary" onClick={handleBack}>
-                ← Back to Selection
+                ← Back {recentDays ? 'to Home' : 'to Selection'}
               </button>
               <div className="flex flex-gap">
                 <button
@@ -259,21 +320,31 @@ export default function Home() {
               </div>
             </div>
 
+            {recentDays && (
+              <h2 style={{ marginBottom: '1rem', fontSize: '1.5rem' }}>
+                Recent Uploads (Last {recentDays} Days)
+              </h2>
+            )}
+
             <ThumbnailGallery
               peopleIds={selectedPeople}
               eventId={selectedEvent}
               noPeople={showNoPeople}
               sortOrder={sortOrder}
               exclusiveFilter={exclusiveFilter}
+              recentDays={recentDays}
+              peopleNames={selectedPeopleNames}
+              eventName={selectedEventName}
               onMediaClick={handleMediaClick}
               onMediaFullscreen={handleMediaFullscreen}
+              onNavigateHome={() => setView('home')}
             />
           </div>
         )}
 
         {view === 'manage-people' && (
           <>
-            <button className="btn btn-secondary mb-2" onClick={() => setView('select')}>
+            <button className="btn btn-secondary mb-2" onClick={() => setView('home')}>
               ← Back
             </button>
             <PeopleManager />
@@ -282,7 +353,7 @@ export default function Home() {
 
         {view === 'manage-events' && (
           <>
-            <button className="btn btn-secondary mb-2" onClick={() => setView('select')}>
+            <button className="btn btn-secondary mb-2" onClick={() => setView('home')}>
               ← Back
             </button>
             <EventManager />
@@ -291,7 +362,7 @@ export default function Home() {
 
         {view === 'process-files' && (
           <>
-            <button className="btn btn-secondary mb-2" onClick={() => setView('select')}>
+            <button className="btn btn-secondary mb-2" onClick={() => setView('home')}>
               ← Back
             </button>
             <ProcessNewFiles />
@@ -300,7 +371,7 @@ export default function Home() {
 
         {view === 'upload-media' && (
           <>
-            <button className="btn btn-secondary mb-2" onClick={() => setView('select')}>
+            <button className="btn btn-secondary mb-2" onClick={() => setView('home')}>
               ← Back
             </button>
             <UploadMedia onProcessFiles={() => setView('process-files')} />
@@ -309,7 +380,7 @@ export default function Home() {
 
         {view === 'new-media' && (
           <>
-            <button className="btn btn-secondary mb-2" onClick={() => setView('select')}>
+            <button className="btn btn-secondary mb-2" onClick={() => setView('home')}>
               ← Back
             </button>
             <NewMediaView 
@@ -321,7 +392,7 @@ export default function Home() {
 
         {view === 'admin-settings' && isAdmin && (
           <>
-            <button className="btn btn-secondary mb-2" onClick={() => setView('select')}>
+            <button className="btn btn-secondary mb-2" onClick={() => setView('home')}>
               ← Back
             </button>
             <AdminSettings onRequestsChange={checkAuthStatus} />
@@ -338,6 +409,17 @@ export default function Home() {
             }}
             onMediaChange={setSelectedMedia}
             startFullscreen={startFullscreen}
+          />
+        )}
+
+        {showSettingsMenu && (
+          <SettingsMenu
+            onManagePeople={() => setView('manage-people')}
+            onManageEvents={() => setView('manage-events')}
+            onProcessFiles={() => setView('process-files')}
+            onAdminSettings={isAdmin ? () => setView('admin-settings') : undefined}
+            pendingCount={authStatus?.pendingCount || 0}
+            onClose={() => setShowSettingsMenu(false)}
           />
         )}
       </main>

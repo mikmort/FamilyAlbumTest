@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo, useCallback, memo } from 'react';
+import useSWR from 'swr';
 import { MediaItem } from '../lib/types';
 
 interface ThumbnailGalleryProps {
@@ -9,126 +10,177 @@ interface ThumbnailGalleryProps {
   noPeople: boolean;
   sortOrder: 'asc' | 'desc';
   exclusiveFilter: boolean;
+  recentDays?: number | null;
+  peopleNames?: string[];
+  eventName?: string | null;
   onMediaClick: (media: MediaItem, allMedia: MediaItem[]) => void;
   onMediaFullscreen?: (media: MediaItem, allMedia: MediaItem[]) => void;
+  onNavigateHome?: () => void;
 }
 
-export default function ThumbnailGallery({
+// Memoized thumbnail component for better performance
+const ThumbnailItem = memo(({ 
+  item, 
+  onItemClick, 
+  onItemContextMenu 
+}: { 
+  item: MediaItem;
+  onItemClick: () => void;
+  onItemContextMenu: (e: React.MouseEvent) => void;
+}) => {
+  return (
+    <div
+      className={`thumbnail-item ${item.PType === 2 ? 'video-thumbnail' : ''}`}
+      onClick={onItemClick}
+      onContextMenu={onItemContextMenu}
+    >
+      <img
+        src={
+          item.PThumbnailUrl 
+            ? `${item.PThumbnailUrl}${item.PThumbnailUrl.includes('?') ? '&' : '?'}v=${new Date(item.PLastModifiedDate).getTime()}` 
+            : '/placeholder.svg'
+        }
+        alt={item.PDescription || item.PFileName}
+        loading="lazy"
+        onLoad={(e) => {
+          const img = e.target as HTMLImageElement;
+          console.log(`✅ Thumbnail loaded: ${item.PFileName}`, {
+            naturalWidth: img.naturalWidth,
+            naturalHeight: img.naturalHeight,
+            ratio: `${img.naturalWidth}x${img.naturalHeight}`,
+            url: item.PThumbnailUrl
+          });
+        }}
+        onError={(e) => {
+          console.error('❌ Thumbnail failed to load:', {
+            fileName: item.PFileName,
+            thumbnailUrl: item.PThumbnailUrl,
+            type: item.PType === 2 ? 'video' : 'image'
+          });
+          // Set a gray placeholder on error
+          (e.target as HTMLImageElement).src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="200" height="200"%3E%3Crect width="200" height="200" fill="%23ddd"/%3E%3Ctext x="50%25" y="50%25" text-anchor="middle" dy=".3em" fill="%23999" font-family="sans-serif"%3ENo Thumbnail%3C/text%3E%3C/svg%3E';
+        }}
+      />
+      {item.PType === 2 && (
+        <div className="video-indicator">
+          {item.PTime ? `${Math.floor(item.PTime / 60)}:${(item.PTime % 60).toString().padStart(2, '0')}` : 'VIDEO'}
+        </div>
+      )}
+    </div>
+  );
+});
+
+ThumbnailItem.displayName = 'ThumbnailItem';
+
+// Custom fetcher for SWR with retry logic
+const fetcher = async (url: string) => {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 60000); // 60 second timeout
+
+  try {
+    const res = await fetch(url, { signal: controller.signal });
+    clearTimeout(timeoutId);
+
+    if (!res.ok) {
+      const errorData = await res.json().catch(() => ({ error: 'Unknown error' }));
+      
+      // Log detailed error info to console for debugging
+      console.error('❌ Media API Error:', {
+        status: res.status,
+        statusText: res.statusText,
+        url: res.url,
+        errorData: errorData
+      });
+      
+      throw new Error(errorData.message || errorData.error || `Server error: ${res.status}`);
+    }
+
+    return await res.json();
+  } catch (err) {
+    clearTimeout(timeoutId);
+    throw err;
+  }
+};
+
+function ThumbnailGallery({
   peopleIds,
   eventId,
   noPeople,
   sortOrder,
   exclusiveFilter,
+  recentDays,
+  peopleNames,
+  eventName,
   onMediaClick,
   onMediaFullscreen,
+  onNavigateHome,
 }: ThumbnailGalleryProps) {
-  const [media, setMedia] = useState<MediaItem[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [retryCount, setRetryCount] = useState(0);
-  const [isWarmingUp, setIsWarmingUp] = useState(false);
 
-  useEffect(() => {
-    fetchMedia();
-  }, [peopleIds, eventId, noPeople, sortOrder, exclusiveFilter]);
-
-  const fetchMedia = async (isRetry = false) => {
-    try {
-      setLoading(true);
-      setError(null);
-      
-      if (isRetry && retryCount === 0) {
-        setIsWarmingUp(true);
+  // Memoize the query string to prevent unnecessary re-fetches
+  const queryString = useMemo(() => {
+    const params = new URLSearchParams();
+    if (peopleIds.length > 0) {
+      params.append('peopleIds', peopleIds.join(','));
+      if (exclusiveFilter) {
+        params.append('exclusiveFilter', 'true');
       }
-      
-      const params = new URLSearchParams();
-
-      if (peopleIds.length > 0) {
-        params.append('peopleIds', peopleIds.join(','));
-        if (exclusiveFilter) {
-          params.append('exclusiveFilter', 'true');
-        }
-      }
-      if (eventId) {
-        params.append('eventId', eventId.toString());
-      }
-      if (noPeople) {
-        params.append('noPeople', 'true');
-      }
-      params.append('sortOrder', sortOrder);
-
-      // Increase timeout for cold starts
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 60000); // 60 second timeout
-
-      const res = await fetch(`/api/media?${params.toString()}`, {
-        signal: controller.signal
-      });
-      
-      clearTimeout(timeoutId);
-
-      if (!res.ok) {
-        const errorData = await res.json().catch(() => ({ error: 'Unknown error' }));
-        
-        // Log detailed error info to console for debugging
-        console.error('❌ Media API Error:', {
-          status: res.status,
-          statusText: res.statusText,
-          url: res.url,
-          errorData: errorData
-        });
-        
-        // If we have detailed error info from the server, log it
-        if (errorData.message) {
-          console.error('Error message:', errorData.message);
-        }
-        if (errorData.stack) {
-          console.error('Stack trace:', errorData.stack);
-        }
-        if (errorData.debug) {
-          console.error('Debug info:', errorData.debug);
-        }
-        
-        throw new Error(errorData.message || errorData.error || `Server error: ${res.status}`);
-      }
-
-      const data = await res.json();
-      
-      // Log video thumbnails for debugging
-      const videoItems = data.filter((item: MediaItem) => item.PType === 2);
-      if (videoItems.length > 0) {
-        console.log('📹 Video items loaded:', videoItems.map((item: MediaItem) => ({
-          fileName: item.PFileName,
-          thumbnailUrl: item.PThumbnailUrl
-        })));
-      }
-      
-      setMedia(data);
-      setRetryCount(0);
-      setIsWarmingUp(false);
-    } catch (err) {
-      console.error('❌ ThumbnailGallery fetch error:', err);
-      
-      if (err instanceof Error) {
-        if (err.name === 'AbortError') {
-          setError('The request timed out. The database may be warming up. Please try again.');
-        } else {
-          setError(err.message);
-        }
-      } else {
-        setError('An error occurred');
-      }
-    } finally {
-      setLoading(false);
     }
-  };
+    if (eventId) {
+      params.append('eventId', eventId.toString());
+    }
+    if (noPeople) {
+      params.append('noPeople', 'true');
+    }
+    if (recentDays) {
+      params.append('recentDays', recentDays.toString());
+    }
+    params.append('sortOrder', sortOrder);
+    return params.toString();
+  }, [peopleIds, eventId, noPeople, sortOrder, exclusiveFilter, recentDays]);
 
-  const handleRetry = () => {
+  // Use SWR for data fetching with caching
+  const { data: media, error, isLoading, mutate } = useSWR<MediaItem[]>(
+    `/api/media?${queryString}`,
+    fetcher,
+    {
+      revalidateOnFocus: false,
+      revalidateOnReconnect: false,
+      dedupingInterval: 5000, // Dedupe requests within 5 seconds
+    }
+  );
+
+  // Detect if error is a warmup/timeout error
+  const isWarmingUp = useMemo(() => {
+    if (!error) return false;
+    const errorMessage = error.message?.toLowerCase() || '';
+    return errorMessage.includes('timeout') || errorMessage.includes('warming up') || errorMessage.includes('abort');
+  }, [error]);
+
+  const handleRetry = useCallback(() => {
     setRetryCount(prev => prev + 1);
-    fetchMedia(true);
-  };
+    mutate();
+  }, [mutate]);
 
-  if (loading) {
+  // Memoize callbacks to prevent unnecessary re-renders
+  const handleMediaClick = useCallback((item: MediaItem) => {
+    console.log('Thumbnail clicked:', {
+      fileName: item.PFileName,
+      blobUrl: item.PBlobUrl,
+      thumbnailUrl: item.PThumbnailUrl,
+      type: item.PType
+    });
+    onMediaClick(item, media || []);
+  }, [media, onMediaClick]);
+
+  const handleMediaContextMenu = useCallback((e: React.MouseEvent, item: MediaItem) => {
+    e.preventDefault(); // Prevent default context menu
+    if (onMediaFullscreen) {
+      onMediaFullscreen(item, media || []);
+    }
+  }, [media, onMediaFullscreen]);
+
+  if (isLoading) {
     return (
       <div className="loading-container">
         <div className="loading-card">
@@ -161,8 +213,8 @@ export default function ThumbnailGallery({
         <div className="error-card">
           <div className="error-icon">⚠️</div>
           <h2>Unable to Load Photos</h2>
-          <p className="error-message">{error}</p>
-          {error.includes('warming up') || error.includes('timed out') ? (
+          <p className="error-message">{error.message}</p>
+          {isWarmingUp ? (
             <div className="error-hint">
               <p><strong>💡 Tip:</strong> The database may need a moment to start up.</p>
               <p>Click retry below - it should work on the second try!</p>
@@ -176,7 +228,7 @@ export default function ThumbnailGallery({
     );
   }
 
-  if (media.length === 0) {
+  if (!media || media.length === 0) {
     return (
       <div className="card text-center">
         <h2>No Photos Found</h2>
@@ -185,8 +237,70 @@ export default function ThumbnailGallery({
     );
   }
 
+  // Build breadcrumb items
+  const breadcrumbItems: string[] = ['Home'];
+  
+  if (recentDays) {
+    breadcrumbItems.push(`Recent (${recentDays} days)`);
+  } else if (noPeople) {
+    breadcrumbItems.push('Untagged Photos');
+  } else if (eventName) {
+    breadcrumbItems.push('Events', eventName);
+  } else if (peopleNames && peopleNames.length > 0) {
+    breadcrumbItems.push('People', peopleNames.join(' & '));
+  }
+
   return (
     <>
+      {/* Breadcrumb Navigation */}
+      {breadcrumbItems.length > 1 && (
+        <div style={{
+          background: 'white',
+          borderRadius: '8px',
+          padding: '0.75rem 1.5rem',
+          marginBottom: '1rem',
+          boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '0.5rem',
+          fontSize: '0.95rem',
+        }}>
+          {breadcrumbItems.map((item, index) => (
+            <div key={index} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              {index === 0 ? (
+                <button
+                  onClick={onNavigateHome}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    color: '#667eea',
+                    cursor: 'pointer',
+                    padding: 0,
+                    fontSize: 'inherit',
+                    fontWeight: '500',
+                    textDecoration: 'none',
+                  }}
+                  onMouseOver={(e) => e.currentTarget.style.textDecoration = 'underline'}
+                  onMouseOut={(e) => e.currentTarget.style.textDecoration = 'none'}
+                >
+                  {item}
+                </button>
+              ) : (
+                <span style={{ 
+                  color: index === breadcrumbItems.length - 1 ? '#2c3e50' : '#666',
+                  fontWeight: index === breadcrumbItems.length - 1 ? '600' : '400'
+                }}>
+                  {item}
+                </span>
+              )}
+              {index < breadcrumbItems.length - 1 && (
+                <span style={{ color: '#ccc', userSelect: 'none' }}>›</span>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+
       <div className="card mb-2">
         <p>
           <strong>{media.length}</strong> photo{media.length !== 1 ? 's' : ''} found
@@ -195,59 +309,16 @@ export default function ThumbnailGallery({
 
       <div className="thumbnail-gallery">
         {media.map((item) => (
-          <div
+          <ThumbnailItem
             key={item.PFileName}
-            className={`thumbnail-item ${item.PType === 2 ? 'video-thumbnail' : ''}`}
-            onClick={() => {
-              console.log('Thumbnail clicked:', {
-                fileName: item.PFileName,
-                blobUrl: item.PBlobUrl,
-                thumbnailUrl: item.PThumbnailUrl,
-                type: item.PType
-              });
-              onMediaClick(item, media);
-            }}
-            onContextMenu={(e) => {
-              e.preventDefault(); // Prevent default context menu
-              if (onMediaFullscreen) {
-                onMediaFullscreen(item, media);
-              }
-            }}
-          >
-            <img
-              src={
-                item.PThumbnailUrl 
-                  ? `${item.PThumbnailUrl}${item.PThumbnailUrl.includes('?') ? '&' : '?'}v=${new Date(item.PLastModifiedDate).getTime()}` 
-                  : '/placeholder.svg'
-              }
-              alt={item.PDescription || item.PFileName}
-              onLoad={(e) => {
-                const img = e.target as HTMLImageElement;
-                console.log(`✅ Thumbnail loaded: ${item.PFileName}`, {
-                  naturalWidth: img.naturalWidth,
-                  naturalHeight: img.naturalHeight,
-                  ratio: `${img.naturalWidth}x${img.naturalHeight}`,
-                  url: item.PThumbnailUrl
-                });
-              }}
-              onError={(e) => {
-                console.error('❌ Thumbnail failed to load:', {
-                  fileName: item.PFileName,
-                  thumbnailUrl: item.PThumbnailUrl,
-                  type: item.PType === 2 ? 'video' : 'image'
-                });
-                // Set a gray placeholder on error
-                (e.target as HTMLImageElement).src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="200" height="200"%3E%3Crect width="200" height="200" fill="%23ddd"/%3E%3Ctext x="50%25" y="50%25" text-anchor="middle" dy=".3em" fill="%23999" font-family="sans-serif"%3ENo Thumbnail%3C/text%3E%3C/svg%3E';
-              }}
-            />
-            {item.PType === 2 && (
-              <div className="video-indicator">
-                {item.PTime ? `${Math.floor(item.PTime / 60)}:${(item.PTime % 60).toString().padStart(2, '0')}` : 'VIDEO'}
-              </div>
-            )}
-          </div>
+            item={item}
+            onItemClick={() => handleMediaClick(item)}
+            onItemContextMenu={(e) => handleMediaContextMenu(e, item)}
+          />
         ))}
       </div>
     </>
   );
 }
+
+export default memo(ThumbnailGallery);

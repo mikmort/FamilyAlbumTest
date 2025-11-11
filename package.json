@@ -5,6 +5,9 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
+    "dev:api": "cd api && npm start",
+    "dev:frontend": "next dev",
+    "dev:full": "npm run setup:api-env && concurrently --names \"API,WEB\" --prefix-colors \"blue,green\" \"npm:dev:api\" \"npm:dev:frontend\"",
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
@@ -12,12 +15,17 @@
     "test:headed": "playwright test --headed",
     "test:debug": "playwright test --debug",
     "test:ui": "playwright test --ui",
-    "test:report": "playwright show-report"
+    "test:report": "playwright show-report",
+    "setup:env": "node scripts/setup-env.js",
+    "setup:api-env": "node scripts/setup-api-env.js",
+    "setup:agent": "node scripts/setup-coding-agent.js",
+    "test:setup": "node scripts/setup-env.js && npm test"
   },
   "dependencies": {
     "@azure/storage-blob": "^12.29.1",
     "@vladmandic/face-api": "^1.7.15",
     "dotenv": "^17.2.3",
+    "encoding": "^0.1.13",
     "exif-reader": "^2.0.2",
     "exifreader": "^4.18.0",
     "face-api.js": "^0.22.2",
@@ -27,7 +35,8 @@
     "node-fetch": "^2.7.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
-    "sharp": "^0.33.5"
+    "sharp": "^0.33.5",
+    "swr": "^2.3.6"
   },
   "devDependencies": {
     "@playwright/test": "^1.56.1",
@@ -36,6 +45,7 @@
     "@types/react": "^18.2.0",
     "@types/react-dom": "^18.2.0",
     "better-sqlite3": "^12.4.1",
+    "concurrently": "^9.2.1",
     "csv-parse": "^6.1.0",
     "eslint": "^8.54.0",
     "eslint-config-next": "^14.0.0",

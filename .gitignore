@@ -62,3 +62,4 @@ page-chunk.js
 recent-runs.json
 run-jobs*.json
 *.dat
+packages-microsoft-prod.deb

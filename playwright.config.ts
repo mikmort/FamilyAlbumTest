@@ -14,11 +14,11 @@ export default defineConfig({
   // Fail the build on CI if you accidentally left test.only in the source code
   forbidOnly: !!process.env.CI,
   
-  // Retry on CI only
-  retries: process.env.CI ? 2 : 0,
+  // Retry on CI only - reduce retries to speed up failing tests
+  retries: process.env.CI ? 1 : 0,
   
-  // Opt out of parallel tests on CI
-  workers: process.env.CI ? 1 : undefined,
+  // Use 2 workers on CI for parallel execution (faster than 1, still stable)
+  workers: process.env.CI ? 2 : undefined,
   
   // Reporter to use
   reporter: [
@@ -29,7 +29,8 @@ export default defineConfig({
   // Shared settings for all projects
   use: {
     // Base URL for tests
-    baseURL: 'http://localhost:3000',
+    // Use PRODUCTION_URL for E2E testing against deployed site, or localhost for local dev
+    baseURL: process.env.PRODUCTION_URL || 'http://localhost:3000',
     
     // Collect trace when retrying failed test
     trace: 'on-first-retry',
@@ -37,53 +38,104 @@ export default defineConfig({
     // Screenshot on failure
     screenshot: 'only-on-failure',
     
-    // Video on failure
-    video: 'retain-on-failure',
+    // Video on failure - disabled in Copilot environment due to ffmpeg requirements
+    video: process.env.COPILOT_AGENT_ACTION ? 'off' : 'retain-on-failure',
   },
 
   // Configure projects for major browsers
   projects: [
     {
       name: 'chromium',
-      use: { ...devices['Desktop Chrome'] },
+      use: { 
+        ...devices['Desktop Chrome'],
+        // Use system-installed Chromium in GitHub Copilot environment
+        // This avoids browser download issues when Playwright browsers can't be installed
+        launchOptions: process.env.COPILOT_AGENT_ACTION ? {
+          executablePath: '/usr/bin/chromium-browser',
+        } : undefined,
+      },
     },
 
-    {
-      name: 'firefox',
-      use: { ...devices['Desktop Firefox'] },
-    },
+    // Only run chromium in Copilot environment to speed up tests
+    // Firefox and Webkit require their own browser installations
+    ...(process.env.COPILOT_AGENT_ACTION ? [] : [
+      {
+        name: 'firefox',
+        use: { ...devices['Desktop Firefox'] },
+      },
 
-    {
-      name: 'webkit',
-      use: { ...devices['Desktop Safari'] },
-    },
+      {
+        name: 'webkit',
+        use: { ...devices['Desktop Safari'] },
+      },
+    ]),
 
     // Test against mobile viewports
     {
       name: 'Mobile Chrome',
-      use: { ...devices['Pixel 5'] },
+      use: { 
+        ...devices['Pixel 5'],
+        // Use system-installed Chromium for mobile tests in Copilot environment
+        launchOptions: process.env.COPILOT_AGENT_ACTION ? {
+          executablePath: '/usr/bin/chromium-browser',
+        } : undefined,
+      },
     },
-    {
-      name: 'Mobile Safari',
-      use: { ...devices['iPhone 12'] },
-    },
+    
+    // Only run Mobile Safari outside of Copilot environment
+    ...(process.env.COPILOT_AGENT_ACTION ? [] : [
+      {
+        name: 'Mobile Safari',
+        use: { ...devices['iPhone 12'] },
+      },
+    ]),
   ],
 
   // Run your local dev server before starting the tests
-  webServer: {
-    command: 'npm run dev',
-    url: 'http://localhost:3000',
-    reuseExistingServer: !process.env.CI,
-    stdout: 'ignore',
-    stderr: 'pipe',
-    timeout: 120 * 1000,
-    env: {
-      // Enable dev mode for tests to bypass authentication
-      DEV_MODE: 'true',
-      DEV_USER_EMAIL: 'test@example.com',
-      DEV_USER_ROLE: 'Admin',
-      // Use test database or mock data
-      // Add your test database credentials here if needed
+  // Skip when PRODUCTION_URL is set (E2E testing against deployed site)
+  // Or when SKIP_API_SERVER is true (frontend-only testing)
+  webServer: process.env.PRODUCTION_URL ? undefined : process.env.SKIP_API_SERVER === 'true' ? [
+    // Next.js frontend only (API calls will fail but frontend tests work)
+    {
+      command: 'npm run dev',
+      url: 'http://localhost:3000',
+      reuseExistingServer: !process.env.CI,
+      stdout: 'ignore',
+      stderr: 'pipe',
+      timeout: 120 * 1000,
+      env: {
+        // Enable dev mode for tests to bypass authentication
+        DEV_MODE: 'true',
+        DEV_USER_EMAIL: 'test@example.com',
+        DEV_USER_ROLE: 'Admin',
+      },
     },
-  },
+  ] : [
+    // Azure Functions API (must start first)
+    {
+      command: 'npm run setup:api-env && cd api && npm start',
+      url: 'http://localhost:7071/api/version',
+      reuseExistingServer: !process.env.CI,
+      stdout: 'ignore',
+      stderr: 'pipe',
+      timeout: 120 * 1000,
+    },
+    // Next.js frontend (proxies API calls to Azure Functions)
+    {
+      command: 'npm run dev',
+      url: 'http://localhost:3000',
+      reuseExistingServer: !process.env.CI,
+      stdout: 'ignore',
+      stderr: 'pipe',
+      timeout: 120 * 1000,
+      env: {
+        // Enable dev mode for tests to bypass authentication
+        DEV_MODE: 'true',
+        DEV_USER_EMAIL: 'test@example.com',
+        DEV_USER_ROLE: 'Admin',
+        // Use test database or mock data
+        // Add your test database credentials here if needed
+      },
+    },
+  ],
 });

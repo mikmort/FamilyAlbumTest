@@ -85,13 +85,43 @@ Additional documentation in the `docs/` folder:
 ```bash
 cd FamilyAlbumTest
 npm install
+cd api && npm install && cd ..
 ```
 
-### 2. Configure Environment Variables
+### 2. Install Azure Functions Core Tools
+
+For full local development with API support, install Azure Functions Core Tools:
+
+**macOS:**
+```bash
+brew tap azure/functions
+brew install azure-functions-core-tools@4
+```
+
+**Windows:**
+```powershell
+npm install -g azure-functions-core-tools@4 --unsafe-perm true
+```
+
+**Linux:**
+```bash
+wget -q https://packages.microsoft.com/config/ubuntu/20.04/packages-microsoft-prod.deb
+sudo dpkg -i packages-microsoft-prod.deb
+sudo apt-get update && sudo apt-get install azure-functions-core-tools-4
+```
+
+See [docs/LOCAL_AZURE_FUNCTIONS.md](docs/LOCAL_AZURE_FUNCTIONS.md) for detailed installation instructions.
+
+### 3. Configure Environment Variables
 
 Create a `.env.local` file in the root directory:
 
 ```env
+# Development Mode (for testing without OAuth)
+DEV_MODE=true
+DEV_USER_EMAIL=dev@example.com
+DEV_USER_ROLE=Admin
+
 # Azure SQL Database Configuration
 AZURE_SQL_SERVER=your-server.database.windows.net
 AZURE_SQL_DATABASE=FamilyAlbum
@@ -104,20 +134,39 @@ AZURE_STORAGE_KEY=your-storage-access-key
 AZURE_STORAGE_CONTAINER=family-album-media
 ```
 
-### 3. Run Development Server
+Then generate API configuration:
 
+```bash
+npm run setup:api-env
+```
+
+### 4. Run Development Servers
+
+**Option A: Run full stack (recommended)**
+```bash
+npm run dev:full
+```
+
+This starts both Azure Functions (port 7071) and Next.js (port 3000).
+
+**Option B: Run Next.js only (limited functionality)**
 ```bash
 npm run dev
 ```
 
 Open [http://localhost:3000](http://localhost:3000) in your browser.
 
-### 4. Testing (Optional)
+**Note**: API endpoints require Azure Functions to be running. Use `npm run dev:full` for complete functionality.
 
-The application includes Playwright tests for automated testing:
+### 5. Testing with Playwright
+
+The application includes comprehensive Playwright tests with **dev mode** for authentication bypass:
 
 ```bash
-# Run all tests
+# Automatic setup and run all tests
+node scripts/setup-env.js && npm test
+
+# Or manually run tests
 npm test
 
 # Run tests with browser visible
@@ -125,9 +174,33 @@ npm run test:headed
 
 # Run tests in debug mode
 npm run test:debug
+
+# Run specific test file
+npx playwright test tests/navigation.spec.ts
 ```
 
-Tests use **dev mode** to bypass authentication. See [tests/README.md](tests/README.md) for more details.
+**Dev Mode**: Tests automatically bypass OAuth authentication using dev mode. This allows GitHub Copilot and coding agents to run tests without OAuth setup.
+
+**Configuration**:
+- Dev mode is enabled in `playwright.config.ts`
+- For manual testing, create `.env.local` with `DEV_MODE=true`
+- For CI/CD, configure GitHub Secrets (see below)
+
+See [tests/README.md](tests/README.md) and [docs/DEV_MODE_TESTING.md](docs/DEV_MODE_TESTING.md) for details.
+
+### 5. Configure GitHub Secrets for CI/CD Testing
+
+To enable full Playwright testing in GitHub Actions and for coding agents:
+
+1. **Add GitHub Secrets** (Settings → Secrets and variables → Actions):
+   - `AZURE_SQL_SERVER`, `AZURE_SQL_DATABASE`, `AZURE_SQL_USER`, `AZURE_SQL_PASSWORD`
+   - `AZURE_STORAGE_ACCOUNT`, `AZURE_STORAGE_KEY`, `AZURE_STORAGE_CONTAINER`
+
+2. **Tests run automatically** on push/PR via the Playwright workflow
+
+3. **GitHub Copilot** can run tests with full access to Azure resources
+
+See [docs/GITHUB_SECRETS_SETUP.md](docs/GITHUB_SECRETS_SETUP.md) for detailed setup instructions.
 
 ## Deployment to Azure
 

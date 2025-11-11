@@ -313,6 +313,17 @@ export default function MediaDetailModal({
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+        
+        // If 409 Conflict (person already tagged), handle gracefully
+        if (response.status === 409) {
+          console.log('ℹ️ Person already tagged (409), ignoring...');
+          // Silently ignore - the person is already in the list
+          setShowPeopleSelector(false);
+          setPeopleSearchFilter('');
+          setSavingTag(false);
+          return;
+        }
+        
         console.error('❌ Tag person API Error:', {
           status: response.status,
           statusText: response.statusText,

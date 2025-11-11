@@ -664,8 +664,11 @@ module.exports = async function (context, req) {
             const noPeople = req.query.noPeople === 'true';
             const sortOrder = req.query.sortOrder || 'desc';
             const exclusiveFilter = req.query.exclusiveFilter === 'true';
+            const random = req.query.random === '1' || req.query.random === 'true';
+            const limit = req.query.limit ? parseInt(req.query.limit) : null;
+            const recentDays = req.query.recentDays ? parseInt(req.query.recentDays) : null;
 
-            context.log('Parsed filters:', { peopleIds, eventId, noPeople, sortOrder, exclusiveFilter });
+            context.log('Parsed filters:', { peopleIds, eventId, noPeople, sortOrder, exclusiveFilter, random, limit, recentDays });
 
             let mediaQuery = `
                 SELECT DISTINCT p.*
@@ -760,13 +763,41 @@ module.exports = async function (context, req) {
                 `);
             }
 
+            // Filter by recent uploads (last N days)
+            if (recentDays && recentDays > 0) {
+                whereClauses.push(`p.PDateEntered >= DATEADD(day, -@recentDays, GETDATE())`);
+                params.recentDays = recentDays;
+            }
+
             if (whereClauses.length > 0) {
                 mediaQuery += ` WHERE ${whereClauses.join(' AND ')}`;
             }
 
             // Sorting
-            const orderDirection = sortOrder === 'asc' ? 'ASC' : 'DESC';
-            mediaQuery += ` ORDER BY p.PYear ${orderDirection}, p.PMonth ${orderDirection}, p.PFileName ${orderDirection}`;
+            if (random) {
+                // For random ordering with DISTINCT, we need to include NEWID() in SELECT
+                // But since we can't use it with DISTINCT, we'll use a subquery approach
+                // or just remove DISTINCT for random queries since duplicates are unlikely
+                mediaQuery += ` ORDER BY NEWID()`;
+                // Note: The DISTINCT will be removed for random queries below
+            } else {
+                const orderDirection = sortOrder === 'asc' ? 'ASC' : 'DESC';
+                mediaQuery += ` ORDER BY p.PYear ${orderDirection}, p.PMonth ${orderDirection}, p.PFileName ${orderDirection}`;
+            }
+
+            // Add TOP limit if specified
+            if (limit && limit > 0) {
+                // For random queries, we can't use DISTINCT with ORDER BY NEWID()
+                // So we remove DISTINCT for random queries
+                if (random) {
+                    mediaQuery = mediaQuery.replace('SELECT DISTINCT p.*', `SELECT TOP ${limit} p.*`);
+                } else {
+                    mediaQuery = mediaQuery.replace('SELECT DISTINCT p.*', `SELECT DISTINCT TOP ${limit} p.*`);
+                }
+            } else if (random) {
+                // Even without limit, remove DISTINCT for random queries
+                mediaQuery = mediaQuery.replace('SELECT DISTINCT p.*', `SELECT p.*`);
+            }
 
             context.log('Executing main media query...');
             context.log('Query:', mediaQuery);

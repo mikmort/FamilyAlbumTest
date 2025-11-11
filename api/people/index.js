@@ -1,5 +1,6 @@
 const { query, execute } = require('../shared/db');
 const { checkAuthorization } = require('../shared/auth');
+const { cache } = require('../shared/cache');
 
 module.exports = async function (context, req) {
     context.log('People API function processed a request.');
@@ -27,29 +28,39 @@ module.exports = async function (context, req) {
     try {
         // GET /api/people/:id - Get single person by ID
         if (method === 'GET' && personId) {
-            const personQuery = `
-                SELECT 
-                    ID,
-                    neName,
-                    neRelation,
-                    neType,
-                    neDateLastModified,
-                    ISNULL(neCount, 0) as neCount
-                FROM dbo.NameEvent WITH (NOLOCK)
-                WHERE ID = @id AND neType = 'N'
-            `;
-            const people = await query(personQuery, { id: personId });
+            const cacheKey = `person:${personId}`;
+            let person = cache.get(cacheKey);
+            
+            if (!person) {
+                const personQuery = `
+                    SELECT 
+                        ID,
+                        neName,
+                        neRelation,
+                        neType,
+                        neDateLastModified,
+                        ISNULL(neCount, 0) as neCount,
+                        Birthday,
+                        IsFamilyMember
+                    FROM dbo.NameEvent WITH (NOLOCK)
+                    WHERE ID = @id AND neType = 'N'
+                `;
+                const people = await query(personQuery, { id: personId });
 
-            if (people.length === 0) {
-                context.res = {
-                    status: 404,
-                    headers: { 'Content-Type': 'application/json' },
-                    body: {
-                        success: false,
-                        error: 'Person not found'
-                    }
-                };
-                return;
+                if (people.length === 0) {
+                    context.res = {
+                        status: 404,
+                        headers: { 'Content-Type': 'application/json' },
+                        body: {
+                            success: false,
+                            error: 'Person not found'
+                        }
+                    };
+                    return;
+                }
+                
+                person = people[0];
+                cache.set(cacheKey, person);
             }
 
             context.res = {
@@ -57,7 +68,7 @@ module.exports = async function (context, req) {
                 headers: { 'Content-Type': 'application/json' },
                 body: {
                     success: true,
-                    person: people[0]
+                    person: person
                 }
             };
             return;
@@ -65,19 +76,27 @@ module.exports = async function (context, req) {
         
         // GET /api/people - List all people
         if (method === 'GET') {
-            const peopleQuery = `
-                SELECT 
-                    ID,
-                    neName,
-                    neRelation,
-                    neType,
-                    neDateLastModified,
-                    ISNULL(neCount, 0) as neCount
-                FROM dbo.NameEvent WITH (NOLOCK)
-                WHERE neType = 'N'
-                ORDER BY neName
-            `;
-            const people = await query(peopleQuery);
+            const cacheKey = 'people:all';
+            let people = cache.get(cacheKey, 10 * 60 * 1000); // Cache for 10 minutes
+            
+            if (!people) {
+                const peopleQuery = `
+                    SELECT 
+                        ID,
+                        neName,
+                        neRelation,
+                        neType,
+                        neDateLastModified,
+                        ISNULL(neCount, 0) as neCount,
+                        Birthday,
+                        IsFamilyMember
+                    FROM dbo.NameEvent WITH (NOLOCK)
+                    WHERE neType = 'N'
+                    ORDER BY neName
+                `;
+                people = await query(peopleQuery);
+                cache.set(cacheKey, people);
+            }
 
             context.res = {
                 status: 200,
@@ -92,7 +111,7 @@ module.exports = async function (context, req) {
 
         // POST /api/people - Create new person
         if (method === 'POST') {
-            const { name, neName, relation, neRelation } = req.body;
+            const { name, neName, relation, neRelation, birthday, isFamilyMember } = req.body;
             
             // Accept both 'name' and 'neName' for backwards compatibility
             const personName = name || neName;
@@ -106,16 +125,33 @@ module.exports = async function (context, req) {
                 return;
             }
 
+            // Auto-set IsFamilyMember for Morton family members and related families
+            let isFamilyValue = isFamilyMember || false;
+            if (personName && (
+                personName.includes(' Morton') || personName.startsWith('Morton ') ||
+                personName.includes(' Moss') || personName.startsWith('Moss ') ||
+                personName.includes(' Kaplan') || personName.startsWith('Kaplan ') ||
+                personName.includes(' Hodges') || personName.startsWith('Hodges ') ||
+                personName.includes(' Kaplan-Moss') || personName.startsWith('Kaplan-Moss ')
+            )) {
+                isFamilyValue = true;
+            }
+
             const insertQuery = `
-                INSERT INTO dbo.NameEvent (neName, neRelation, neType, neCount)
-                OUTPUT INSERTED.ID, INSERTED.neName, INSERTED.neRelation, INSERTED.neType, INSERTED.neCount as photoCount
-                VALUES (@name, @relation, 'N', 0)
+                INSERT INTO dbo.NameEvent (neName, neRelation, neType, neCount, Birthday, IsFamilyMember)
+                OUTPUT INSERTED.ID, INSERTED.neName, INSERTED.neRelation, INSERTED.neType, INSERTED.neCount as photoCount, INSERTED.Birthday, INSERTED.IsFamilyMember
+                VALUES (@name, @relation, 'N', 0, @birthday, @isFamilyMember)
             `;
 
             const result = await query(insertQuery, { 
                 name: personName,
-                relation: personRelation || null
+                relation: personRelation || null,
+                birthday: birthday || null,
+                isFamilyMember: isFamilyValue
             });
+
+            // Invalidate people cache
+            cache.invalidatePattern('people:');
 
             context.res = {
                 status: 201,
@@ -129,7 +165,7 @@ module.exports = async function (context, req) {
 
         // PUT /api/people - Update person
         if (method === 'PUT') {
-            const { id, name, relation } = req.body;
+            const { id, name, relation, birthday, isFamilyMember } = req.body;
 
             if (!id || !name) {
                 context.res = {
@@ -139,16 +175,34 @@ module.exports = async function (context, req) {
                 return;
             }
 
+            // Auto-set isFamilyMember if last name is Morton or related families
+            let isFamilyValue = isFamilyMember;
+            if (name && (
+                name.includes(' Morton') || name.startsWith('Morton ') ||
+                name.includes(' Moss') || name.startsWith('Moss ') ||
+                name.includes(' Kaplan') || name.startsWith('Kaplan ') ||
+                name.includes(' Hodges') || name.startsWith('Hodges ') ||
+                name.includes(' Kaplan-Moss') || name.startsWith('Kaplan-Moss ')
+            )) {
+                isFamilyValue = true;
+            }
+
             const updateQuery = `
                 UPDATE dbo.NameEvent 
-                SET neName = @name, neRelation = @relation
+                SET neName = @name, neRelation = @relation, Birthday = @birthday, IsFamilyMember = @isFamilyMember
                 WHERE ID = @id
             `;
 
-            await execute(updateQuery, { id, name, relation: relation || null });
+            await execute(updateQuery, { 
+                id, 
+                name, 
+                relation: relation || null,
+                birthday: birthday || null,
+                isFamilyMember: isFamilyValue ?? null
+            });
 
             const selectQuery = `
-                SELECT ID, neName, neRelation, ISNULL(neCount, 0) as neCount
+                SELECT ID, neName, neRelation, ISNULL(neCount, 0) as neCount, Birthday, IsFamilyMember
                 FROM dbo.NameEvent
                 WHERE ID = @id
             `;
@@ -162,6 +216,9 @@ module.exports = async function (context, req) {
                 };
                 return;
             }
+
+            // Invalidate people cache
+            cache.invalidatePattern('people:');
 
             context.res = {
                 status: 200,
@@ -192,6 +249,9 @@ module.exports = async function (context, req) {
             // Delete person
             const deleteQuery = `DELETE FROM dbo.NameEvent WHERE ID = @id`;
             await execute(deleteQuery, { id });
+
+            // Invalidate people cache
+            cache.invalidatePattern('people:');
 
             context.res = {
                 status: 204

@@ -1,0 +1,14 @@
+{
+  "IsEncrypted": false,
+  "Values": {
+    "FUNCTIONS_WORKER_RUNTIME": "python",
+    "AzureWebJobsStorage": "",
+    "AZURE_STORAGE_ACCOUNT": "<your-storage-account-name>",
+    "AZURE_STORAGE_KEY": "<your-storage-account-key>",
+    "AZURE_STORAGE_CONTAINER": "family-album-media",
+    "DB_SERVER": "<your-sql-server>.database.windows.net",
+    "DB_DATABASE": "FamilyAlbum",
+    "DB_USER": "<your-db-username>",
+    "DB_PASSWORD": "<your-db-password>"
+  }
+}

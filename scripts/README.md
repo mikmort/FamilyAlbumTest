@@ -2,6 +2,22 @@
 
 This folder contains utility scripts for deploying and managing the Family Album application.
 
+## Quick Reference
+
+### Local Development
+- **`setup-env.js`** - Generate `.env.local` from environment variables (for testing)
+- **`setup-api-env.js`** - Generate `api/local.settings.json` for Azure Functions
+- **`verify-api-setup.js`** - Verify local Azure Functions setup is complete
+
+### Deployment
+- **`maintenance/deploy.ps1`** - Deploy Azure infrastructure
+- **`maintenance/setup-database.ps1`** - Initialize database schema  
+- **`maintenance/setup-github-azure.ps1`** - Configure GitHub secrets
+
+### Utilities
+- **`maintenance/bulk-upload-photos.ps1`** - Bulk upload media files
+- **`maintenance/convert-videos-to-mp4.ps1`** - Convert videos to web format
+
 ## Directory Structure
 
 - **`maintenance/`** - Active maintenance and deployment scripts (deploy, setup, upload utilities, video conversion)
@@ -20,6 +36,42 @@ Key scripts include:
 - **`maintenance/convert-videos-to-mp4.ps1`** - Convert videos to web format
 
 See the `sql/` folder for SQL scripts used for database updates and fixes.
+
+## Local Development Scripts
+
+### setup-env.js
+Creates `.env.local` file from environment variables (e.g., GitHub Secrets).
+
+```bash
+npm run setup:env
+```
+
+Useful for:
+- GitHub Copilot and coding agents (reads GitHub Secrets)
+- CI/CD environments (reads env vars)
+- Quick setup without manual configuration
+
+### setup-api-env.js
+Generates `api/local.settings.json` for Azure Functions from `.env.local`.
+
+```bash
+npm run setup:api-env
+```
+
+Required before running Azure Functions locally with `npm run dev:api` or `npm run dev:full`.
+
+### verify-api-setup.js
+Verifies that local Azure Functions setup is complete and ready to use.
+
+```bash
+node scripts/verify-api-setup.js
+```
+
+Checks:
+- Required files exist (templates, scripts, docs)
+- Package.json has necessary scripts
+- Playwright config is updated
+- Azure Functions Core Tools is installed
 
 ## Archived Scripts
 

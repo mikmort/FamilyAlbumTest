@@ -910,6 +910,16 @@ button {
   filter: brightness(1.2);
 }
 
+.event-date-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  background-color: #e3f2fd;
+  border-radius: 4px;
+  font-size: 0.85rem;
+  color: #1976d2;
+  font-weight: 500;
+}
+
 .event-details-preview {
   display: block;
   font-size: 0.9rem;

@@ -1,5 +1,6 @@
 const { query, execute } = require('../shared/db');
 const { checkAuthorization } = require('../shared/auth');
+const { cache } = require('../shared/cache');
 
 module.exports = async function (context, req) {
     context.log('Events API function processed a request.');
@@ -23,20 +24,27 @@ module.exports = async function (context, req) {
     try {
         // GET /api/events - List all events
         if (method === 'GET' && !id) {
-            const eventsQuery = `
-                SELECT 
-                    ID,
-                    neName,
-                    neRelation,
-                    neType,
-                    neDateLastModified,
-                    ISNULL(neCount, 0) as neCount
-                FROM dbo.NameEvent WITH (NOLOCK)
-                WHERE neType = 'E'
-                ORDER BY neName
-            `;
+            const cacheKey = 'events:all';
+            let events = cache.get(cacheKey, 10 * 60 * 1000); // Cache for 10 minutes
+            
+            if (!events) {
+                const eventsQuery = `
+                    SELECT 
+                        ID,
+                        neName,
+                        neRelation,
+                        neType,
+                        neDateLastModified,
+                        ISNULL(neCount, 0) as neCount,
+                        EventDate
+                    FROM dbo.NameEvent WITH (NOLOCK)
+                    WHERE neType = 'E'
+                    ORDER BY neName
+                `;
 
-            const events = await query(eventsQuery);
+                events = await query(eventsQuery);
+                cache.set(cacheKey, events);
+            }
 
             context.res = {
                 status: 200,
@@ -51,33 +59,42 @@ module.exports = async function (context, req) {
 
         // GET /api/events/[id] - Get specific event
         if (method === 'GET' && id) {
-            const eventQuery = `
-                SELECT 
-                    ID,
-                    neName,
-                    neRelation,
-                    neType,
-                    neDateLastModified,
-                    ISNULL(neCount, 0) as neCount
-                FROM dbo.NameEvent
-                WHERE ID = @id AND neType = 'E'
-            `;
+            const cacheKey = `event:${id}`;
+            let event = cache.get(cacheKey);
+            
+            if (!event) {
+                const eventQuery = `
+                    SELECT 
+                        ID,
+                        neName,
+                        neRelation,
+                        neType,
+                        neDateLastModified,
+                        ISNULL(neCount, 0) as neCount,
+                        EventDate
+                    FROM dbo.NameEvent
+                    WHERE ID = @id AND neType = 'E'
+                `;
 
-            const result = await query(eventQuery, { id: parseInt(id) });
+                const result = await query(eventQuery, { id: parseInt(id) });
 
-            if (result.length === 0) {
-                context.res = {
-                    status: 404,
-                    body: { error: 'Event not found' }
-                };
-                return;
+                if (result.length === 0) {
+                    context.res = {
+                        status: 404,
+                        body: { error: 'Event not found' }
+                    };
+                    return;
+                }
+                
+                event = result[0];
+                cache.set(cacheKey, event);
             }
 
             context.res = {
                 status: 200,
                 body: {
                     success: true,
-                    event: result[0]
+                    event: event
                 }
             };
             return;
@@ -85,7 +102,7 @@ module.exports = async function (context, req) {
 
         // POST /api/events - Create new event
         if (method === 'POST') {
-            const { name, neName, relation, neRelation } = req.body;
+            const { name, neName, relation, neRelation, eventDate } = req.body;
             const eventName = name || neName;
             const eventRelation = relation || neRelation || null;
 
@@ -114,24 +131,28 @@ module.exports = async function (context, req) {
 
             // Insert new event
             const insertQuery = `
-                INSERT INTO dbo.NameEvent (neName, neRelation, neType, neDateLastModified, neCount)
-                VALUES (@name, @relation, 'E', GETDATE(), 0);
+                INSERT INTO dbo.NameEvent (neName, neRelation, neType, neDateLastModified, neCount, EventDate)
+                VALUES (@name, @relation, 'E', GETDATE(), 0, @eventDate);
                 SELECT SCOPE_IDENTITY() as ID;
             `;
 
             const result = await query(insertQuery, {
                 name: eventName.trim(),
-                relation: eventRelation
+                relation: eventRelation,
+                eventDate: eventDate || null
             });
 
             const newId = result[0].ID;
 
             // Fetch the created event
             const createdEvent = await query(
-                `SELECT ID, neName, neRelation, neType, neDateLastModified, neCount 
+                `SELECT ID, neName, neRelation, neType, neDateLastModified, neCount, EventDate
                  FROM dbo.NameEvent WHERE ID = @id`,
                 { id: newId }
             );
+
+            // Invalidate events cache
+            cache.invalidatePattern('events:');
 
             context.res = {
                 status: 201,
@@ -141,7 +162,8 @@ module.exports = async function (context, req) {
                     // Also return alternate field names for compatibility
                     id: newId,
                     name: eventName.trim(),
-                    relation: eventRelation
+                    relation: eventRelation,
+                    eventDate: eventDate || null
                 }
             };
             return;
@@ -150,12 +172,12 @@ module.exports = async function (context, req) {
         // PUT /api/events/[id] or PUT /api/events - Update event
         if (method === 'PUT') {
             // Accept ID from URL path or request body (for compatibility)
-            const { name, neName, relation, neRelation, id: bodyId } = req.body;
+            const { name, neName, relation, neRelation, id: bodyId, eventDate } = req.body;
             const eventId = id || bodyId;
             const eventName = name || neName;
             const eventRelation = relation || neRelation;
 
-            context.log(`📝 Updating event ${eventId}: name="${eventName}", relation="${eventRelation}"`);
+            context.log(`📝 Updating event ${eventId}: name="${eventName}", relation="${eventRelation}", eventDate="${eventDate}"`);
 
             if (!eventId) {
                 context.res = {
@@ -193,6 +215,7 @@ module.exports = async function (context, req) {
                 UPDATE dbo.NameEvent
                 SET neName = @name,
                     neRelation = @relation,
+                    EventDate = @eventDate,
                     neDateLastModified = GETDATE()
                 WHERE ID = @id AND neType = 'E'
             `;
@@ -200,17 +223,21 @@ module.exports = async function (context, req) {
             await execute(updateQuery, {
                 id: parseInt(eventId),
                 name: eventName.trim(),
-                relation: eventRelation || null
+                relation: eventRelation || null,
+                eventDate: eventDate || null
             });
 
             context.log(`✅ Event ${eventId} updated successfully`);
 
             // Fetch updated event
             const updatedEvent = await query(
-                `SELECT ID, neName, neRelation, neType, neDateLastModified, neCount 
+                `SELECT ID, neName, neRelation, neType, neDateLastModified, neCount, EventDate
                  FROM dbo.NameEvent WHERE ID = @id`,
                 { id: parseInt(eventId) }
             );
+
+            // Invalidate events cache
+            cache.invalidatePattern('events:');
 
             context.res = {
                 status: 200,
@@ -259,6 +286,9 @@ module.exports = async function (context, req) {
                 WHERE ID = @id AND neType = 'E'
             `;
             await execute(deleteQuery, { id: parseInt(id) });
+
+            // Invalidate events cache
+            cache.invalidatePattern('events:');
 
             context.res = {
                 status: 200,

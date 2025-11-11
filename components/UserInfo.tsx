@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { getLogoutUrl } from '../lib/auth';
 
 interface UserClaim {
   typ: string;
@@ -19,6 +20,7 @@ export default function UserInfo() {
   const [user, setUser] = useState<UserPrincipal | null>(null);
   const [loading, setLoading] = useState(true);
   const [pictureUrl, setPictureUrl] = useState<string | null>(null);
+  const [dropdownOpen, setDropdownOpen] = useState(false);
 
   useEffect(() => {
     fetch('/.auth/me')
@@ -45,6 +47,20 @@ export default function UserInfo() {
       .catch(() => setLoading(false));
   }, []);
 
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      if (!target.closest('.user-menu-wrapper')) {
+        setDropdownOpen(false);
+      }
+    };
+    if (dropdownOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => document.removeEventListener('mousedown', handleClickOutside);
+    }
+  }, [dropdownOpen]);
+
   if (loading) return null;
   if (!user) return null;
 
@@ -62,8 +78,21 @@ export default function UserInfo() {
   };
 
   return (
-    <div className="user-info">
-      <span className="user-name">
+    <div className="user-menu-wrapper" style={{ position: 'relative' }}>
+      <button
+        onClick={() => setDropdownOpen(!dropdownOpen)}
+        style={{
+          background: 'transparent',
+          border: 'none',
+          color: 'white',
+          cursor: 'pointer',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '8px',
+          padding: '0.5rem',
+          fontSize: '14px',
+        }}
+      >
         {pictureUrl ? (
           <img 
             src={pictureUrl} 
@@ -72,20 +101,60 @@ export default function UserInfo() {
               width: '28px',
               height: '28px',
               borderRadius: '50%',
-              marginRight: '8px',
-              verticalAlign: 'middle',
               objectFit: 'cover'
             }}
             onError={() => setPictureUrl(null)}
           />
         ) : (
-          <span style={{ marginRight: '4px' }}>{getProviderIcon()}</span>
+          <span>{getProviderIcon()}</span>
         )}
-        {user.userDetails}
-      </span>
-      <a href="/.auth/logout?post_logout_redirect_uri=/login.html" className="logout-link">
-        Sign Out
-      </a>
+        <span>{user.userDetails}</span>
+        <span style={{ fontSize: '10px' }}>▼</span>
+      </button>
+
+      {dropdownOpen && (
+        <div style={{
+          position: 'absolute',
+          top: '100%',
+          right: 0,
+          marginTop: '0.5rem',
+          background: 'white',
+          borderRadius: '8px',
+          boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
+          minWidth: '200px',
+          zIndex: 1000,
+        }}>
+          <a
+            href={getLogoutUrl()}
+            style={{
+              display: 'block',
+              padding: '0.75rem 1rem',
+              color: '#333',
+              textDecoration: 'none',
+              borderBottom: '1px solid #f0f0f0',
+              transition: 'background 0.2s',
+            }}
+            onMouseOver={(e) => e.currentTarget.style.background = '#f8f9fa'}
+            onMouseOut={(e) => e.currentTarget.style.background = 'white'}
+          >
+            🔄 Sign in as Different User
+          </a>
+          <a
+            href={getLogoutUrl()}
+            style={{
+              display: 'block',
+              padding: '0.75rem 1rem',
+              color: '#dc3545',
+              textDecoration: 'none',
+              transition: 'background 0.2s',
+            }}
+            onMouseOver={(e) => e.currentTarget.style.background = '#f8f9fa'}
+            onMouseOut={(e) => e.currentTarget.style.background = 'white'}
+          >
+            🚪 Sign Out
+          </a>
+        </div>
+      )}
     </div>
   );
 }
