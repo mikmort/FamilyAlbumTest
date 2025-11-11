@@ -154,7 +154,8 @@ export default function Home() {
     console.log('handleMediaClick called with:', {
       fileName: media.PFileName,
       blobUrl: media.PBlobUrl,
-      type: media.PType
+      type: media.PType,
+      event: media.Event // Add event to debug log
     });
     setSelectedMedia(media);
     setMediaList(allMedia);
