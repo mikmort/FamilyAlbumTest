@@ -1506,10 +1506,13 @@ module.exports = async function (context, req) {
                 const currentEventResult = await query(currentEventQuery, { filename: dbFileName });
                 const currentEventID = currentEventResult.length > 0 ? currentEventResult[0].npID : null;
                 
-                context.log('Current event ID:', currentEventID, 'New event ID:', eventID);
+                // Normalize eventID: treat empty string or null as no event
+                const normalizedEventID = eventID || null;
+                
+                context.log('Current event ID:', currentEventID, 'New event ID:', normalizedEventID);
 
                 // If event changed, update NamePhoto table
-                if (currentEventID !== eventID) {
+                if (currentEventID !== normalizedEventID) {
                     eventChanged = true;
                     
                     // Remove old event if exists
@@ -1520,15 +1523,27 @@ module.exports = async function (context, req) {
                         `;
                         await execute(deleteEventQuery, { filename: dbFileName, eventID: currentEventID });
                         context.log('Removed old event:', currentEventID);
+                        
+                        // Update old event count
+                        await execute(`
+                            UPDATE NameEvent
+                            SET neCount = (
+                                SELECT COUNT(*)
+                                FROM NamePhoto
+                                WHERE npID = @eventID
+                            )
+                            WHERE ID = @eventID
+                        `, { eventID: currentEventID });
+                        context.log('Updated count for old event:', currentEventID);
                     }
                     
                     // Add new event if provided
-                    if (eventID) {
+                    if (normalizedEventID) {
                         // Verify the event exists and is type 'E'
                         const eventCheckQuery = `
                             SELECT ID FROM dbo.NameEvent WHERE ID = @eventID AND neType = 'E'
                         `;
-                        const eventCheck = await query(eventCheckQuery, { eventID });
+                        const eventCheck = await query(eventCheckQuery, { eventID: normalizedEventID });
                         
                         if (eventCheck.length === 0) {
                             context.res = {
@@ -1542,8 +1557,20 @@ module.exports = async function (context, req) {
                             INSERT INTO dbo.NamePhoto (npID, npFileName)
                             VALUES (@eventID, @filename)
                         `;
-                        await execute(insertEventQuery, { eventID, filename: dbFileName });
-                        context.log('Added new event:', eventID);
+                        await execute(insertEventQuery, { eventID: normalizedEventID, filename: dbFileName });
+                        context.log('Added new event:', normalizedEventID);
+                        
+                        // Update new event count
+                        await execute(`
+                            UPDATE NameEvent
+                            SET neCount = (
+                                SELECT COUNT(*)
+                                FROM NamePhoto
+                                WHERE npID = @eventID
+                            )
+                            WHERE ID = @eventID
+                        `, { eventID: normalizedEventID });
+                        context.log('Updated count for new event:', normalizedEventID);
                     }
                 }
             }
