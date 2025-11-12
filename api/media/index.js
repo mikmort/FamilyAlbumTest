@@ -1550,7 +1550,12 @@ module.exports = async function (context, req) {
 
             // Handle event updates
             let eventChanged = false;
+            const eventDebugLog = []; // Collect debug info for response
+            
             if (eventID !== undefined) {
+                eventDebugLog.push('EVENT UPDATE START');
+                eventDebugLog.push(`Received eventID: ${eventID} (type: ${typeof eventID})`);
+                
                 context.log('=== EVENT UPDATE START ===');
                 context.log('Processing event update:', { 
                     receivedEventID: eventID, 
@@ -1572,6 +1577,10 @@ module.exports = async function (context, req) {
                 // Normalize eventID: treat empty string or null as no event
                 const normalizedEventID = eventID || null;
                 
+                eventDebugLog.push(`Current event ID: ${currentEventID}`);
+                eventDebugLog.push(`Normalized event ID: ${normalizedEventID}`);
+                eventDebugLog.push(`Will update: ${currentEventID !== normalizedEventID}`);
+                
                 context.log('Event comparison:', { 
                     currentEventID, 
                     normalizedEventID,
@@ -1582,15 +1591,18 @@ module.exports = async function (context, req) {
                 if (currentEventID !== normalizedEventID) {
                     context.log('=== EVENT CHANGED - UPDATING ===');
                     eventChanged = true;
+                    eventDebugLog.push('Event changed - starting update process');
                     
                     // Remove old event if exists
                     if (currentEventID) {
+                        eventDebugLog.push(`Deleting old event association: npFileName=${dbFileName}, npID=${currentEventID}`);
                         const deleteEventQuery = `
                             DELETE FROM dbo.NamePhoto
                             WHERE npFileName = @filename AND npID = @eventID
                         `;
                         await execute(deleteEventQuery, { filename: dbFileName, eventID: currentEventID });
                         context.log('Removed old event:', currentEventID);
+                        eventDebugLog.push(`Deleted old event association successfully`);
                         
                         // Update old event count
                         await execute(`
@@ -1603,10 +1615,13 @@ module.exports = async function (context, req) {
                             WHERE ID = @eventID
                         `, { eventID: currentEventID });
                         context.log('Updated count for old event:', currentEventID);
+                        eventDebugLog.push(`Updated neCount for old event ${currentEventID}`);
                     }
                     
                     // Add new event if provided
                     if (normalizedEventID) {
+                        eventDebugLog.push(`Adding new event: ID=${normalizedEventID}`);
+                        
                         // Verify the event exists and is type 'E'
                         const eventCheckQuery = `
                             SELECT ID FROM dbo.NameEvent WHERE ID = @eventID AND neType = 'E'
@@ -1614,6 +1629,7 @@ module.exports = async function (context, req) {
                         const eventCheck = await query(eventCheckQuery, { eventID: normalizedEventID });
                         
                         if (eventCheck.length === 0) {
+                            eventDebugLog.push(`ERROR: Event ID ${normalizedEventID} not found or not type 'E'`);
                             context.res = {
                                 status: 400,
                                 body: { error: 'Invalid event ID' }
@@ -1627,6 +1643,7 @@ module.exports = async function (context, req) {
                         `;
                         await execute(insertEventQuery, { eventID: normalizedEventID, filename: dbFileName });
                         context.log('Added new event:', normalizedEventID);
+                        eventDebugLog.push(`Inserted new event association: npID=${normalizedEventID}, npFileName=${dbFileName}`);
                         
                         // Update new event count
                         await execute(`
@@ -1639,25 +1656,31 @@ module.exports = async function (context, req) {
                             WHERE ID = @eventID
                         `, { eventID: normalizedEventID });
                         context.log('Updated count for new event:', normalizedEventID);
+                        eventDebugLog.push(`Updated neCount for new event ${normalizedEventID}`);
                     }
                     
                     // Also update PPeopleList to maintain consistency with original design
                     // PPeopleList should contain: [eventID (if exists), ...personIDs]
+                    eventDebugLog.push('=== UPDATING PPeopleList ===');
                     context.log('=== UPDATING PPeopleList ===');
                     const getCurrentPPeopleListQuery = `SELECT PPeopleList FROM dbo.Pictures WHERE PFileName = @filename`;
                     const currentPPeopleListResult = await query(getCurrentPPeopleListQuery, { filename: dbFileName });
                     const currentPPeopleList = currentPPeopleListResult[0]?.PPeopleList || '';
                     
                     context.log('Current PPeopleList from DB:', currentPPeopleList);
+                    eventDebugLog.push(`Current PPeopleList from DB: "${currentPPeopleList}"`);
                     
                     // Parse current PPeopleList
                     const currentIds = currentPPeopleList.split(',').map(s => s.trim()).filter(Boolean).map(id => parseInt(id));
                     context.log('Parsed currentIds:', currentIds);
+                    eventDebugLog.push(`Parsed currentIds: [${currentIds.join(', ')}]`);
                     context.log('Removing old event ID:', currentEventID);
+                    eventDebugLog.push(`Removing old event ID: ${currentEventID}`);
                     
                     // Remove old event ID from list (events have IDs in NameEvent with neType='E')
                     const peopleOnlyIds = currentIds.filter(id => id !== currentEventID);
                     context.log('People-only IDs after removing event:', peopleOnlyIds);
+                    eventDebugLog.push(`People-only IDs after removing event: [${peopleOnlyIds.join(', ')}]`);
                     
                     // Add new event ID at the beginning if provided
                     const newPPeopleList = normalizedEventID 
@@ -1665,7 +1688,9 @@ module.exports = async function (context, req) {
                         : peopleOnlyIds.join(',');
                     
                     context.log('NEW PPeopleList:', newPPeopleList);
+                    eventDebugLog.push(`NEW PPeopleList: "${newPPeopleList}"`);
                     context.log('Executing UPDATE query...');
+                    eventDebugLog.push('Executing UPDATE Pictures SET PPeopleList...');
                     
                     await execute(`
                         UPDATE dbo.Pictures
@@ -1675,8 +1700,10 @@ module.exports = async function (context, req) {
                     `, { filename: dbFileName, peopleList: newPPeopleList });
                     
                     context.log('✅ PPeopleList updated successfully');
+                    eventDebugLog.push('✅ PPeopleList UPDATE executed successfully');
                 }
                 context.log('=== EVENT UPDATE END ===');
+                eventDebugLog.push('=== EVENT UPDATE END ===');
             }
 
             if (updates.length === 0 && !eventChanged) {
@@ -1751,11 +1778,23 @@ module.exports = async function (context, req) {
                 mediaData.Event = null;
             }
 
+            // Add debug info to response for troubleshooting
+            const debugInfo = {
+                receivedEventID: eventID,
+                eventIDType: typeof eventID,
+                normalizedEventID: eventID || null,
+                eventChanged: eventChanged,
+                currentPPeopleList: mediaData.PPeopleList,
+                eventInResponse: mediaData.Event,
+                eventDebugLog: eventDebugLog
+            };
+
             context.res = {
                 status: 200,
                 body: {
                     success: true,
-                    media: mediaData
+                    media: mediaData,
+                    _debug: debugInfo // Add debug info to response
                 }
             };
             return;
