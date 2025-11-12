@@ -209,16 +209,22 @@ async function processBatch(context, batchSize) {
                     fullBlobPath = `media/${blobPath}`;
                 }
 
+                context.log(`Checking blob: ${fullBlobPath}`);
+                context.log(`  PFileName: ${image.PFileName}`);
+                context.log(`  PFileDirectory: ${image.PFileDirectory || 'NULL'}`);
+
                 // Check if blob exists
                 const blobClient = containerClient.getBlockBlobClient(fullBlobPath);
                 const exists = await blobClient.exists();
                 
                 if (!exists) {
-                    context.log.warn(`Blob not found: ${fullBlobPath}`);
+                    context.log.warn(`❌ Blob not found: ${fullBlobPath}`);
                     batchProgress.skipped++;
                     batchProgress.processed++;
                     continue;
                 }
+                
+                context.log(`✅ Blob exists: ${fullBlobPath}`);
 
                 // Download the image
                 const downloadResponse = await blobClient.download();
