@@ -55,7 +55,7 @@ module.exports = async function (context, req) {
                 AND PBlobUrl IS NOT NULL
             `);
 
-            const count = result.recordset[0]?.count || 0;
+            const count = result[0]?.count || 0;
 
             context.res = {
                 status: 200,
