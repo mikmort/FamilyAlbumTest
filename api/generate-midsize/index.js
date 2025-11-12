@@ -109,8 +109,8 @@ module.exports = async function (context, req) {
                 return;
             }
 
-            // Get batch size from request (default 50, max 200)
-            const batchSize = Math.min(req.body?.batchSize || 50, 200);
+            // Get batch size from request (default 50, max 10000 for "process all")
+            const batchSize = Math.min(req.body?.batchSize || 50, 10000);
 
             // Start batch processing (async)
             processBatch(context, batchSize);

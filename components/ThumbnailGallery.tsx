@@ -116,6 +116,9 @@ function ThumbnailGallery({
   onNavigateHome,
 }: ThumbnailGalleryProps) {
   const [retryCount, setRetryCount] = useState(0);
+  const [allMedia, setAllMedia] = useState<MediaItem[]>([]);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const [hasMore, setHasMore] = useState(false);
 
   // Memoize the query string to prevent unnecessary re-fetches
   const queryString = useMemo(() => {
@@ -139,9 +142,9 @@ function ThumbnailGallery({
     return params.toString();
   }, [peopleIds, eventId, noPeople, sortOrder, exclusiveFilter, recentDays]);
 
-  // Use SWR for data fetching with caching
-  const { data: media, error, isLoading, mutate } = useSWR<MediaItem[]>(
-    `/api/media?${queryString}`,
+  // Initial fetch with limit=100 for fast initial load
+  const { data: initialMedia, error, isLoading, mutate } = useSWR<MediaItem[]>(
+    `/api/media?${queryString}&limit=100`,
     fetcher,
     {
       revalidateOnFocus: false,
@@ -149,6 +152,45 @@ function ThumbnailGallery({
       dedupingInterval: 5000, // Dedupe requests within 5 seconds
     }
   );
+
+  // When initial data loads, fetch all remaining items in background
+  useEffect(() => {
+    if (initialMedia && initialMedia.length > 0) {
+      // Set initial media immediately for fast perceived performance
+      setAllMedia(initialMedia);
+      
+      // Check if there might be more items (if we got exactly 100, likely more exist)
+      if (initialMedia.length === 100) {
+        setHasMore(true);
+        setIsLoadingMore(true);
+        
+        // Fetch all items in background
+        const fetchAll = async () => {
+          try {
+            const response = await fetch(`/api/media?${queryString}`);
+            if (response.ok) {
+              const allItems = await response.json();
+              // Only update if we got more items than initially
+              if (allItems.length > initialMedia.length) {
+                setAllMedia(allItems);
+                console.log(`📊 Progressive load: ${initialMedia.length} → ${allItems.length} items`);
+              }
+            }
+          } catch (err) {
+            console.warn('Background fetch failed:', err);
+          } finally {
+            setIsLoadingMore(false);
+            setHasMore(false);
+          }
+        };
+        
+        // Small delay to ensure initial render is smooth
+        setTimeout(fetchAll, 100);
+      } else {
+        setHasMore(false);
+      }
+    }
+  }, [initialMedia, queryString]);
 
   // Detect if error is a warmup/timeout error
   const isWarmingUp = useMemo(() => {
@@ -170,15 +212,15 @@ function ThumbnailGallery({
       thumbnailUrl: item.PThumbnailUrl,
       type: item.PType
     });
-    onMediaClick(item, media || []);
-  }, [media, onMediaClick]);
+    onMediaClick(item, allMedia || []);
+  }, [allMedia, onMediaClick]);
 
   const handleMediaContextMenu = useCallback((e: React.MouseEvent, item: MediaItem) => {
     e.preventDefault(); // Prevent default context menu
     if (onMediaFullscreen) {
-      onMediaFullscreen(item, media || []);
+      onMediaFullscreen(item, allMedia || []);
     }
-  }, [media, onMediaFullscreen]);
+  }, [allMedia, onMediaFullscreen]);
 
   if (isLoading) {
     return (
@@ -228,7 +270,11 @@ function ThumbnailGallery({
     );
   }
 
-  if (!media || media.length === 0) {
+  if (!allMedia || allMedia.length === 0) {
+    // Still loading or no results
+    if (isLoading) {
+      return null; // Loading state handled above
+    }
     return (
       <div className="card text-center">
         <h2>No Photos Found</h2>
@@ -303,12 +349,13 @@ function ThumbnailGallery({
 
       <div className="card mb-2">
         <p>
-          <strong>{media.length}</strong> photo{media.length !== 1 ? 's' : ''} found
+          <strong>{allMedia.length}</strong> photo{allMedia.length !== 1 ? 's' : ''} found
+          {isLoadingMore && <span style={{ marginLeft: '10px', color: '#666', fontSize: '0.9em' }}>Loading more...</span>}
         </p>
       </div>
 
       <div className="thumbnail-gallery">
-        {media.map((item) => (
+        {allMedia.map((item: MediaItem) => (
           <ThumbnailItem
             key={item.PFileName}
             item={item}

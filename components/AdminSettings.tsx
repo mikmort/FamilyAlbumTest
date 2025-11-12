@@ -964,7 +964,7 @@ export default function AdminSettings({ onRequestsChange }: AdminSettingsProps) 
           </button>
 
           <button
-            onClick={() => startMidsizeGeneration(200)}
+            onClick={() => startMidsizeGeneration(9999)}
             disabled={isGeneratingMidsize || !midsizeStatus || midsizeStatus.filesNeedingMidsize === 0}
             style={{
               padding: '10px 20px',
@@ -976,7 +976,7 @@ export default function AdminSettings({ onRequestsChange }: AdminSettingsProps) 
               fontSize: '1rem'
             }}
           >
-            {isGeneratingMidsize ? '⏳ Processing...' : '▶️▶️ Process 200 Images (Large Batch)'}
+            {isGeneratingMidsize ? '⏳ Processing...' : '▶️▶️ Process All Images'}
           </button>
 
           <button
