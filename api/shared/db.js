@@ -17,8 +17,6 @@ const config = {
     max: 10, // Maximum connections
     min: 2,  // Keep 2 connections alive
     idleTimeoutMillis: 60000, // 60 seconds (increased since no auto-pause on Basic tier)
-    acquireTimeoutMillis: 15000, // 15 seconds to acquire connection from pool
-    evictionRunIntervalMillis: 30000, // Check for idle connections every 30 seconds
   },
 };
 
