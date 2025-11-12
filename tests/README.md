@@ -126,7 +126,18 @@ For detailed setup, see:
 
 ## Continuous Integration
 
-Tests run automatically in GitHub Actions on push and pull requests.
+**Note:** Automatic test runs in GitHub Actions are **disabled** because:
+- Tests require a running dev server (Next.js + Azure Functions)
+- Setting up the full environment in CI is complex and time-consuming
+- Tests can be run manually when needed or locally during development
+
+### Manual CI Test Runs
+To run tests in GitHub Actions:
+1. Go to GitHub → Actions → "Playwright Tests" workflow
+2. Click "Run workflow"
+3. Select branch and run
+
+Tests run automatically on push and pull requests in local development.
 
 See `.github/workflows/playwright.yml` for the CI configuration.
 
