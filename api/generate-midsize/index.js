@@ -162,6 +162,8 @@ async function processBatch(context, batchSize) {
         // Get images that need midsize versions
         // Note: Don't filter by dimensions here since many images have NULL width/height
         // Let the processing logic check actual image size
+        // Note: Don't filter by PBlobUrl IS NOT NULL - older images don't have this field populated
+        // The processing logic will construct the blob path from PFileDirectory + PFileName
         const result = await query(`
             SELECT TOP ${batchSize}
                 PFileName,
@@ -170,7 +172,6 @@ async function processBatch(context, batchSize) {
             FROM Pictures
             WHERE PType = 1 
             AND PMidsizeUrl IS NULL
-            AND PBlobUrl IS NOT NULL
             ORDER BY PDateEntered DESC
         `);
 
