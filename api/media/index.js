@@ -895,6 +895,7 @@ module.exports = async function (context, req) {
                         
                         const npRows = await query(npQuery, npParams);
                         context.log(`Found ${npRows.length} NamePhoto event associations`);
+                        context.log('NamePhoto event rows:', JSON.stringify(npRows.slice(0, 5))); // Log first 5 for debugging
                         
                         // Add these event IDs to candidateIds so they get looked up in NameEvent
                         const npEventIds = new Set();
