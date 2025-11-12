@@ -19,7 +19,8 @@
     "setup:env": "node scripts/setup-env.js",
     "setup:api-env": "node scripts/setup-api-env.js",
     "setup:agent": "node scripts/setup-coding-agent.js",
-    "test:setup": "node scripts/setup-env.js && npm test"
+    "test:setup": "node scripts/setup-env.js && npm test",
+    "check:python-api": "node scripts/check-python-api.js"
   },
   "dependencies": {
     "@azure/storage-blob": "^12.29.1",

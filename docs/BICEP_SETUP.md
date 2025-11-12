@@ -57,8 +57,8 @@ Add secret: `AZURE_STATIC_WEB_APPS_API_TOKEN` (value from deployment)
 ## What Gets Deployed
 
 - **Resource Group**: `familyalbum-prod-rg`
-- **SQL Server**: Serverless (0.5-2 vCores, auto-pause)
-- **SQL Database**: 10GB, auto-backup
+- **SQL Server**: Basic tier (always-on, 2GB)
+- **SQL Database**: 2GB, auto-backup
 - **Storage Account**: 40GB+, lifecycle management
 - **Static Web App**: Free tier with MSA auth
 
@@ -78,10 +78,10 @@ Add secret: `AZURE_STATIC_WEB_APPS_API_TOKEN` (value from deployment)
 
 | Service | Monthly Cost |
 |---------|--------------|
-| SQL Database (Serverless) | $10-20 |
+| SQL Database (Basic) | ~$5 |
 | Blob Storage (40GB) | $2-4 |
 | Static Web App | $0 |
-| **Total** | **$12-24** |
+| **Total** | **$7-9** |
 
 ## Ready to Deploy?
 

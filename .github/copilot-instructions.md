@@ -389,7 +389,7 @@ test.describe('Feature Name', () => {
 ### Database Connection Issues
 - Check environment variables in `.env.local`
 - Verify firewall rules allow your IP
-- Ensure database is not paused (serverless tier)
+- Test database connectivity from Azure portal
 - Check SQL credentials are correct
 
 ### Authentication Issues

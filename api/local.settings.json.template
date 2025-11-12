@@ -15,7 +15,9 @@
     
     "DEV_MODE": "true",
     "DEV_USER_EMAIL": "dev@example.com",
-    "DEV_USER_ROLE": "Admin"
+    "DEV_USER_ROLE": "Admin",
+    
+    "PYTHON_FUNCTION_APP_URL": "http://localhost:7072"
   },
   "Host": {
     "LocalHttpPort": 7071,

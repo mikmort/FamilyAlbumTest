@@ -216,6 +216,22 @@ module.exports = async function (context, req) {
         // For new uploads without directory structure, just use the filename
         const apiUrl = `/api/media/${fileName}`;
         const apiThumbUrl = `/api/media/${fileName}?thumbnail=true`;
+        
+        // Check if midsize version exists (for images >1MB that were resized)
+        let apiMidsizeUrl = null;
+        if (mediaType === 1) {
+            const fileExt = fileName.substring(fileName.lastIndexOf('.'));
+            const midsizeFileName = `${fileName.substring(0, fileName.lastIndexOf('.'))}-midsize${fileExt}`;
+            const midsizeBlobName = `media/${midsizeFileName}`;
+            const midsizeBlobClient = containerClient.getBlockBlobClient(midsizeBlobName);
+            const midsizeExists = await midsizeBlobClient.exists();
+            if (midsizeExists) {
+                apiMidsizeUrl = `/api/media/${midsizeFileName}`;
+                context.log(`✓ Midsize version found: ${apiMidsizeUrl}`);
+            } else {
+                context.log(`No midsize version found for ${fileName}`);
+            }
+        }
 
         let thumbnailUrl = null;
         let width = 0;
@@ -399,9 +415,9 @@ module.exports = async function (context, req) {
         // Add to UnindexedFiles table for processing
         const insertQuery = `
             INSERT INTO dbo.UnindexedFiles 
-                (uiFileName, uiDirectory, uiThumbUrl, uiType, uiWidth, uiHeight, uiVtime, uiStatus, uiBlobUrl, uiMonth, uiYear, uiUploadedBy)
+                (uiFileName, uiDirectory, uiThumbUrl, uiType, uiWidth, uiHeight, uiVtime, uiStatus, uiBlobUrl, uiMonth, uiYear, uiUploadedBy, uiMidsizeUrl)
             VALUES 
-                (@fileName, @directory, @thumbUrl, @type, @width, @height, @duration, 'N', @blobUrl, @month, @year, @uploadedBy)
+                (@fileName, @directory, @thumbUrl, @type, @width, @height, @duration, 'N', @blobUrl, @month, @year, @uploadedBy, @midsizeUrl)
         `;
 
         const insertParams = {
@@ -416,6 +432,7 @@ module.exports = async function (context, req) {
             month: month,
             year: year,
             uploadedBy: authResult.user?.Email || null,  // Track who uploaded (note: capital E from DB)
+            midsizeUrl: apiMidsizeUrl, // NEW: midsize URL for progressive loading
         };
         
         context.log('📝 ============ FINAL INSERT PARAMETERS ============');

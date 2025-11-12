@@ -54,10 +54,19 @@ export default function AdminSettings({ onRequestsChange }: AdminSettingsProps) 
   const [newEmail, setNewEmail] = useState('');
   const [newRole, setNewRole] = useState<'Admin' | 'Full' | 'Read'>('Read');
   const [newNotes, setNewNotes] = useState('');
+  
+  // Midsize generation state
+  const [midsizeStatus, setMidsizeStatus] = useState<{
+    filesNeedingMidsize: number;
+    message: string;
+  } | null>(null);
+  const [midsizeProgress, setMidsizeProgress] = useState<any>(null);
+  const [isGeneratingMidsize, setIsGeneratingMidsize] = useState(false);
 
   useEffect(() => {
     fetchUsers();
     fetchPendingRequests();
+    fetchMidsizeStatus();
     checkForIncompleteSession();
   }, []);
 
@@ -110,6 +119,63 @@ export default function AdminSettings({ onRequestsChange }: AdminSettingsProps) 
     } catch (err) {
       console.error('Error loading pending requests:', err);
     }
+  };
+
+  const fetchMidsizeStatus = async () => {
+    try {
+      const response = await fetch('/api/generate-midsize');
+      const data = await response.json();
+      setMidsizeStatus(data);
+    } catch (err) {
+      console.error('Error loading midsize status:', err);
+    }
+  };
+
+  const startMidsizeGeneration = async (batchSize: number = 50) => {
+    try {
+      setIsGeneratingMidsize(true);
+      const response = await fetch('/api/generate-midsize/batch', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ batchSize })
+      });
+      
+      const data = await response.json();
+      
+      if (response.ok) {
+        alert(`Batch processing started! Processing ${batchSize} images. Check progress below.`);
+        // Poll for progress
+        pollMidsizeProgress();
+      } else {
+        alert(`Error: ${data.error}`);
+        setIsGeneratingMidsize(false);
+      }
+    } catch (err: any) {
+      console.error('Error starting midsize generation:', err);
+      alert(`Error: ${err.message}`);
+      setIsGeneratingMidsize(false);
+    }
+  };
+
+  const pollMidsizeProgress = async () => {
+    const pollInterval = setInterval(async () => {
+      try {
+        const response = await fetch('/api/generate-midsize/progress');
+        const data = await response.json();
+        setMidsizeProgress(data);
+        
+        if (!data.isRunning) {
+          clearInterval(pollInterval);
+          setIsGeneratingMidsize(false);
+          // Refresh status
+          fetchMidsizeStatus();
+        }
+      } catch (err) {
+        console.error('Error polling progress:', err);
+        clearInterval(pollInterval);
+        setIsGeneratingMidsize(false);
+      }
+    }, 2000); // Poll every 2 seconds
   };
 
   const addUser = async () => {
@@ -816,6 +882,123 @@ export default function AdminSettings({ onRequestsChange }: AdminSettingsProps) 
             )}
           </div>
         )}
+      </div>
+
+      {/* Midsize Image Generation Section */}
+      <div className="card" style={{ marginBottom: '2rem', background: '#f0fff4', borderColor: '#28a745' }}>
+        <h2 style={{ marginTop: 0 }}>🖼️ Midsize Image Generation</h2>
+        <p style={{ color: '#666', marginBottom: '1rem' }}>
+          Generate 1080px midsize versions for existing large images (&gt;1MB) to improve loading performance.
+          New uploads automatically create midsize versions.
+        </p>
+
+        {midsizeStatus && (
+          <div style={{ 
+            padding: '1rem', 
+            background: midsizeStatus.filesNeedingMidsize > 0 ? '#fff3cd' : '#d4edda',
+            borderRadius: '4px',
+            marginBottom: '1rem',
+            border: `1px solid ${midsizeStatus.filesNeedingMidsize > 0 ? '#ffc107' : '#28a745'}`
+          }}>
+            <p style={{ margin: 0, fontWeight: 'bold' }}>
+              📊 {midsizeStatus.filesNeedingMidsize} images need midsize versions
+            </p>
+          </div>
+        )}
+
+        {midsizeProgress && (
+          <div style={{
+            padding: '1rem',
+            background: '#e7f3ff',
+            borderRadius: '4px',
+            marginBottom: '1rem',
+            border: '1px solid #007bff'
+          }}>
+            <h3 style={{ marginTop: 0, marginBottom: '0.5rem' }}>
+              {midsizeProgress.isRunning ? '⏳ Processing...' : '✅ Complete'}
+            </h3>
+            <div style={{ marginBottom: '0.5rem' }}>
+              <strong>Progress:</strong> {midsizeProgress.processed} / {midsizeProgress.total}
+            </div>
+            <div style={{ marginBottom: '0.5rem' }}>
+              <strong>✓ Succeeded:</strong> {midsizeProgress.succeeded} | 
+              <strong style={{ marginLeft: '1rem' }}>✗ Failed:</strong> {midsizeProgress.failed} |
+              <strong style={{ marginLeft: '1rem' }}>⊘ Skipped:</strong> {midsizeProgress.skipped}
+            </div>
+            {midsizeProgress.errors && midsizeProgress.errors.length > 0 && (
+              <details style={{ marginTop: '0.5rem' }}>
+                <summary style={{ cursor: 'pointer', color: '#dc3545' }}>
+                  View {midsizeProgress.errors.length} error(s)
+                </summary>
+                <ul style={{ marginTop: '0.5rem', fontSize: '0.9rem' }}>
+                  {midsizeProgress.errors.slice(0, 10).map((err: any, idx: number) => (
+                    <li key={idx}>
+                      <strong>{err.fileName}:</strong> {err.error}
+                    </li>
+                  ))}
+                  {midsizeProgress.errors.length > 10 && (
+                    <li>... and {midsizeProgress.errors.length - 10} more</li>
+                  )}
+                </ul>
+              </details>
+            )}
+          </div>
+        )}
+
+        <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+          <button
+            onClick={() => startMidsizeGeneration(50)}
+            disabled={isGeneratingMidsize || !midsizeStatus || midsizeStatus.filesNeedingMidsize === 0}
+            style={{
+              padding: '10px 20px',
+              backgroundColor: isGeneratingMidsize || !midsizeStatus || midsizeStatus.filesNeedingMidsize === 0 ? '#ccc' : '#28a745',
+              color: 'white',
+              border: 'none',
+              borderRadius: '4px',
+              cursor: isGeneratingMidsize || !midsizeStatus || midsizeStatus.filesNeedingMidsize === 0 ? 'not-allowed' : 'pointer',
+              fontSize: '1rem',
+              fontWeight: 'bold'
+            }}
+          >
+            {isGeneratingMidsize ? '⏳ Processing...' : '▶️ Process 50 Images'}
+          </button>
+
+          <button
+            onClick={() => startMidsizeGeneration(200)}
+            disabled={isGeneratingMidsize || !midsizeStatus || midsizeStatus.filesNeedingMidsize === 0}
+            style={{
+              padding: '10px 20px',
+              backgroundColor: isGeneratingMidsize || !midsizeStatus || midsizeStatus.filesNeedingMidsize === 0 ? '#ccc' : '#17a2b8',
+              color: 'white',
+              border: 'none',
+              borderRadius: '4px',
+              cursor: isGeneratingMidsize || !midsizeStatus || midsizeStatus.filesNeedingMidsize === 0 ? 'not-allowed' : 'pointer',
+              fontSize: '1rem'
+            }}
+          >
+            {isGeneratingMidsize ? '⏳ Processing...' : '▶️▶️ Process 200 Images (Large Batch)'}
+          </button>
+
+          <button
+            onClick={fetchMidsizeStatus}
+            disabled={isGeneratingMidsize}
+            style={{
+              padding: '10px 20px',
+              backgroundColor: '#6c757d',
+              color: 'white',
+              border: 'none',
+              borderRadius: '4px',
+              cursor: isGeneratingMidsize ? 'not-allowed' : 'pointer'
+            }}
+          >
+            🔄 Refresh Status
+          </button>
+        </div>
+
+        <p style={{ marginTop: '1rem', fontSize: '0.9rem', color: '#666', fontStyle: 'italic' }}>
+          ⚠️ Note: Processing creates 1080px versions and uploads them to blob storage. 
+          This operation may take several minutes for large batches. Progress updates every 2 seconds.
+        </p>
       </div>
 
       {/* Pending Requests Section */}

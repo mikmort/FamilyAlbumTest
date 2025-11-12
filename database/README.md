@@ -170,4 +170,4 @@ node scripts/get-schema.js
 ### Database connection issues?
 - Check `api/local.settings.json` for correct credentials
 - Verify firewall rules allow your IP
-- Ensure database is not paused (serverless tier)
+- Test connectivity from Azure portal

@@ -155,6 +155,7 @@ module.exports = async function (context, req) {
         people, // Array of person IDs
         blobUrl,
         thumbUrl,
+        midsizeUrl, // NEW: midsize URL for progressive loading
         type,
         width,
         height,
@@ -166,6 +167,7 @@ module.exports = async function (context, req) {
       if (directory) directory = directory.replace(/\\/g, '/');
       if (blobUrl) blobUrl = blobUrl.replace(/\\/g, '/');
       if (thumbUrl) thumbUrl = thumbUrl.replace(/\\/g, '/');
+      if (midsizeUrl) midsizeUrl = midsizeUrl.replace(/\\/g, '/');
 
       if (!uiID || !fileName) {
         context.res = {
@@ -186,12 +188,12 @@ module.exports = async function (context, req) {
           INSERT INTO Pictures (
             PFileName, PFileDirectory, PDescription, PMonth, PYear,
             PPeopleList, PNameCount, PThumbnailUrl, PType, PTime,
-            PBlobUrl, PReviewed, PDateEntered, PLastModifiedDate
+            PBlobUrl, PReviewed, PDateEntered, PLastModifiedDate, PMidsizeUrl
           )
           VALUES (
             @fileName, @directory, @description, @month, @year,
             @peopleList, @nameCount, @thumbUrl, @type, @time,
-            @blobUrl, @reviewed, GETDATE(), GETDATE()
+            @blobUrl, @reviewed, GETDATE(), GETDATE(), @midsizeUrl
           )
         `, {
           fileName,
@@ -205,7 +207,8 @@ module.exports = async function (context, req) {
           type: type || 1,
           time: vtime || 0,
           blobUrl: blobUrl || '',
-          reviewed: 1
+          reviewed: 1,
+          midsizeUrl: midsizeUrl || null // NEW: progressive loading support
         });
 
         // 2. Insert into NamePhoto for each tagged person (or "No Tagged People")

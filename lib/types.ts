@@ -30,6 +30,7 @@ export interface MediaItem {
   PPeopleList: string;
   PNameCount: number;
   PThumbnailUrl: string;
+  PMidsizeUrl?: string | null; // 1080px version for progressive loading
   PType: number; // 1=image, 2=video
   PTime: number;
   PDateEntered: Date;
@@ -47,6 +48,7 @@ export interface UnindexedFile {
   uiFileName: string;
   uiDirectory: string;
   uiThumbUrl: string;
+  uiMidsizeUrl?: string | null; // 1080px version for progressive loading
   uiType: number; // 1=image, 2=video
   uiWidth: number;
   uiHeight: number;

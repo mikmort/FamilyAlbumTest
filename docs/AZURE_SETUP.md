@@ -12,7 +12,7 @@ This guide walks you through setting up all Azure resources needed for the Famil
    - **Region**: Choose closest to you (e.g., `East US`, `West Europe`)
 4. Click "Review + Create" > "Create"
 
-## Step 2: Create Azure SQL Database (Serverless)
+## Step 2: Create Azure SQL Database (Basic Tier)
 
 ### Create Server and Database
 
@@ -31,13 +31,8 @@ This guide walks you through setting up all Azure resources needed for the Famil
 
 4. **Compute + storage**:
    - Click "Configure database"
-   - **Service tier**: Select "General Purpose"
-   - **Compute tier**: Select "Serverless"
-   - **Hardware Configuration**: Select standard-series (Gen5)
-   - **Min vCores**: 0.5
-   - **Max vCores**: 2
-   - **Auto-pause delay**: 60 minutes (1 hour)
-   - **Data max size**: 5 GB (increase if needed)
+   - **Service tier**: Select "Basic"
+   - **Data max size**: 2 GB (sufficient for metadata)
    - Click "Apply"
 
 5. **Networking tab**:
@@ -194,18 +189,18 @@ Based on minimal usage (10-20 users, 5GB photos, 100 page views/month):
 
 | Service | Configuration | Estimated Monthly Cost |
 |---------|--------------|----------------------|
-| Azure SQL Database | Serverless, 0.5-2 vCores, auto-pause 1hr | $5-15 |
+| Azure SQL Database | Basic tier, always-on, 2GB | ~$5 |
 | Azure Blob Storage | Standard LRS, 5GB hot tier | $0.50-1 |
 | Azure Static Web Apps | Free tier, <100GB bandwidth | $0 |
-| **Total** | | **$5.50-16** |
+| **Total** | | **$5.50-6** |
 
 ### Cost Saving Tips
 
 1. **SQL Database**:
-   - Set auto-pause to 60 minutes
-   - Use serverless tier (pauses when idle)
-   - Keep max vCores at 2 or lower
-   - Enable auto-pause during known idle times
+   - Basic tier provides predictable costs (~$5/month)
+   - No cold start delays (always-on)
+   - 2GB storage is sufficient for metadata
+   - Upgrade to Standard tier if you need more storage or performance
 
 2. **Blob Storage**:
    - Use lifecycle management to move old photos to Cool tier after 90 days
@@ -263,7 +258,7 @@ Based on minimal usage (10-20 users, 5GB photos, 100 page views/month):
 
 ## Support Resources
 
-- [Azure SQL Database Serverless](https://docs.microsoft.com/en-us/azure/azure-sql/database/serverless-tier-overview)
+- [Azure SQL Database Pricing](https://azure.microsoft.com/pricing/details/azure-sql-database/single/)
 - [Azure Blob Storage Pricing](https://azure.microsoft.com/en-us/pricing/details/storage/blobs/)
 - [Azure Static Web Apps Documentation](https://docs.microsoft.com/en-us/azure/static-web-apps/)
 - [Next.js on Azure](https://docs.microsoft.com/en-us/azure/static-web-apps/deploy-nextjs)

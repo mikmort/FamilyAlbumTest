@@ -1007,11 +1007,16 @@ module.exports = async function (context, req) {
                     const thumbnailUrl = item.PThumbnailUrl 
                         ? item.PThumbnailUrl 
                         : `/api/media/${encodedBlobPath}?thumbnail=true`;
+                    
+                    // Add midsize URL for progressive loading (1080px version)
+                    // Midsize URLs are stored in PMidsizeUrl column for images >1MB
+                    const midsizeUrl = item.PMidsizeUrl || null;
 
                     return {
                         ...item,
                         PBlobUrl: `/api/media/${encodedBlobPath}`,
                         PThumbnailUrl: thumbnailUrl,
+                        PMidsizeUrl: midsizeUrl,
                         TaggedPeople: orderedTagged,
                         Event: eventForItem
                     };

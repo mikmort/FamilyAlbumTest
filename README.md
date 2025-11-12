@@ -33,7 +33,7 @@ A comprehensive family photo and video management web application built with Nex
 
 - **Frontend**: Next.js 14 with TypeScript and React
 - **API**: Next.js API Routes (serverless functions)
-- **Database**: Azure SQL Database (Serverless tier for cost savings)
+- **Database**: Azure SQL Database (Basic tier, always-on)
 - **Storage**: Azure Blob Storage for media files and thumbnails
 - **Hosting**: Azure Static Web Apps (free tier available)
 - **Face Recognition**: face-api.js with TensorFlow.js (browser-based, privacy-friendly)
@@ -232,10 +232,10 @@ npm run build
 
 This application is designed to be cost-effective for small family use:
 
-1. **Azure SQL Serverless**: 
-   - Automatically pauses when not in use
-   - Estimated cost: $5-15/month with minimal usage
-   - Set auto-pause delay to 1 hour
+1. **Azure SQL Basic Tier**: 
+   - Always-on database (no cold start delays)
+   - Fixed cost: ~$5/month
+   - 2 GB database storage (sufficient for metadata)
 
 2. **Azure Blob Storage**:
    - Standard LRS tier
@@ -246,7 +246,7 @@ This application is designed to be cost-effective for small family use:
    - Free tier available (100GB bandwidth/month)
    - Perfect for small family applications
 
-4. **Total Estimated Cost**: $5-20/month for a family of 10-20 users
+4. **Total Estimated Cost**: $5-10/month for a family of 10-20 users
 
 ## Database Schema
 
@@ -307,7 +307,7 @@ The following features are planned for future releases:
 ### Database Connection Issues
 - Verify firewall rules allow your IP
 - Check connection string format
-- Ensure database is not paused (serverless tier)
+- Test database connectivity from Azure portal
 
 ### Storage Upload Failures
 - Verify storage account access key

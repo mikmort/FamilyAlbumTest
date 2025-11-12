@@ -61,7 +61,7 @@ resource sqlFirewallAll 'Microsoft.Sql/servers/firewallRules@2023-05-01-preview'
   }
 }
 
-// Azure SQL Database (Serverless) - Optimized for 20 users
+// Azure SQL Database (Basic Tier) - Always on, ~$5/month
 resource sqlDatabase 'Microsoft.Sql/servers/databases@2023-05-01-preview' = {
   parent: sqlServer
   name: sqlDatabaseName
@@ -71,21 +71,17 @@ resource sqlDatabase 'Microsoft.Sql/servers/databases@2023-05-01-preview' = {
     Environment: environment
   }
   sku: {
-    name: 'GP_S_Gen5'
-    tier: 'GeneralPurpose'
-    family: 'Gen5'
-    capacity: 2 // Max vCores (can scale down to 0.5)
+    name: 'Basic'
+    tier: 'Basic'
   }
   properties: {
     collation: 'SQL_Latin1_General_CP1_CI_AS'
-    maxSizeBytes: 10737418240 // 10 GB (sufficient for metadata, actual media in blob storage)
+    maxSizeBytes: 2147483648 // 2 GB (sufficient for metadata, actual media in blob storage)
     catalogCollation: 'SQL_Latin1_General_CP1_CI_AS'
     zoneRedundant: false
     readScale: 'Disabled'
-    autoPauseDelay: 60 // Auto-pause after 60 minutes of inactivity
     requestedBackupStorageRedundancy: 'Local'
     isLedgerOn: false
-    minCapacity: json('0.5') // Min vCores when active
   }
 }
 

@@ -9,12 +9,16 @@ const config = {
     encrypt: true,
     trustServerCertificate: false,
     enableArithAbort: true,
-    requestTimeout: 15000, // 15 seconds
+    requestTimeout: 30000, // 30 seconds (increased for Basic tier - no auto-pause delays)
+    connectionTimeout: 15000, // 15 seconds to establish connection
+    abortTransactionOnError: true,
   },
   pool: {
-    max: 10,
-    min: 2, // Keep 2 connections alive to avoid cold starts
-    idleTimeoutMillis: 30000,
+    max: 10, // Maximum connections
+    min: 2,  // Keep 2 connections alive
+    idleTimeoutMillis: 60000, // 60 seconds (increased since no auto-pause on Basic tier)
+    acquireTimeoutMillis: 15000, // 15 seconds to acquire connection from pool
+    evictionRunIntervalMillis: 30000, // Check for idle connections every 30 seconds
   },
 };
 

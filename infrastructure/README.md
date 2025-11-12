@@ -4,7 +4,7 @@ This directory contains Infrastructure as Code (IaC) using Azure Bicep templates
 
 ## Architecture Overview
 
-- **Azure SQL Database (Serverless)**: Auto-pausing, 0.5-2 vCores, 10GB
+- **Azure SQL Database (Basic)**: Always-on, 2GB
 - **Azure Blob Storage**: Standard LRS, Hot tier, 40GB+ capacity
 - **Azure Static Web App**: Free tier with MSA authentication
 - **Region**: East US (optimized for your location)
@@ -261,10 +261,10 @@ Create `staticwebapp.config.json` in your project root:
 
 The Bicep templates include several cost optimizations:
 
-1. **SQL Database Serverless**
-   - Auto-pauses after 60 minutes
-   - Scales down to 0.5 vCores
-   - Estimated: $10-20/month with moderate usage
+1. **SQL Database Basic Tier**
+   - Always-on (no cold start delays)
+   - Predictable fixed cost
+   - Estimated: ~$5/month
 
 2. **Blob Storage Lifecycle**
    - Moves files to Cool tier after 90 days
@@ -275,7 +275,7 @@ The Bicep templates include several cost optimizations:
    - 100GB bandwidth/month (sufficient for 20 users)
    - $0/month
 
-**Total Estimated Cost: $11-23/month**
+**Total Estimated Cost: $6-8/month**
 
 ## Monitoring and Alerts
 

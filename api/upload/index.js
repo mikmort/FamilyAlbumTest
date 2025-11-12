@@ -1,5 +1,5 @@
 const { execute, query } = require('../shared/db');
-const { uploadBlob } = require('../shared/storage');
+const { uploadBlob, deleteBlob } = require('../shared/storage');
 const sharp = require('sharp');
 const ffmpeg = require('fluent-ffmpeg');
 const ffmpegPath = require('@ffmpeg-installer/ffmpeg').path;
@@ -7,7 +7,7 @@ const { Readable } = require('stream');
 
 ffmpeg.setFfmpegPath(ffmpegPath);
 
-// Version: 2.0 - AVI to MP4 conversion with uppercase extension fix
+// Version: 2.1 - Added midsize image generation for files >1MB
 /**
  * Check if filename exists and generate Windows-style duplicate name if needed
  * E.g., IMG_5033.jpg -> IMG_5033 (1).jpg -> IMG_5033 (2).jpg
@@ -252,17 +252,21 @@ module.exports = async function (context, req) {
         const mediaType = actualContentType.startsWith('image/') ? 1 : 2; // 1=image, 2=video
 
         let thumbnailUrl = null;
+        let midsizeUrl = null; // NEW: midsize image URL
         let blobUrl = null;
         let width = 0;
         let height = 0;
         let duration = 0;
 
-        // Process images: fix orientation and create thumbnail
+        // Process images: fix orientation, create thumbnail, and create midsize if >1MB
         if (mediaType === 1) {
             try {
                 // First, check original metadata to log orientation
                 const originalMetadata = await sharp(buffer).metadata();
                 context.log(`Original image EXIF orientation: ${originalMetadata.orientation || 'none'}, dimensions: ${originalMetadata.width}x${originalMetadata.height}`);
+                
+                const originalSizeMB = buffer.length / (1024 * 1024);
+                context.log(`Original image size: ${originalSizeMB.toFixed(2)} MB`);
 
                 // Create the full-size rotated image FIRST
                 const rotatedBuffer = await sharp(buffer, { failOnError: false })
@@ -276,6 +280,40 @@ module.exports = async function (context, req) {
                 height = metadata.height || 0;
 
                 context.log(`Full image after rotation - dimensions: ${width}x${height}, orientation: ${metadata.orientation || 'undefined'}`);
+
+                // NEW: Create midsize version if image >1MB and dimensions >1080px
+                const shouldCreateMidsize = originalSizeMB > 1 && (width > 1080 || height > 1080);
+                if (shouldCreateMidsize) {
+                    context.log(`Creating midsize version (image >1MB and dimensions >1080px)`);
+                    
+                    const midsizeBuffer = await sharp(rotatedBuffer)
+                        .resize(1080, 1080, {
+                            fit: 'inside',
+                            withoutEnlargement: true
+                        })
+                        .jpeg({ quality: 85, mozjpeg: true })
+                        .toBuffer();
+                    
+                    const midsizeMetadata = await sharp(midsizeBuffer).metadata();
+                    const midsizeSizeMB = midsizeBuffer.length / (1024 * 1024);
+                    context.log(`Midsize image created - dimensions: ${midsizeMetadata.width}x${midsizeMetadata.height}, size: ${midsizeSizeMB.toFixed(2)} MB`);
+                    
+                    // Prepare midsize filename
+                    const fileExt = uniqueFilename.substring(uniqueFilename.lastIndexOf('.'));
+                    const midsizeFilename = `${uniqueFilename.substring(0, uniqueFilename.lastIndexOf('.'))}-midsize${fileExt}`;
+                    const midsizeBlobPath = `media/${midsizeFilename}`;
+                    
+                    // Upload midsize
+                    context.log(`Uploading midsize as: ${midsizeFilename}`);
+                    midsizeUrl = await uploadBlob(
+                        midsizeBlobPath,
+                        midsizeBuffer,
+                        'image/jpeg'
+                    );
+                    context.log(`✅ Midsize uploaded to: ${midsizeUrl}`);
+                } else {
+                    context.log(`Skipping midsize creation (size: ${originalSizeMB.toFixed(2)}MB, dimensions: ${width}x${height})`);
+                }
 
                 // Now create thumbnail FROM THE ROTATED BUFFER (not from original)
                 // This way the thumbnail is created from an already-rotated image
@@ -454,7 +492,7 @@ module.exports = async function (context, req) {
         context.res = {
             status: 201,
             headers: {
-                'X-Upload-Version': '2.0-AVI-FIX',
+                'X-Upload-Version': '2.1-MIDSIZE',
                 'X-Original-Filename': fileName,
                 'X-Final-Filename': uniqueFilename
             },
@@ -462,7 +500,8 @@ module.exports = async function (context, req) {
                 success: true,
                 fileName: uniqueFilename,
                 blobUrl,
-                thumbnailUrl
+                thumbnailUrl,
+                midsizeUrl // NEW: include midsize URL in response
             }
         };
 

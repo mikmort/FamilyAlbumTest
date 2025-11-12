@@ -28,6 +28,13 @@ export default function MediaDetailModal({
   const [showNavigationArrows, setShowNavigationArrows] = useState(false);
   const [isLoadingMedia, setIsLoadingMedia] = useState(false);
   
+  // Progressive loading: Show midsize first, then swap to full resolution
+  const [currentImageSrc, setCurrentImageSrc] = useState<string>(() => {
+    // Use midsize URL if available, otherwise full resolution
+    return media.PMidsizeUrl || media.PBlobUrl;
+  });
+  const [isLoadingFullRes, setIsLoadingFullRes] = useState(false);
+  
   const [description, setDescription] = useState(media.PDescription || '');
   const [month, setMonth] = useState<number | ''>(media.PMonth || '');
   const [year, setYear] = useState<number | ''>(media.PYear || '');
@@ -70,6 +77,34 @@ export default function MediaDetailModal({
       setCurrentEventName(null);
     }
   }, [media.Event]);
+  
+  // Progressive loading effect: Load full resolution in background
+  useEffect(() => {
+    // Only for images with midsize URLs
+    if (media.PType === 1 && media.PMidsizeUrl && media.PMidsizeUrl !== media.PBlobUrl) {
+      // Start with midsize
+      setCurrentImageSrc(media.PMidsizeUrl);
+      setIsLoadingFullRes(true);
+      
+      // Preload full resolution in background
+      const fullResImg = new Image();
+      fullResImg.onload = () => {
+        // Seamlessly swap to full resolution
+        setCurrentImageSrc(media.PBlobUrl);
+        setIsLoadingFullRes(false);
+      };
+      fullResImg.onerror = () => {
+        // If full res fails, keep midsize
+        console.warn('Failed to load full resolution, keeping midsize');
+        setIsLoadingFullRes(false);
+      };
+      fullResImg.src = media.PBlobUrl;
+    } else {
+      // No midsize, use full resolution directly
+      setCurrentImageSrc(media.PBlobUrl);
+      setIsLoadingFullRes(false);
+    }
+  }, [media.PFileName, media.PBlobUrl, media.PMidsizeUrl, media.PType]);
   
   const [allPeople, setAllPeople] = useState<Person[]>([]);
   const [allEvents, setAllEvents] = useState<Event[]>([]);
@@ -805,7 +840,7 @@ export default function MediaDetailModal({
               </div>
             ) : (
               <img 
-                src={media.PBlobUrl} 
+                src={currentImageSrc} 
                 alt={media.PDescription || media.PFileName}
                 className="fullscreen-image"
                 onError={() => setImageError(true)}
@@ -1028,13 +1063,13 @@ export default function MediaDetailModal({
                 </div>
               ) : (
                 <img 
-                  src={media.PBlobUrl} 
+                  src={currentImageSrc} 
                   alt={media.PDescription || media.PFileName}
                   onClick={() => setIsFullScreen(true)}
                   style={{ cursor: 'pointer' }}
                   onError={(e) => {
                     console.error('Image load error:', media.PFileName);
-                    console.error('Image URL:', media.PBlobUrl);
+                    console.error('Image URL:', currentImageSrc);
                     setImageError(true);
                   }}
                   onLoad={() => setIsLoadingMedia(false)}
