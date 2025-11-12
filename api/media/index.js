@@ -1551,7 +1551,13 @@ module.exports = async function (context, req) {
             // Handle event updates
             let eventChanged = false;
             if (eventID !== undefined) {
-                context.log('Processing event update:', { currentEventID: eventID });
+                context.log('=== EVENT UPDATE START ===');
+                context.log('Processing event update:', { 
+                    receivedEventID: eventID, 
+                    type: typeof eventID,
+                    isNull: eventID === null,
+                    isEmpty: eventID === ''
+                });
                 
                 // Get current event for this photo (events have neType='E')
                 const currentEventQuery = `
@@ -1566,10 +1572,15 @@ module.exports = async function (context, req) {
                 // Normalize eventID: treat empty string or null as no event
                 const normalizedEventID = eventID || null;
                 
-                context.log('Current event ID:', currentEventID, 'New event ID:', normalizedEventID);
+                context.log('Event comparison:', { 
+                    currentEventID, 
+                    normalizedEventID,
+                    willUpdate: currentEventID !== normalizedEventID 
+                });
 
                 // If event changed, update NamePhoto table
                 if (currentEventID !== normalizedEventID) {
+                    context.log('=== EVENT CHANGED - UPDATING ===');
                     eventChanged = true;
                     
                     // Remove old event if exists
@@ -1632,22 +1643,29 @@ module.exports = async function (context, req) {
                     
                     // Also update PPeopleList to maintain consistency with original design
                     // PPeopleList should contain: [eventID (if exists), ...personIDs]
+                    context.log('=== UPDATING PPeopleList ===');
                     const getCurrentPPeopleListQuery = `SELECT PPeopleList FROM dbo.Pictures WHERE PFileName = @filename`;
                     const currentPPeopleListResult = await query(getCurrentPPeopleListQuery, { filename: dbFileName });
                     const currentPPeopleList = currentPPeopleListResult[0]?.PPeopleList || '';
                     
+                    context.log('Current PPeopleList from DB:', currentPPeopleList);
+                    
                     // Parse current PPeopleList
                     const currentIds = currentPPeopleList.split(',').map(s => s.trim()).filter(Boolean).map(id => parseInt(id));
+                    context.log('Parsed currentIds:', currentIds);
+                    context.log('Removing old event ID:', currentEventID);
                     
                     // Remove old event ID from list (events have IDs in NameEvent with neType='E')
                     const peopleOnlyIds = currentIds.filter(id => id !== currentEventID);
+                    context.log('People-only IDs after removing event:', peopleOnlyIds);
                     
                     // Add new event ID at the beginning if provided
                     const newPPeopleList = normalizedEventID 
                         ? [normalizedEventID, ...peopleOnlyIds].join(',')
                         : peopleOnlyIds.join(',');
                     
-                    context.log('Updating PPeopleList from', currentPPeopleList, 'to', newPPeopleList);
+                    context.log('NEW PPeopleList:', newPPeopleList);
+                    context.log('Executing UPDATE query...');
                     
                     await execute(`
                         UPDATE dbo.Pictures
@@ -1655,7 +1673,10 @@ module.exports = async function (context, req) {
                             PLastModifiedDate = GETDATE()
                         WHERE PFileName = @filename
                     `, { filename: dbFileName, peopleList: newPPeopleList });
+                    
+                    context.log('✅ PPeopleList updated successfully');
                 }
+                context.log('=== EVENT UPDATE END ===');
             }
 
             if (updates.length === 0 && !eventChanged) {
