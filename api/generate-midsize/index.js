@@ -175,7 +175,7 @@ async function processBatch(context, batchSize) {
             ORDER BY PDateEntered DESC
         `);
 
-        const images = result.recordset;
+        const images = result || [];
         batchProgress.total = images.length;
 
         context.log(`Found ${images.length} images to process`);
