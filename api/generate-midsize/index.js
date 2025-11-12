@@ -160,18 +160,17 @@ async function processBatch(context, batchSize) {
         context.log(`Starting batch midsize generation (batch size: ${batchSize})...`);
 
         // Get images that need midsize versions
+        // Note: Don't filter by dimensions here since many images have NULL width/height
+        // Let the processing logic check actual image size
         const result = await query(`
             SELECT TOP ${batchSize}
                 PFileName,
                 PFileDirectory,
-                PBlobUrl,
-                PWidth,
-                PHeight
+                PBlobUrl
             FROM Pictures
             WHERE PType = 1 
             AND PMidsizeUrl IS NULL
             AND PBlobUrl IS NOT NULL
-            AND (PWidth > 1080 OR PHeight > 1080)
             ORDER BY PDateEntered DESC
         `);
 
