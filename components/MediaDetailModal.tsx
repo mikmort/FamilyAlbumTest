@@ -35,6 +35,9 @@ export default function MediaDetailModal({
   });
   const [isLoadingFullRes, setIsLoadingFullRes] = useState(false);
   
+  // Store image dimensions to prevent layout shift
+  const [imageDimensions, setImageDimensions] = useState<{width: number, height: number} | null>(null);
+  
   const [description, setDescription] = useState(media.PDescription || '');
   const [month, setMonth] = useState<number | ''>(media.PMonth || '');
   const [year, setYear] = useState<number | ''>(media.PYear || '');
@@ -86,23 +89,44 @@ export default function MediaDetailModal({
       setCurrentImageSrc(media.PMidsizeUrl);
       setIsLoadingFullRes(true);
       
-      // Preload full resolution in background
-      const fullResImg = new Image();
-      fullResImg.onload = () => {
-        // Seamlessly swap to full resolution
-        setCurrentImageSrc(media.PBlobUrl);
-        setIsLoadingFullRes(false);
+      // Preload the midsize to get dimensions first
+      const midsizeImg = new Image();
+      midsizeImg.onload = () => {
+        // Store dimensions from midsize image
+        setImageDimensions({
+          width: midsizeImg.naturalWidth,
+          height: midsizeImg.naturalHeight
+        });
+        
+        // Now preload full resolution in background
+        const fullResImg = new Image();
+        fullResImg.onload = () => {
+          // Seamlessly swap to full resolution (dimensions already set)
+          setCurrentImageSrc(media.PBlobUrl);
+          setIsLoadingFullRes(false);
+        };
+        fullResImg.onerror = () => {
+          // If full res fails, keep midsize
+          console.warn('Failed to load full resolution, keeping midsize');
+          setIsLoadingFullRes(false);
+        };
+        fullResImg.src = media.PBlobUrl;
       };
-      fullResImg.onerror = () => {
-        // If full res fails, keep midsize
-        console.warn('Failed to load full resolution, keeping midsize');
-        setIsLoadingFullRes(false);
-      };
-      fullResImg.src = media.PBlobUrl;
+      midsizeImg.src = media.PMidsizeUrl;
     } else {
-      // No midsize, use full resolution directly
+      // No midsize, use full resolution directly and get its dimensions
       setCurrentImageSrc(media.PBlobUrl);
       setIsLoadingFullRes(false);
+      
+      // Still need to get dimensions for layout stability
+      const img = new Image();
+      img.onload = () => {
+        setImageDimensions({
+          width: img.naturalWidth,
+          height: img.naturalHeight
+        });
+      };
+      img.src = media.PBlobUrl;
     }
   }, [media.PFileName, media.PBlobUrl, media.PMidsizeUrl, media.PType]);
   
@@ -846,6 +870,13 @@ export default function MediaDetailModal({
                 onError={() => setImageError(true)}
                 onLoad={() => setIsLoadingMedia(false)}
                 key={media.PFileName}
+                style={imageDimensions ? {
+                  width: imageDimensions.width,
+                  height: imageDimensions.height,
+                  maxWidth: '95vw',
+                  maxHeight: '95vh',
+                  objectFit: 'contain'
+                } : undefined}
               />
             )
           ) : (
@@ -1066,7 +1097,14 @@ export default function MediaDetailModal({
                   src={currentImageSrc} 
                   alt={media.PDescription || media.PFileName}
                   onClick={() => setIsFullScreen(true)}
-                  style={{ cursor: 'pointer' }}
+                  style={imageDimensions ? {
+                    cursor: 'pointer',
+                    width: imageDimensions.width,
+                    height: imageDimensions.height,
+                    maxWidth: '100%',
+                    maxHeight: '75vh',
+                    objectFit: 'contain'
+                  } : { cursor: 'pointer' }}
                   onError={(e) => {
                     console.error('Image load error:', media.PFileName);
                     console.error('Image URL:', currentImageSrc);

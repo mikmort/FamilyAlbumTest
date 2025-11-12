@@ -302,6 +302,8 @@ button {
   height: auto;
   max-height: 75vh;
   object-fit: contain;
+  /* Smooth transition when swapping from midsize to full resolution */
+  transition: opacity 0.15s ease-in-out;
 }
 
 .metadata-panel {
@@ -554,6 +556,8 @@ button {
   max-height: 95vh;
   object-fit: contain;
   cursor: default;
+  /* Smooth transition when swapping from midsize to full resolution */
+  transition: opacity 0.15s ease-in-out;
 }
 
 /* Navigation Arrows - Fullscreen */
