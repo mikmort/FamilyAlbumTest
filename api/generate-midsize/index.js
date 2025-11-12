@@ -187,9 +187,12 @@ async function processBatch(context, batchSize) {
                 context.log(`Processing: ${image.PFileName}`);
 
                 // Construct blob path
+                // Note: PFileDirectory uses backslashes (e.g., "Family Pictures\Calendar2021")
+                // but Azure blob storage uses forward slashes
                 let blobPath = image.PFileName;
                 if (image.PFileDirectory) {
-                    blobPath = `${image.PFileDirectory}/${image.PFileName}`;
+                    const directory = image.PFileDirectory.replace(/\\/g, '/');
+                    blobPath = `${directory}/${image.PFileName}`;
                 }
                 
                 // Try with and without media/ prefix
