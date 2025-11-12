@@ -47,12 +47,12 @@ module.exports = async function (context, req) {
             }
 
             // Query for large images without midsize URLs
+            // Note: Don't filter by PBlobUrl - old images don't have this field populated
             const result = await query(`
                 SELECT COUNT(*) as count
                 FROM Pictures
                 WHERE PType = 1 
                 AND PMidsizeUrl IS NULL
-                AND PBlobUrl IS NOT NULL
             `);
 
             const count = result[0]?.count || 0;
