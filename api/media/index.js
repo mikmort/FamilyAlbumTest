@@ -1629,6 +1629,32 @@ module.exports = async function (context, req) {
                         `, { eventID: normalizedEventID });
                         context.log('Updated count for new event:', normalizedEventID);
                     }
+                    
+                    // Also update PPeopleList to maintain consistency with original design
+                    // PPeopleList should contain: [eventID (if exists), ...personIDs]
+                    const getCurrentPPeopleListQuery = `SELECT PPeopleList FROM dbo.Pictures WHERE PFileName = @filename`;
+                    const currentPPeopleListResult = await query(getCurrentPPeopleListQuery, { filename: dbFileName });
+                    const currentPPeopleList = currentPPeopleListResult[0]?.PPeopleList || '';
+                    
+                    // Parse current PPeopleList
+                    const currentIds = currentPPeopleList.split(',').map(s => s.trim()).filter(Boolean).map(id => parseInt(id));
+                    
+                    // Remove old event ID from list (events have IDs in NameEvent with neType='E')
+                    const peopleOnlyIds = currentIds.filter(id => id !== currentEventID);
+                    
+                    // Add new event ID at the beginning if provided
+                    const newPPeopleList = normalizedEventID 
+                        ? [normalizedEventID, ...peopleOnlyIds].join(',')
+                        : peopleOnlyIds.join(',');
+                    
+                    context.log('Updating PPeopleList from', currentPPeopleList, 'to', newPPeopleList);
+                    
+                    await execute(`
+                        UPDATE dbo.Pictures
+                        SET PPeopleList = @peopleList,
+                            PLastModifiedDate = GETDATE()
+                        WHERE PFileName = @filename
+                    `, { filename: dbFileName, peopleList: newPPeopleList });
                 }
             }
 
