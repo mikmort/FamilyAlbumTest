@@ -13,6 +13,7 @@ interface ThumbnailGalleryProps {
   recentDays?: number | null;
   peopleNames?: string[];
   eventName?: string | null;
+  updatedMedia?: MediaItem | null; // Updated media item from modal
   onMediaClick: (media: MediaItem, allMedia: MediaItem[]) => void;
   onMediaFullscreen?: (media: MediaItem, allMedia: MediaItem[]) => void;
   onNavigateHome?: () => void;
@@ -111,6 +112,7 @@ function ThumbnailGallery({
   recentDays,
   peopleNames,
   eventName,
+  updatedMedia,
   onMediaClick,
   onMediaFullscreen,
   onNavigateHome,
@@ -191,6 +193,18 @@ function ThumbnailGallery({
       }
     }
   }, [initialMedia, queryString]);
+
+  // Update allMedia when an item is updated externally (e.g., from modal)
+  useEffect(() => {
+    if (updatedMedia) {
+      setAllMedia(prevMedia => 
+        prevMedia.map(item => 
+          item.PFileName === updatedMedia.PFileName ? updatedMedia : item
+        )
+      );
+      console.log(`📝 ThumbnailGallery: Updated ${updatedMedia.PFileName} with event:`, updatedMedia.Event);
+    }
+  }, [updatedMedia]);
 
   // Detect if error is a warmup/timeout error
   const isWarmingUp = useMemo(() => {

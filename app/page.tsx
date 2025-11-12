@@ -48,6 +48,7 @@ export default function Home() {
   const [selectedMedia, setSelectedMedia] = useState<MediaItem | null>(null);
   const [startFullscreen, setStartFullscreen] = useState(false);
   const [mediaList, setMediaList] = useState<MediaItem[]>([]);
+  const [lastUpdatedMedia, setLastUpdatedMedia] = useState<MediaItem | null>(null);
   const [showSettingsMenu, setShowSettingsMenu] = useState(false);
 
   // Wake up database immediately on mount (before auth check)
@@ -336,6 +337,7 @@ export default function Home() {
               recentDays={recentDays}
               peopleNames={selectedPeopleNames}
               eventName={selectedEventName}
+              updatedMedia={lastUpdatedMedia}
               onMediaClick={handleMediaClick}
               onMediaFullscreen={handleMediaFullscreen}
               onNavigateHome={() => setView('home')}
@@ -417,6 +419,8 @@ export default function Home() {
               );
               // Update selectedMedia so it has the latest data
               setSelectedMedia(updatedMedia);
+              // Notify ThumbnailGallery to update its cache
+              setLastUpdatedMedia(updatedMedia);
             }}
             onMediaChange={setSelectedMedia}
             startFullscreen={startFullscreen}

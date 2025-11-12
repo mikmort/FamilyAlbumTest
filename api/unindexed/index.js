@@ -256,7 +256,37 @@ module.exports = async function (context, req) {
           `);
         }
 
-        // 4. Mark unindexed file as processed
+        // 4. Insert event if provided
+        if (eventID) {
+          context.log('Adding event:', eventID);
+          // Verify the event exists and is type 'E'
+          const eventCheck = await query(`
+            SELECT ID FROM NameEvent WHERE ID = @eventID AND neType = 'E'
+          `, { eventID });
+          
+          if (eventCheck.length > 0) {
+            await execute(`
+              INSERT INTO NamePhoto (npID, npFileName)
+              VALUES (@eventID, @fileName)
+            `, { eventID, fileName });
+            context.log('Event added successfully');
+            
+            // Update event count
+            await execute(`
+              UPDATE NameEvent
+              SET neCount = (
+                SELECT COUNT(*)
+                FROM NamePhoto
+                WHERE npID = @eventID
+              )
+              WHERE ID = @eventID
+            `, { eventID });
+          } else {
+            context.log('Warning: Invalid event ID provided:', eventID);
+          }
+        }
+
+        // 5. Mark unindexed file as processed
         await execute(`
           UPDATE UnindexedFiles
           SET uiStatus = 'P'
