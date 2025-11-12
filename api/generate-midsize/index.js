@@ -188,25 +188,19 @@ async function processBatch(context, batchSize) {
 
                 // Construct blob path
                 // Two formats in database:
-                // 1. New uploads: PFileName is just filename, use PFileDirectory if present
-                // 2. Old uploads: PFileName contains full path (e.g., "Family Pictures/Calendar2021/IMG.jpg")
-                let blobPath;
+                // 1. New uploads: PFileName is just filename, stored in media/ folder
+                // 2. Old uploads: PFileName contains full path (e.g., "Albums/IMG.jpg"), stored at root
+                let fullBlobPath;
                 if (image.PFileName.includes('/')) {
-                    // Old format - PFileName already has full path with forward slashes
-                    blobPath = image.PFileName;
+                    // Old format - PFileName already has full path, stored at container root
+                    fullBlobPath = image.PFileName;
                 } else if (image.PFileDirectory) {
                     // New format with directory - convert backslashes to forward slashes
                     const directory = image.PFileDirectory.replace(/\\/g, '/');
-                    blobPath = `${directory}/${image.PFileName}`;
+                    fullBlobPath = `media/${directory}/${image.PFileName}`;
                 } else {
-                    // New format without directory
-                    blobPath = image.PFileName;
-                }
-                
-                // Add media/ prefix if not already present
-                let fullBlobPath = blobPath;
-                if (!blobPath.startsWith('media/')) {
-                    fullBlobPath = `media/${blobPath}`;
+                    // New format without directory - stored in media/ folder
+                    fullBlobPath = `media/${image.PFileName}`;
                 }
 
                 context.log(`Checking blob: ${fullBlobPath}`);
