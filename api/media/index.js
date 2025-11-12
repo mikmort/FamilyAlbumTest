@@ -964,11 +964,31 @@ module.exports = async function (context, req) {
                     }
                     
                     // If no event found in PPeopleList, check the NamePhoto event lookup that was built earlier
-                    if (!eventForItem && item.PFileName && npEventLookup[item.PFileName]) {
-                        const npEventId = npEventLookup[item.PFileName];
-                        const eventLookupData = eventLookup[npEventId];
-                        if (eventLookupData) {
-                            eventForItem = { ID: eventLookupData.ID, neName: eventLookupData.neName };
+                    if (!eventForItem && item.PFileName) {
+                        // Try multiple filename variants for matching
+                        const variants = [
+                            item.PFileName,
+                            item.PFileName.replace(/\//g, '\\'),
+                            item.PFileName.replace(/\\/g, '/'),
+                            `${item.PFileDirectory}/${item.PFileName}`.replace(/\\/g, '/'),
+                            `${item.PFileDirectory}\\${item.PFileName}`.replace(/\//g, '\\')
+                        ];
+                        
+                        for (const variant of variants) {
+                            if (npEventLookup[variant]) {
+                                const npEventId = npEventLookup[variant];
+                                const eventLookupData = eventLookup[npEventId];
+                                if (eventLookupData) {
+                                    eventForItem = { ID: eventLookupData.ID, neName: eventLookupData.neName };
+                                    context.log(`✅ Event matched for ${item.PFileName} using variant: ${variant}`);
+                                    break;
+                                }
+                            }
+                        }
+                        
+                        if (!eventForItem) {
+                            context.log(`❌ No event match for ${item.PFileName}, tried variants:`, variants);
+                            context.log('Available npEventLookup keys (first 10):', Object.keys(npEventLookup).slice(0, 10));
                         }
                     }
 
