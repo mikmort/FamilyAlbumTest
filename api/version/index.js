@@ -4,8 +4,8 @@
  */
 module.exports = async function (context, req) {
   const version = {
-    version: "1.0.0",
-    buildDate: "2025-11-09T09:20:00Z", // Updated on each deployment
+    version: "1.0.1",
+    buildDate: "2025-11-12T17:00:00Z", // Updated on each deployment
     commit: process.env.GITHUB_SHA || "local-dev",
     environment: process.env.AZURE_FUNCTIONS_ENVIRONMENT || "local",
     nodeVersion: process.version,
@@ -13,7 +13,8 @@ module.exports = async function (context, req) {
       databaseWarmupHandling: true,
       faceTrainingOptimization: true,
       maxPhotosLimit: 5000,
-      sasUrlBatchSize: 50
+      sasUrlBatchSize: 50,
+      midsizeImageSupport: true
     }
   };
 
