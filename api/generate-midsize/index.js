@@ -187,15 +187,23 @@ async function processBatch(context, batchSize) {
                 context.log(`Processing: ${image.PFileName}`);
 
                 // Construct blob path
-                // Note: PFileDirectory uses backslashes (e.g., "Family Pictures\Calendar2021")
-                // but Azure blob storage uses forward slashes
-                let blobPath = image.PFileName;
-                if (image.PFileDirectory) {
+                // Two formats in database:
+                // 1. New uploads: PFileName is just filename, use PFileDirectory if present
+                // 2. Old uploads: PFileName contains full path (e.g., "Family Pictures/Calendar2021/IMG.jpg")
+                let blobPath;
+                if (image.PFileName.includes('/')) {
+                    // Old format - PFileName already has full path with forward slashes
+                    blobPath = image.PFileName;
+                } else if (image.PFileDirectory) {
+                    // New format with directory - convert backslashes to forward slashes
                     const directory = image.PFileDirectory.replace(/\\/g, '/');
                     blobPath = `${directory}/${image.PFileName}`;
+                } else {
+                    // New format without directory
+                    blobPath = image.PFileName;
                 }
                 
-                // Try with and without media/ prefix
+                // Add media/ prefix if not already present
                 let fullBlobPath = blobPath;
                 if (!blobPath.startsWith('media/')) {
                     fullBlobPath = `media/${blobPath}`;
