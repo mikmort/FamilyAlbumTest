@@ -871,12 +871,7 @@ export default function MediaDetailModal({
                 onLoad={() => setIsLoadingMedia(false)}
                 key={media.PFileName}
                 style={imageDimensions ? {
-                  aspectRatio: `${imageDimensions.width} / ${imageDimensions.height}`,
-                  maxWidth: '95vw',
-                  maxHeight: '95vh',
-                  width: 'auto',
-                  height: 'auto',
-                  objectFit: 'contain'
+                  aspectRatio: `${imageDimensions.width} / ${imageDimensions.height}`
                 } : undefined}
               />
             )
