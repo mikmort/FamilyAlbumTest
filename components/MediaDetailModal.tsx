@@ -871,10 +871,11 @@ export default function MediaDetailModal({
                 onLoad={() => setIsLoadingMedia(false)}
                 key={media.PFileName}
                 style={imageDimensions ? {
-                  width: imageDimensions.width,
-                  height: imageDimensions.height,
+                  aspectRatio: `${imageDimensions.width} / ${imageDimensions.height}`,
                   maxWidth: '95vw',
                   maxHeight: '95vh',
+                  width: 'auto',
+                  height: 'auto',
                   objectFit: 'contain'
                 } : undefined}
               />
@@ -1099,9 +1100,9 @@ export default function MediaDetailModal({
                   onClick={() => setIsFullScreen(true)}
                   style={imageDimensions ? {
                     cursor: 'pointer',
-                    width: imageDimensions.width,
-                    height: imageDimensions.height,
-                    maxWidth: '100%',
+                    aspectRatio: `${imageDimensions.width} / ${imageDimensions.height}`,
+                    width: '100%',
+                    height: 'auto',
                     maxHeight: '75vh',
                     objectFit: 'contain'
                   } : { cursor: 'pointer' }}
