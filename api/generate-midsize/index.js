@@ -240,7 +240,9 @@ async function processBatch(context, batchSize) {
                 }
 
                 // Generate midsize (1080px max dimension)
+                // Note: .rotate() without arguments auto-rotates based on EXIF orientation
                 const midsizeBuffer = await sharp(imageBuffer)
+                    .rotate() // Auto-rotate based on EXIF orientation
                     .resize(1080, 1080, {
                         fit: 'inside',
                         withoutEnlargement: true
