@@ -186,39 +186,49 @@ async function processBatch(context, batchSize) {
             try {
                 context.log(`Processing: ${image.PFileName}`);
 
-                // Construct blob path
-                // Two formats in database:
-                // 1. New uploads: PFileName is just filename, stored in media/ folder
-                // 2. Old uploads: PFileName contains full path (e.g., "Albums/IMG.jpg"), stored at root
+                // Construct blob paths to try
+                // Old images might be stored at root OR under media/ prefix
+                // Try multiple locations to find the blob
                 let fullBlobPath;
+                let pathsToTry = [];
+                
                 if (image.PFileName.includes('/')) {
-                    // Old format - PFileName already has full path, stored at container root
-                    fullBlobPath = image.PFileName;
+                    // Old format - PFileName already has full path
+                    // Try both at root and under media/ prefix
+                    pathsToTry.push(image.PFileName);
+                    pathsToTry.push(`media/${image.PFileName}`);
                 } else if (image.PFileDirectory) {
                     // New format with directory - convert backslashes to forward slashes
                     const directory = image.PFileDirectory.replace(/\\/g, '/');
-                    fullBlobPath = `media/${directory}/${image.PFileName}`;
+                    pathsToTry.push(`media/${directory}/${image.PFileName}`);
                 } else {
                     // New format without directory - stored in media/ folder
-                    fullBlobPath = `media/${image.PFileName}`;
+                    pathsToTry.push(`media/${image.PFileName}`);
                 }
 
-                context.log(`Checking blob: ${fullBlobPath}`);
-                context.log(`  PFileName: ${image.PFileName}`);
+                context.log(`Trying blob paths for: ${image.PFileName}`);
                 context.log(`  PFileDirectory: ${image.PFileDirectory || 'NULL'}`);
-
-                // Check if blob exists
-                const blobClient = containerClient.getBlockBlobClient(fullBlobPath);
-                const exists = await blobClient.exists();
                 
-                if (!exists) {
-                    context.log.warn(`❌ Blob not found: ${fullBlobPath}`);
+                // Try each path until we find the blob
+                let blobClient = null;
+                for (const tryPath of pathsToTry) {
+                    context.log(`  Checking: ${tryPath}`);
+                    const testClient = containerClient.getBlockBlobClient(tryPath);
+                    const exists = await testClient.exists();
+                    if (exists) {
+                        fullBlobPath = tryPath;
+                        blobClient = testClient;
+                        context.log(`  ✅ Found at: ${tryPath}`);
+                        break;
+                    }
+                }
+                
+                if (!blobClient) {
+                    context.log.warn(`❌ Blob not found in any location:`, pathsToTry);
                     batchProgress.skipped++;
                     batchProgress.processed++;
                     continue;
                 }
-                
-                context.log(`✅ Blob exists: ${fullBlobPath}`);
 
                 // Download the image
                 const downloadResponse = await blobClient.download();
@@ -255,28 +265,38 @@ async function processBatch(context, batchSize) {
                 
                 context.log(`Midsize created - ${midsizeMetadata.width}x${midsizeMetadata.height}, ${midsizeSizeMB.toFixed(2)} MB`);
 
-                // Prepare midsize filename - extract just the filename without directory
-                const fileNameOnly = image.PFileName.split('/').pop().split('\\').pop(); // Handle both / and \
-                const fileExt = fileNameOnly.substring(fileNameOnly.lastIndexOf('.'));
-                const baseName = fileNameOnly.substring(0, fileNameOnly.lastIndexOf('.'));
-                const midsizeFileName = `${baseName}-midsize${fileExt}`;
+                // Prepare midsize filename and path
+                // Store midsize in same location as original (match the path structure)
+                const fileExt = fullBlobPath.substring(fullBlobPath.lastIndexOf('.'));
+                const basePath = fullBlobPath.substring(0, fullBlobPath.lastIndexOf('.'));
+                const midsizeBlobPath = `${basePath}-midsize${fileExt}`;
                 
-                // Build blob path with directory (normalize to forward slashes)
-                const normalizedDir = image.PFileDirectory ? image.PFileDirectory.replace(/\\/g, '/') : '';
-                const midsizeBlobPath = normalizedDir 
-                    ? `media/${normalizedDir}/${midsizeFileName}`
-                    : `media/${midsizeFileName}`;
+                // Extract directory and filename for API URL
+                const fullPathNormalized = fullBlobPath.replace(/\\/g, '/');
+                const pathParts = fullPathNormalized.split('/');
+                const fileNameOnly = pathParts[pathParts.length - 1];
+                const fileNameBase = fileNameOnly.substring(0, fileNameOnly.lastIndexOf('.'));
+                const fileNameExt = fileNameOnly.substring(fileNameOnly.lastIndexOf('.'));
+                const midsizeFileName = `${fileNameBase}-midsize${fileNameExt}`;
+                
+                // Build API URL - remove media/ prefix if present
+                let apiPath = fullPathNormalized.startsWith('media/') 
+                    ? fullPathNormalized.substring(6)  // Remove "media/" prefix
+                    : fullPathNormalized;
+                const directory = pathParts.slice(0, -1).join('/').replace(/^media\/?/, ''); // Remove media/ from directory
+                const apiMidsizeUrl = directory 
+                    ? `/api/media/${directory}/${midsizeFileName}`
+                    : `/api/media/${midsizeFileName}`;
+
+                context.log(`Midsize will be stored at: ${midsizeBlobPath}`);
+                context.log(`API URL will be: ${apiMidsizeUrl}`);
 
                 // Check if midsize already exists
                 const midsizeExists = await blobExists(midsizeBlobPath);
                 if (midsizeExists) {
                     context.log(`Midsize already exists for ${image.PFileName}`);
                     
-                    // Update database with existing midsize URL (use forward slashes for API URL)
-                    const dirForUrl = image.PFileDirectory ? image.PFileDirectory.replace(/\\/g, '/') : '';
-                    const apiMidsizeUrl = dirForUrl 
-                        ? `/api/media/${dirForUrl}/${midsizeFileName}`
-                        : `/api/media/${midsizeFileName}`;
+                    // Update database with midsize URL
                     await query(`
                         UPDATE Pictures
                         SET PMidsizeUrl = @midsizeUrl,
@@ -301,11 +321,7 @@ async function processBatch(context, batchSize) {
 
                 context.log(`Uploaded midsize to: ${midsizeUrl}`);
 
-                // Update database with midsize URL (use forward slashes for API URL)
-                const dirForUrl = image.PFileDirectory ? image.PFileDirectory.replace(/\\/g, '/') : '';
-                const apiMidsizeUrl = dirForUrl 
-                    ? `/api/media/${dirForUrl}/${midsizeFileName}`
-                    : `/api/media/${midsizeFileName}`;
+                // Update database with midsize URL
                 await query(`
                     UPDATE Pictures
                     SET PMidsizeUrl = @midsizeUrl,
