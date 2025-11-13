@@ -92,7 +92,7 @@ export default function MediaDetailModal({
       // Preload the midsize to get dimensions first
       const midsizeImg = new Image();
       midsizeImg.onload = () => {
-        // Store dimensions from midsize image
+        // Store dimensions from midsize image (keep these for layout stability)
         setImageDimensions({
           width: midsizeImg.naturalWidth,
           height: midsizeImg.naturalHeight
@@ -101,12 +101,8 @@ export default function MediaDetailModal({
         // Now preload full resolution in background
         const fullResImg = new Image();
         fullResImg.onload = () => {
-          // Update dimensions to match full resolution before swapping
-          setImageDimensions({
-            width: fullResImg.naturalWidth,
-            height: fullResImg.naturalHeight
-          });
-          // Seamlessly swap to full resolution
+          // Seamlessly swap to full resolution without changing container size
+          // The full-res image will render at midsize dimensions but with full quality
           setCurrentImageSrc(media.PBlobUrl);
           setIsLoadingFullRes(false);
         };
