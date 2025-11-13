@@ -181,7 +181,13 @@ module.exports = async function (context, req) {
         // 1. Insert into Pictures table
         // If no people are tagged, use ID=1 ("No Tagged People")
         const hasPeople = people && people.length > 0;
-        const peopleList = hasPeople ? people.join(',') : '1'; // ID=1 for untagged
+        
+        // Build PPeopleList: [eventID (if exists), ...personIDs]
+        // PPeopleList is the source of truth for both events and people
+        const peopleIds = hasPeople ? people : [1]; // ID=1 for untagged
+        const peopleList = eventID 
+          ? [eventID, ...peopleIds].join(',')  // Event first, then people
+          : peopleIds.join(',');
         const nameCount = hasPeople ? people.length : 1;
         
         await execute(`
