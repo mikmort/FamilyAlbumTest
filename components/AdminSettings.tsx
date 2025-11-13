@@ -1049,6 +1049,41 @@ export default function AdminSettings({ onRequestsChange }: AdminSettingsProps) 
           This operation may take several minutes for large batches. Progress updates every 2 seconds.
         </p>
 
+        {/* Fix Path Issues Section */}
+        <div style={{ 
+          marginTop: '2rem', 
+          paddingTop: '2rem', 
+          borderTop: '2px solid #dee2e6' 
+        }}>
+          <h3 style={{ marginBottom: '1rem' }}>🔧 Fix Missing Midsize Images (Path Issue)</h3>
+          <p style={{ marginBottom: '1rem', fontSize: '0.95rem', color: '#666' }}>
+            If you see 404 errors or black screens for images, this will regenerate midsize versions 
+            with corrected paths. This fixes images stored with mixed slashes (Events\Whistler).
+          </p>
+
+          <button
+            onClick={() => startMidsizeGeneration(9999)}
+            disabled={isGeneratingMidsize}
+            style={{
+              padding: '10px 20px',
+              backgroundColor: isGeneratingMidsize ? '#ccc' : '#dc3545',
+              color: 'white',
+              border: 'none',
+              borderRadius: '4px',
+              cursor: isGeneratingMidsize ? 'not-allowed' : 'pointer',
+              fontSize: '1rem',
+              fontWeight: 'bold'
+            }}
+          >
+            {isGeneratingMidsize ? '⏳ Processing...' : '🔧 Fix All Missing Midsize Images'}
+          </button>
+
+          <p style={{ marginTop: '1rem', fontSize: '0.85rem', color: '#856404', background: '#fff3cd', padding: '0.75rem', borderRadius: '4px', border: '1px solid #ffc107' }}>
+            <strong>ℹ️ Note:</strong> This will regenerate ALL images that don't have a midsize URL in the database.
+            Use this if you recently cleared broken midsize URLs. Progress shown above.
+          </p>
+        </div>
+
         {/* Regenerate Midsize Section */}
         <div style={{ 
           marginTop: '2rem', 
