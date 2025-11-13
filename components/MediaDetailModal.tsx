@@ -879,16 +879,7 @@ export default function MediaDetailModal({
             </button>
           )}
           
-          {isLoadingMedia ? (
-            <div style={{
-              color: 'white',
-              textAlign: 'center',
-              padding: '2rem',
-              fontSize: '1.5rem'
-            }}>
-              Loading...
-            </div>
-          ) : media.PType === 1 ? (
+          {media.PType === 1 ? (
             isRetrying ? (
               <div style={{
                 color: 'white',
@@ -1149,17 +1140,6 @@ export default function MediaDetailModal({
                   <p style={{ marginTop: '1.5rem', fontSize: '0.85rem', color: '#868e96' }}>
                     URL: {media.PBlobUrl}
                   </p>
-                </div>
-              ) : isLoadingMedia ? (
-                <div style={{
-                  minHeight: '400px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  color: '#6c757d',
-                  fontSize: '1.2rem'
-                }}>
-                  Loading image...
                 </div>
               ) : (
                 <img 
