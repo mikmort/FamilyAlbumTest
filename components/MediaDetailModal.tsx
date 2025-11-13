@@ -101,7 +101,12 @@ export default function MediaDetailModal({
         // Now preload full resolution in background
         const fullResImg = new Image();
         fullResImg.onload = () => {
-          // Seamlessly swap to full resolution (dimensions already set)
+          // Update dimensions to match full resolution before swapping
+          setImageDimensions({
+            width: fullResImg.naturalWidth,
+            height: fullResImg.naturalHeight
+          });
+          // Seamlessly swap to full resolution
           setCurrentImageSrc(media.PBlobUrl);
           setIsLoadingFullRes(false);
         };
