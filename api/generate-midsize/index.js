@@ -261,9 +261,10 @@ async function processBatch(context, batchSize) {
                 const baseName = fileNameOnly.substring(0, fileNameOnly.lastIndexOf('.'));
                 const midsizeFileName = `${baseName}-midsize${fileExt}`;
                 
-                // Build blob path with directory
-                const midsizeBlobPath = image.PFileDirectory 
-                    ? `media/${image.PFileDirectory}/${midsizeFileName}`
+                // Build blob path with directory (normalize to forward slashes)
+                const normalizedDir = image.PFileDirectory ? image.PFileDirectory.replace(/\\/g, '/') : '';
+                const midsizeBlobPath = normalizedDir 
+                    ? `media/${normalizedDir}/${midsizeFileName}`
                     : `media/${midsizeFileName}`;
 
                 // Check if midsize already exists

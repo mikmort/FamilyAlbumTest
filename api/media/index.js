@@ -300,12 +300,23 @@ module.exports = async function (context, req) {
             const backslashPath = blobPath.replace(/\//g, '\\');
             if (backslashPath !== blobPath) {
                 pathsToTry.push(backslashPath);
+                // Also try with media/ prefix and backslashes
+                pathsToTry.push(`media/${backslashPath}`);
             }
             
             // If path contains special chars, try with encoded variations
             const pathParts = blobPath.split('/');
             const directory = pathParts.slice(0, -1).join('/');
             const filenamePart = pathParts[pathParts.length - 1];
+            
+            // For midsize images: try with mixed slashes (directory with backslash, filename with forward slash)
+            // This handles legacy midsize blobs stored as media/Events\Whistler/DSC04536-midsize.JPG
+            if (pathParts.length > 1) {
+                const mixedSlashPath = `media/${directory.replace(/\//g, '\\')}/${filenamePart}`;
+                if (!pathsToTry.includes(mixedSlashPath)) {
+                    pathsToTry.push(mixedSlashPath);
+                }
+            }
             
             // Try with spaces encoded in directory path (e.g., "Events/ES BnotMitzvah" -> "Events/ES%20BnotMitzvah")
             if (directory && directory.includes(' ')) {
