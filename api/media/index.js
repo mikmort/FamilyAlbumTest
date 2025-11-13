@@ -372,16 +372,63 @@ module.exports = async function (context, req) {
                 
                 try {
                     // Use full path (including directory) to avoid conflicts with duplicate filenames
+                    // IMPORTANT: Store thumbnails with the EXACT same path as original (foundPath)
+                    // This ensures we can find them later regardless of encoding variations
                     const thumbnailPath = `thumbnails/${foundPath}`;
-                    const thumbnailExists = await blobExists(thumbnailPath);
+                    
+                    // Try to find existing thumbnail with same path variations as original
+                    let thumbnailFound = false;
+                    let foundThumbnailPath = null;
+                    
+                    // Try same variations we used for original
+                    const thumbnailPathsToTry = [
+                        thumbnailPath,
+                    ];
+                    
+                    // If foundPath had encoding variations, try those for thumbnail too
+                    const thumbnailPathParts = thumbnailPath.split('/');
+                    const thumbDirectory = thumbnailPathParts.slice(0, -1).join('/');
+                    const thumbFilename = thumbnailPathParts[thumbnailPathParts.length - 1];
+                    
+                    // Try with fully encoded filename (spaces and apostrophes)
+                    const thumbFullyEncoded = thumbDirectory + '/' +
+                        encodeURIComponent(thumbFilename)
+                            .replace(/%2F/g, '/')
+                            .replace(/'/g, '%27');
+                    if (thumbFullyEncoded !== thumbnailPath) {
+                        thumbnailPathsToTry.push(thumbFullyEncoded);
+                    }
+                    
+                    // Try with spaces encoded
+                    if (thumbFilename.includes(' ') && !thumbFilename.includes('%20')) {
+                        const thumbSpacesEncoded = thumbDirectory + '/' + thumbFilename.replace(/ /g, '%20');
+                        if (!thumbnailPathsToTry.includes(thumbSpacesEncoded)) {
+                            thumbnailPathsToTry.push(thumbSpacesEncoded);
+                        }
+                    }
+                    
+                    for (const tryPath of thumbnailPathsToTry) {
+                        try {
+                            if (await blobExists(tryPath)) {
+                                thumbnailFound = true;
+                                foundThumbnailPath = tryPath;
+                                context.log(`Found thumbnail at: "${tryPath}"`);
+                                break;
+                            }
+                        } catch (err) {
+                            context.log.error(`Error checking thumbnail "${tryPath}": ${err.message}`);
+                        }
+                    }
+                    
+                    const thumbnailExists = thumbnailFound;
                     
                     let shouldRegenerate = forceRegenerate;
                     
                     // If thumbnail exists, check if it's a placeholder (too small)
                     if (thumbnailExists && !forceRegenerate) {
-                        context.log(`Thumbnail exists at ${thumbnailPath}, checking size...`);
+                        context.log(`Thumbnail exists at ${foundThumbnailPath}, checking size...`);
                         const containerClient = getContainerClient();
-                        const thumbnailBlobClient = containerClient.getBlobClient(thumbnailPath);
+                        const thumbnailBlobClient = containerClient.getBlobClient(foundThumbnailPath);
                         const properties = await thumbnailBlobClient.getProperties();
                         const thumbnailSize = properties.contentLength;
                         
@@ -519,8 +566,8 @@ module.exports = async function (context, req) {
                     }
                 } else {
                     // Thumbnail already exists, use it
-                    context.log(`Using existing thumbnail: ${thumbnailPath}`);
-                    blobPath = thumbnailPath;
+                    context.log(`Using existing thumbnail: ${foundThumbnailPath}`);
+                    blobPath = foundThumbnailPath;
                 }
                 } finally {
                     // Release the lock when done

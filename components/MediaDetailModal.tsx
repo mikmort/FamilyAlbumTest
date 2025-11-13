@@ -92,53 +92,27 @@ export default function MediaDetailModal({
       setCurrentImageSrc(media.PMidsizeUrl);
       setIsLoadingFullRes(true);
       
-      // Preload the midsize to get dimensions first
-      const midsizeImg = new Image();
-      midsizeImg.onload = () => {
-        // Check if we're still on the same image
+      // Preload full resolution in background
+      const fullResImg = new Image();
+      fullResImg.onload = () => {
+        // Check if we're still on the same image before swapping
         if (!isCurrent) return;
         
-        // Store dimensions from midsize image (keep these for layout stability)
-        setImageDimensions({
-          width: midsizeImg.naturalWidth,
-          height: midsizeImg.naturalHeight
-        });
-        
-        // Now preload full resolution in background
-        const fullResImg = new Image();
-        fullResImg.onload = () => {
-          // Check if we're still on the same image before swapping
-          if (!isCurrent) return;
-          
-          // Seamlessly swap to full resolution without changing container size
-          // The full-res image will render at midsize dimensions but with full quality
-          setCurrentImageSrc(media.PBlobUrl);
-          setIsLoadingFullRes(false);
-        };
-        fullResImg.onerror = () => {
-          if (!isCurrent) return;
-          // If full res fails, keep midsize
-          console.warn('Failed to load full resolution, keeping midsize');
-          setIsLoadingFullRes(false);
-        };
-        fullResImg.src = media.PBlobUrl;
+        // Seamlessly swap to full resolution
+        setCurrentImageSrc(media.PBlobUrl);
+        setIsLoadingFullRes(false);
       };
-      midsizeImg.src = media.PMidsizeUrl;
+      fullResImg.onerror = () => {
+        if (!isCurrent) return;
+        // If full res fails, keep midsize
+        console.warn('Failed to load full resolution, keeping midsize');
+        setIsLoadingFullRes(false);
+      };
+      fullResImg.src = media.PBlobUrl;
     } else {
-      // No midsize, use full resolution directly and get its dimensions
+      // No midsize, use full resolution directly
       setCurrentImageSrc(media.PBlobUrl);
       setIsLoadingFullRes(false);
-      
-      // Still need to get dimensions for layout stability
-      const img = new Image();
-      img.onload = () => {
-        if (!isCurrent) return;
-        setImageDimensions({
-          width: img.naturalWidth,
-          height: img.naturalHeight
-        });
-      };
-      img.src = media.PBlobUrl;
     }
     
     // Cleanup function - mark this effect as stale if component unmounts or media changes
@@ -887,13 +861,6 @@ export default function MediaDetailModal({
                 onError={() => setImageError(true)}
                 onLoad={() => setIsLoadingMedia(false)}
                 key={media.PFileName}
-                style={imageDimensions ? {
-                  width: `${imageDimensions.width}px`,
-                  height: `${imageDimensions.height}px`,
-                  maxWidth: '100%',
-                  maxHeight: '100%',
-                  objectFit: 'contain'
-                } : undefined}
               />
             )
           ) : (
