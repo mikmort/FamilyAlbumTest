@@ -296,6 +296,12 @@ module.exports = async function (context, req) {
                 `media/${blobPath}`, // Try with media/ prefix (for newly uploaded files)
             ];
             
+            // Try with backslashes (for old images stored with PFileDirectory backslashes)
+            const backslashPath = blobPath.replace(/\//g, '\\');
+            if (backslashPath !== blobPath) {
+                pathsToTry.push(backslashPath);
+            }
+            
             // If path contains special chars, try with encoded variations
             const pathParts = blobPath.split('/');
             const directory = pathParts.slice(0, -1).join('/');
