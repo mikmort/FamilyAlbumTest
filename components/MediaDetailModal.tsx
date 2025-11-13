@@ -25,6 +25,9 @@ export default function MediaDetailModal({
   const videoRef = useRef<HTMLVideoElement>(null);
   const [videoError, setVideoError] = useState(false);
   const [imageError, setImageError] = useState(false);
+  const [retryCount, setRetryCount] = useState(0);
+  const [isRetrying, setIsRetrying] = useState(false);
+  const retryTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const [showNavigationArrows, setShowNavigationArrows] = useState(false);
   const [isLoadingMedia, setIsLoadingMedia] = useState(false);
   
@@ -157,6 +160,12 @@ export default function MediaDetailModal({
     setIsLoadingMedia(false);
     setVideoError(false);
     setImageError(false);
+    setRetryCount(0);
+    setIsRetrying(false);
+    if (retryTimeoutRef.current) {
+      clearTimeout(retryTimeoutRef.current);
+      retryTimeoutRef.current = null;
+    }
     setDescription(media.PDescription || '');
     setMonth(media.PMonth || '');
     setYear(media.PYear || '');
@@ -165,6 +174,42 @@ export default function MediaDetailModal({
     setTaggedPeople(computeOrderedTaggedPeople(media.TaggedPeople, media.PPeopleList));
     setEditing(false);
   }, [media.PFileName]);
+
+  // Automatic retry with exponential backoff
+  const handleImageError = useCallback(() => {
+    const maxRetries = 3;
+    const baseDelay = 1000; // 1 second
+    
+    if (retryCount < maxRetries) {
+      setIsRetrying(true);
+      const delay = baseDelay * Math.pow(2, retryCount); // Exponential backoff: 1s, 2s, 4s
+      
+      console.log(`Image load failed, retry ${retryCount + 1}/${maxRetries} in ${delay}ms`);
+      
+      retryTimeoutRef.current = setTimeout(() => {
+        setRetryCount(prev => prev + 1);
+        setImageError(false);
+        setIsRetrying(false);
+        // Force reload by adding cache-busting timestamp
+        const timestamp = Date.now();
+        const separator = currentImageSrc.includes('?') ? '&' : '?';
+        setCurrentImageSrc(`${currentImageSrc}${separator}_retry=${timestamp}`);
+      }, delay);
+    } else {
+      console.error('Image load failed after max retries');
+      setImageError(true);
+      setIsRetrying(false);
+    }
+  }, [retryCount, currentImageSrc]);
+
+  // Cleanup retry timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (retryTimeoutRef.current) {
+        clearTimeout(retryTimeoutRef.current);
+      }
+    };
+  }, []);
 
   useEffect(() => {
     if (editing && allEvents.length === 0) {
@@ -844,7 +889,16 @@ export default function MediaDetailModal({
               Loading...
             </div>
           ) : media.PType === 1 ? (
-            imageError ? (
+            isRetrying ? (
+              <div style={{
+                color: 'white',
+                textAlign: 'center',
+                padding: '2rem'
+              }}>
+                <p style={{ fontSize: '1.5rem' }}>🔄 Retrying ({retryCount + 1}/3)...</p>
+                <p style={{ marginTop: '1rem', opacity: 0.7 }}>{media.PFileName}</p>
+              </div>
+            ) : imageError ? (
               <div style={{
                 color: 'white',
                 textAlign: 'center',
@@ -852,14 +906,18 @@ export default function MediaDetailModal({
               }}>
                 <p style={{ fontSize: '1.5rem' }}>⚠️ Image failed to load</p>
                 <p style={{ marginTop: '1rem' }}>{media.PFileName}</p>
+                <p style={{ marginTop: '0.5rem', opacity: 0.7 }}>The image may have a path encoding issue or may not exist in blob storage.</p>
               </div>
             ) : (
               <img 
                 src={currentImageSrc} 
                 alt={media.PDescription || media.PFileName}
                 className="fullscreen-image"
-                onError={() => setImageError(true)}
-                onLoad={() => setIsLoadingMedia(false)}
+                onError={handleImageError}
+                onLoad={() => {
+                  setIsLoadingMedia(false);
+                  setRetryCount(0); // Reset retry count on successful load
+                }}
                 key={media.PFileName}
               />
             )
@@ -1005,7 +1063,31 @@ export default function MediaDetailModal({
             )}
             
             {media.PType === 1 ? (
-              imageError ? (
+              isRetrying ? (
+                <div style={{
+                  background: '#f8f9fa',
+                  border: '2px solid #007bff',
+                  borderRadius: '8px',
+                  padding: '3rem',
+                  textAlign: 'center',
+                  color: '#495057',
+                  minHeight: '400px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  justifyContent: 'center',
+                  alignItems: 'center'
+                }}>
+                  <p style={{ fontSize: '1.2rem', marginBottom: '1rem' }}>
+                    🔄 Retrying ({retryCount + 1}/3)...
+                  </p>
+                  <p style={{ marginBottom: '0.5rem', color: '#495057', opacity: 0.7 }}>
+                    {media.PFileName}
+                  </p>
+                  <p style={{ fontSize: '0.9rem', opacity: 0.6 }}>
+                    Please wait while we retry the connection...
+                  </p>
+                </div>
+              ) : imageError ? (
                 <div style={{
                   background: '#f8f9fa',
                   border: '2px dashed #dee2e6',
@@ -1032,9 +1114,12 @@ export default function MediaDetailModal({
                     <button
                       onClick={() => {
                         setImageError(false);
-                        // Force reload
-                        const img = document.createElement('img');
-                        img.src = media.PBlobUrl + '?t=' + Date.now();
+                        setRetryCount(0);
+                        setIsRetrying(false);
+                        // Force reload with cache-busting
+                        const timestamp = Date.now();
+                        const separator = currentImageSrc.includes('?') ? '&' : '?';
+                        setCurrentImageSrc(`${currentImageSrc.split('?')[0]}${separator}_manual=${timestamp}`);
                       }}
                       style={{
                         padding: '10px 20px',
@@ -1092,9 +1177,12 @@ export default function MediaDetailModal({
                   onError={(e) => {
                     console.error('Image load error:', media.PFileName);
                     console.error('Image URL:', currentImageSrc);
-                    setImageError(true);
+                    handleImageError();
                   }}
-                  onLoad={() => setIsLoadingMedia(false)}
+                  onLoad={() => {
+                    setIsLoadingMedia(false);
+                    setRetryCount(0); // Reset retry count on successful load
+                  }}
                   key={media.PFileName}
                 />
               )
