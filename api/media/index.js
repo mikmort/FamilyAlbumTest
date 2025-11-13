@@ -868,9 +868,8 @@ module.exports = async function (context, req) {
 
             // Build NameEvent lookup for all IDs in PPeopleList across all media.
             // PPeopleList contains comma-separated IDs that reference NameEvent records.
-            // PPeopleList is the source of truth for people ordering.
+            // PPeopleList is the source of truth for people ordering and events.
             let eventLookup = {};
-            let npEventLookup = {};
 
             if (media.length > 0) {
                 // Collect all numeric IDs from PPeopleList across all media items
@@ -884,15 +883,6 @@ module.exports = async function (context, req) {
                     });
                 });
 
-                // Also collect event IDs from NamePhoto table - ONLY if we're filtering by event
-                // For general media lists, NamePhoto events are too expensive to query for all items
-                if (eventId) {
-                    // User is filtering by event, so NamePhoto events might be needed
-                    // But eventId is already used in the WHERE clause for the main query
-                    // so we don't need to do additional NamePhoto queries here
-                    context.log(`Event filter requested (eventId=${eventId}), relying on query WHERE clause for NamePhoto events`);
-                }
-
                 // Batch query NameEvent for all candidate IDs
                 if (candidateIds.size > 0) {
                     const ids = Array.from(candidateIds);
@@ -902,7 +892,7 @@ module.exports = async function (context, req) {
                     ids.forEach((id, i) => { eventParams[`id${i}`] = id; });
                     
                     try {
-                        context.log(`Fetching NameEvent records for ${ids.length} IDs from PPeopleList and NamePhoto...`);
+                        context.log(`Fetching NameEvent records for ${ids.length} IDs from PPeopleList...`);
                         const eventRows = await query(eventQuery, eventParams);
                         context.log(`Found ${eventRows.length} NameEvent records`);
                         eventRows.forEach(r => {
@@ -912,78 +902,6 @@ module.exports = async function (context, req) {
                         context.log.error('Error querying NameEvent IDs:', evErr);
                         throw evErr;
                     }
-                }
-
-                // Build NamePhoto event lookup for individual media items
-                // Query NamePhoto for event associations (neType = 'E')
-                
-                try {
-                    context.log('Querying NamePhoto for event associations...');
-                    // Get all filenames from our media results
-                    const filenames = media.map(m => m.PFileName).filter(Boolean);
-                    
-                    if (filenames.length > 0) {
-                        // Query NamePhoto with both forward and backslash variants
-                        const npParams = {};
-                        const placeholders = [];
-                        
-                        filenames.forEach((fn, i) => {
-                            npParams[`fn${i}`] = fn;
-                            placeholders.push(`@fn${i}`);
-                            
-                            // Also try backslash variant
-                            const backslashVariant = fn.replace(/\//g, '\\');
-                            if (backslashVariant !== fn) {
-                                npParams[`fn${i}_bs`] = backslashVariant;
-                                placeholders.push(`@fn${i}_bs`);
-                            }
-                        });
-                        
-                        const npQuery = `
-                            SELECT DISTINCT np.npFileName, np.npID
-                            FROM dbo.NamePhoto np
-                            INNER JOIN dbo.NameEvent ne ON np.npID = ne.ID
-                            WHERE ne.neType = 'E'
-                            AND np.npFileName IN (${placeholders.join(',')})
-                        `;
-                        
-                        const npRows = await query(npQuery, npParams);
-                        context.log(`Found ${npRows.length} NamePhoto event associations`);
-                        context.log('NamePhoto event rows:', JSON.stringify(npRows.slice(0, 5))); // Log first 5 for debugging
-                        
-                        // Add these event IDs to candidateIds so they get looked up in NameEvent
-                        const npEventIds = new Set();
-                        
-                        npRows.forEach(row => {
-                            // Normalize the filename to use forward slashes as key
-                            const normalizedFilename = row.npFileName.replace(/\\/g, '/');
-                            npEventLookup[normalizedFilename] = row.npID;
-                            // Also store with backslash variant as key
-                            npEventLookup[row.npFileName] = row.npID;
-                            // Collect event IDs
-                            npEventIds.add(row.npID);
-                        });
-                        
-                        // Query NameEvent for these event IDs if not already in eventLookup
-                        if (npEventIds.size > 0) {
-                            const missingEventIds = Array.from(npEventIds).filter(id => !eventLookup[id]);
-                            if (missingEventIds.length > 0) {
-                                const eventIdPlaceholders = missingEventIds.map((_, i) => `@eid${i}`).join(',');
-                                const eventQuery = `SELECT ID, neName, neRelation, neType FROM dbo.NameEvent WHERE ID IN (${eventIdPlaceholders})`;
-                                const eventParams = {};
-                                missingEventIds.forEach((id, i) => { eventParams[`eid${i}`] = id; });
-                                
-                                const eventRows = await query(eventQuery, eventParams);
-                                context.log(`Fetched ${eventRows.length} NameEvent records for NamePhoto events`);
-                                eventRows.forEach(r => {
-                                    eventLookup[r.ID] = { ID: r.ID, neName: r.neName, neType: r.neType, neRelation: r.neRelation };
-                                });
-                            }
-                        }
-                    }
-                } catch (npErr) {
-                    context.log.error('Error querying NamePhoto for events:', npErr);
-                    // Continue without event data rather than failing completely
                 }
             }
 
@@ -1014,35 +932,6 @@ module.exports = async function (context, req) {
                                 eventForItem = { ID: lookup.ID, neName: lookup.neName };
                                 break;
                             }
-                        }
-                    }
-                    
-                    // If no event found in PPeopleList, check the NamePhoto event lookup that was built earlier
-                    if (!eventForItem && item.PFileName) {
-                        // Try multiple filename variants for matching
-                        const variants = [
-                            item.PFileName,
-                            item.PFileName.replace(/\//g, '\\'),
-                            item.PFileName.replace(/\\/g, '/'),
-                            `${item.PFileDirectory}/${item.PFileName}`.replace(/\\/g, '/'),
-                            `${item.PFileDirectory}\\${item.PFileName}`.replace(/\//g, '\\')
-                        ];
-                        
-                        for (const variant of variants) {
-                            if (npEventLookup[variant]) {
-                                const npEventId = npEventLookup[variant];
-                                const eventLookupData = eventLookup[npEventId];
-                                if (eventLookupData) {
-                                    eventForItem = { ID: eventLookupData.ID, neName: eventLookupData.neName };
-                                    context.log(`✅ Event matched for ${item.PFileName} using variant: ${variant}`);
-                                    break;
-                                }
-                            }
-                        }
-                        
-                        if (!eventForItem) {
-                            context.log(`❌ No event match for ${item.PFileName}, tried variants:`, variants);
-                            context.log('Available npEventLookup keys (first 10):', Object.keys(npEventLookup).slice(0, 10));
                         }
                     }
 
@@ -1604,12 +1493,8 @@ module.exports = async function (context, req) {
 
             // Handle event updates
             let eventChanged = false;
-            const eventDebugLog = []; // Collect debug info for response
             
             if (eventID !== undefined) {
-                eventDebugLog.push('EVENT UPDATE START');
-                eventDebugLog.push(`Received eventID: ${eventID} (type: ${typeof eventID})`);
-                
                 context.log('=== EVENT UPDATE START ===');
                 context.log('Processing event update:', { 
                     receivedEventID: eventID, 
@@ -1618,22 +1503,30 @@ module.exports = async function (context, req) {
                     isEmpty: eventID === ''
                 });
                 
-                // Get current event for this photo (events have neType='E')
-                const currentEventQuery = `
-                    SELECT np.npID
-                    FROM dbo.NamePhoto np
-                    INNER JOIN dbo.NameEvent ne ON np.npID = ne.ID
-                    WHERE np.npFileName = @filename AND ne.neType = 'E'
-                `;
-                const currentEventResult = await query(currentEventQuery, { filename: dbFileName });
-                const currentEventID = currentEventResult.length > 0 ? currentEventResult[0].npID : null;
+                // Get current event for this photo from PPeopleList
+                const getCurrentPPeopleListQuery = `SELECT PPeopleList FROM dbo.Pictures WHERE PFileName = @filename`;
+                const currentPPeopleListResult = await query(getCurrentPPeopleListQuery, { filename: dbFileName });
+                const currentPPeopleList = currentPPeopleListResult[0]?.PPeopleList || '';
+                
+                // Parse PPeopleList to find current event (first ID with neType='E')
+                let currentEventID = null;
+                if (currentPPeopleList) {
+                    const tokens = currentPPeopleList.split(',').map(s => s.trim()).filter(Boolean);
+                    const numericIds = tokens.filter(tok => /^\d+$/.test(tok)).map(tok => parseInt(tok));
+                    
+                    // Check each ID to see if it's an event
+                    for (const id of numericIds) {
+                        const checkEventQuery = `SELECT ID FROM dbo.NameEvent WHERE ID = @id AND neType = 'E'`;
+                        const checkResult = await query(checkEventQuery, { id });
+                        if (checkResult.length > 0) {
+                            currentEventID = id;
+                            break;
+                        }
+                    }
+                }
                 
                 // Normalize eventID: treat empty string or null as no event
                 const normalizedEventID = eventID || null;
-                
-                eventDebugLog.push(`Current event ID: ${currentEventID}`);
-                eventDebugLog.push(`Normalized event ID: ${normalizedEventID}`);
-                eventDebugLog.push(`Will update: ${currentEventID !== normalizedEventID}`);
                 
                 context.log('Event comparison:', { 
                     currentEventID, 
@@ -1641,110 +1534,40 @@ module.exports = async function (context, req) {
                     willUpdate: currentEventID !== normalizedEventID 
                 });
 
-                // If event changed, update NamePhoto table
+                // If event changed, update PPeopleList
                 if (currentEventID !== normalizedEventID) {
-                    context.log('=== EVENT CHANGED - UPDATING ===');
+                    context.log('=== EVENT CHANGED - UPDATING PPeopleList ===');
                     eventChanged = true;
-                    eventDebugLog.push('Event changed - starting update process');
                     
-                    // Remove old event if exists
-                    if (currentEventID) {
-                        eventDebugLog.push(`Deleting old event association: npFileName=${dbFileName}, npID=${currentEventID}`);
-                        const deleteEventQuery = `
-                            DELETE FROM dbo.NamePhoto
-                            WHERE npFileName = @filename AND npID = @eventID
-                        `;
-                        await execute(deleteEventQuery, { filename: dbFileName, eventID: currentEventID });
-                        context.log('Removed old event:', currentEventID);
-                        eventDebugLog.push(`Deleted old event association successfully`);
-                        
-                        // Update old event count
-                        await execute(`
-                            UPDATE NameEvent
-                            SET neCount = (
-                                SELECT COUNT(*)
-                                FROM NamePhoto
-                                WHERE npID = @eventID
-                            )
-                            WHERE ID = @eventID
-                        `, { eventID: currentEventID });
-                        context.log('Updated count for old event:', currentEventID);
-                        eventDebugLog.push(`Updated neCount for old event ${currentEventID}`);
-                    }
-                    
-                    // Add new event if provided
+                    // Verify the new event exists if provided
                     if (normalizedEventID) {
-                        eventDebugLog.push(`Adding new event: ID=${normalizedEventID}`);
-                        
-                        // Verify the event exists and is type 'E'
-                        const eventCheckQuery = `
-                            SELECT ID FROM dbo.NameEvent WHERE ID = @eventID AND neType = 'E'
-                        `;
-                        const eventCheck = await query(eventCheckQuery, { eventID: normalizedEventID });
-                        
-                        if (eventCheck.length === 0) {
-                            eventDebugLog.push(`ERROR: Event ID ${normalizedEventID} not found or not type 'E'`);
+                        const verifyEventQuery = `SELECT ID FROM dbo.NameEvent WHERE ID = @id AND neType = 'E'`;
+                        const verifyResult = await query(verifyEventQuery, { id: normalizedEventID });
+                        if (verifyResult.length === 0) {
                             context.res = {
                                 status: 400,
                                 body: { error: 'Invalid event ID' }
                             };
                             return;
                         }
-                        
-                        const insertEventQuery = `
-                            INSERT INTO dbo.NamePhoto (npID, npFileName)
-                            VALUES (@eventID, @filename)
-                        `;
-                        await execute(insertEventQuery, { eventID: normalizedEventID, filename: dbFileName });
-                        context.log('Added new event:', normalizedEventID);
-                        eventDebugLog.push(`Inserted new event association: npID=${normalizedEventID}, npFileName=${dbFileName}`);
-                        
-                        // Update new event count
-                        await execute(`
-                            UPDATE NameEvent
-                            SET neCount = (
-                                SELECT COUNT(*)
-                                FROM NamePhoto
-                                WHERE npID = @eventID
-                            )
-                            WHERE ID = @eventID
-                        `, { eventID: normalizedEventID });
-                        context.log('Updated count for new event:', normalizedEventID);
-                        eventDebugLog.push(`Updated neCount for new event ${normalizedEventID}`);
                     }
                     
-                    // Also update PPeopleList to maintain consistency with original design
-                    // PPeopleList should contain: [eventID (if exists), ...personIDs]
-                    eventDebugLog.push('=== UPDATING PPeopleList ===');
-                    context.log('=== UPDATING PPeopleList ===');
-                    const getCurrentPPeopleListQuery = `SELECT PPeopleList FROM dbo.Pictures WHERE PFileName = @filename`;
-                    const currentPPeopleListResult = await query(getCurrentPPeopleListQuery, { filename: dbFileName });
-                    const currentPPeopleList = currentPPeopleListResult[0]?.PPeopleList || '';
-                    
-                    context.log('Current PPeopleList from DB:', currentPPeopleList);
-                    eventDebugLog.push(`Current PPeopleList from DB: "${currentPPeopleList}"`);
-                    
-                    // Parse current PPeopleList
+                    // Parse current PPeopleList to get all IDs
                     const currentIds = currentPPeopleList.split(',').map(s => s.trim()).filter(Boolean).map(id => parseInt(id));
-                    context.log('Parsed currentIds:', currentIds);
-                    eventDebugLog.push(`Parsed currentIds: [${currentIds.join(', ')}]`);
+                    context.log('Current IDs in PPeopleList:', currentIds);
                     context.log('Removing old event ID:', currentEventID);
-                    eventDebugLog.push(`Removing old event ID: ${currentEventID}`);
                     
-                    // Remove old event ID from list (events have IDs in NameEvent with neType='E')
+                    // Remove old event ID from list (filter out currentEventID)
                     const peopleOnlyIds = currentIds.filter(id => id !== currentEventID);
                     context.log('People-only IDs after removing event:', peopleOnlyIds);
-                    eventDebugLog.push(`People-only IDs after removing event: [${peopleOnlyIds.join(', ')}]`);
                     
-                    // Add new event ID at the beginning if provided
+                    // Build new PPeopleList: [newEventID, ...peopleOnlyIds] or just peopleOnlyIds
                     const newPPeopleList = normalizedEventID 
                         ? [normalizedEventID, ...peopleOnlyIds].join(',')
                         : peopleOnlyIds.join(',');
                     
                     context.log('NEW PPeopleList:', newPPeopleList);
-                    eventDebugLog.push(`NEW PPeopleList: "${newPPeopleList}"`);
                     context.log('Executing UPDATE query...');
-                    eventDebugLog.push('Executing UPDATE Pictures SET PPeopleList...');
                     
                     await execute(`
                         UPDATE dbo.Pictures
@@ -1754,10 +1577,8 @@ module.exports = async function (context, req) {
                     `, { filename: dbFileName, peopleList: newPPeopleList });
                     
                     context.log('✅ PPeopleList updated successfully');
-                    eventDebugLog.push('✅ PPeopleList UPDATE executed successfully');
                 }
                 context.log('=== EVENT UPDATE END ===');
-                eventDebugLog.push('=== EVENT UPDATE END ===');
             }
 
             if (updates.length === 0 && !eventChanged) {
@@ -1813,42 +1634,35 @@ module.exports = async function (context, req) {
                 return;
             }
 
-            // Fetch event data if exists
-            const eventQuery = `
-                SELECT ne.ID, ne.neName
-                FROM dbo.NamePhoto np
-                INNER JOIN dbo.NameEvent ne ON np.npID = ne.ID
-                WHERE np.npFileName = @filename AND ne.neType = 'E'
-            `;
-            const eventResult = await query(eventQuery, { filename: dbFileName });
-            
+            // Fetch event data from PPeopleList
             const mediaData = result[0];
-            if (eventResult.length > 0) {
-                mediaData.Event = {
-                    ID: eventResult[0].ID,
-                    neName: eventResult[0].neName
-                };
-            } else {
-                mediaData.Event = null;
+            let eventForMedia = null;
+            
+            if (mediaData.PPeopleList) {
+                const tokens = mediaData.PPeopleList.split(',').map(s => s.trim()).filter(Boolean);
+                const numericIds = tokens.filter(tok => /^\d+$/.test(tok)).map(tok => parseInt(tok));
+                
+                // Find first ID that is an event (neType='E')
+                for (const id of numericIds) {
+                    const checkEventQuery = `SELECT ID, neName FROM dbo.NameEvent WHERE ID = @id AND neType = 'E'`;
+                    const checkResult = await query(checkEventQuery, { id });
+                    if (checkResult.length > 0) {
+                        eventForMedia = {
+                            ID: checkResult[0].ID,
+                            neName: checkResult[0].neName
+                        };
+                        break;
+                    }
+                }
             }
-
-            // Add debug info to response for troubleshooting
-            const debugInfo = {
-                receivedEventID: eventID,
-                eventIDType: typeof eventID,
-                normalizedEventID: eventID || null,
-                eventChanged: eventChanged,
-                currentPPeopleList: mediaData.PPeopleList,
-                eventInResponse: mediaData.Event,
-                eventDebugLog: eventDebugLog
-            };
+            
+            mediaData.Event = eventForMedia;
 
             context.res = {
                 status: 200,
                 body: {
                     success: true,
-                    media: mediaData,
-                    _debug: debugInfo // Add debug info to response
+                    media: mediaData
                 }
             };
             return;
