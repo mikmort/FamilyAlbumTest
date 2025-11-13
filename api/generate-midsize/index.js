@@ -255,10 +255,13 @@ async function processBatch(context, batchSize) {
                 
                 context.log(`Midsize created - ${midsizeMetadata.width}x${midsizeMetadata.height}, ${midsizeSizeMB.toFixed(2)} MB`);
 
-                // Prepare midsize filename
-                const fileExt = image.PFileName.substring(image.PFileName.lastIndexOf('.'));
-                const baseName = image.PFileName.substring(0, image.PFileName.lastIndexOf('.'));
+                // Prepare midsize filename - extract just the filename without directory
+                const fileNameOnly = image.PFileName.split('/').pop().split('\\').pop(); // Handle both / and \
+                const fileExt = fileNameOnly.substring(fileNameOnly.lastIndexOf('.'));
+                const baseName = fileNameOnly.substring(0, fileNameOnly.lastIndexOf('.'));
                 const midsizeFileName = `${baseName}-midsize${fileExt}`;
+                
+                // Build blob path with directory
                 const midsizeBlobPath = image.PFileDirectory 
                     ? `media/${image.PFileDirectory}/${midsizeFileName}`
                     : `media/${midsizeFileName}`;
@@ -268,8 +271,11 @@ async function processBatch(context, batchSize) {
                 if (midsizeExists) {
                     context.log(`Midsize already exists for ${image.PFileName}`);
                     
-                    // Update database with existing midsize URL
-                    const apiMidsizeUrl = `/api/media/${image.PFileDirectory ? image.PFileDirectory + '/' : ''}${midsizeFileName}`;
+                    // Update database with existing midsize URL (use forward slashes for API URL)
+                    const dirForUrl = image.PFileDirectory ? image.PFileDirectory.replace(/\\/g, '/') : '';
+                    const apiMidsizeUrl = dirForUrl 
+                        ? `/api/media/${dirForUrl}/${midsizeFileName}`
+                        : `/api/media/${midsizeFileName}`;
                     await query(`
                         UPDATE Pictures
                         SET PMidsizeUrl = @midsizeUrl,
@@ -294,8 +300,11 @@ async function processBatch(context, batchSize) {
 
                 context.log(`Uploaded midsize to: ${midsizeUrl}`);
 
-                // Update database with midsize URL
-                const apiMidsizeUrl = `/api/media/${image.PFileDirectory ? image.PFileDirectory + '/' : ''}${midsizeFileName}`;
+                // Update database with midsize URL (use forward slashes for API URL)
+                const dirForUrl = image.PFileDirectory ? image.PFileDirectory.replace(/\\/g, '/') : '';
+                const apiMidsizeUrl = dirForUrl 
+                    ? `/api/media/${dirForUrl}/${midsizeFileName}`
+                    : `/api/media/${midsizeFileName}`;
                 await query(`
                     UPDATE Pictures
                     SET PMidsizeUrl = @midsizeUrl,
