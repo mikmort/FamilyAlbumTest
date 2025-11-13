@@ -64,6 +64,37 @@ module.exports = async function (context, req) {
         
         const recentUploads = await query(recentUploadsQuery);
 
+        // Build NameEvent lookup for all IDs in PPeopleList across all media items
+        const allMedia = [...onThisDay, ...recentUploads];
+        const eventLookup = {};
+        
+        if (allMedia.length > 0) {
+            // Collect all numeric IDs from PPeopleList
+            const candidateIds = new Set();
+            allMedia.forEach(item => {
+                const ppl = item.PPeopleList || '';
+                if (!ppl) return;
+                const tokens = ppl.split(',').map(s => s.trim()).filter(Boolean);
+                tokens.forEach(tok => {
+                    if (/^\d+$/.test(tok)) candidateIds.add(parseInt(tok));
+                });
+            });
+
+            // Batch query NameEvent for all candidate IDs
+            if (candidateIds.size > 0) {
+                const ids = Array.from(candidateIds);
+                const idPlaceholders = ids.map((_, i) => `@id${i}`).join(',');
+                const eventQuery = `SELECT ID, neName, neRelation, neType FROM dbo.NameEvent WHERE ID IN (${idPlaceholders})`;
+                const eventParams = {};
+                ids.forEach((id, i) => { eventParams[`id${i}`] = id; });
+                
+                const eventRows = await query(eventQuery, eventParams);
+                eventRows.forEach(r => {
+                    eventLookup[r.ID] = { ID: r.ID, neName: r.neName, neType: r.neType, neRelation: r.neRelation };
+                });
+            }
+        }
+
         // Get total stats
         const statsQuery = `
             SELECT 
@@ -142,7 +173,7 @@ module.exports = async function (context, req) {
         const randomSuggestionResult = await query(randomSuggestionQuery, { weekSeed: weeksSinceEpoch });
         const randomSuggestion = randomSuggestionResult.length > 0 ? randomSuggestionResult[0] : null;
 
-        // Helper function to transform media items with URLs
+        // Helper function to transform media items with URLs and Event data
         const transformMedia = (mediaItems) => {
             return mediaItems.map(item => {
                 let blobPath = (item.PFileName || '').replace(/\\/g, '/').replace(/\/\//g, '/');
@@ -155,10 +186,25 @@ module.exports = async function (context, req) {
                 
                 const blobUrl = `/api/media/${encodedBlobPath}`;
                 
+                // Extract event from PPeopleList
+                let eventForItem = null;
+                if (item.PPeopleList) {
+                    const tokens = item.PPeopleList.split(',').map(s => s.trim()).filter(Boolean);
+                    const numericIds = tokens.filter(tok => /^\d+$/.test(tok)).map(tok => parseInt(tok));
+                    for (const id of numericIds) {
+                        const lookup = eventLookup[id];
+                        if (lookup && lookup.neType === 'E') {
+                            eventForItem = { ID: lookup.ID, neName: lookup.neName };
+                            break;
+                        }
+                    }
+                }
+                
                 return {
                     ...item,
                     PBlobUrl: blobUrl,
-                    PThumbnailUrl: thumbnailUrl
+                    PThumbnailUrl: thumbnailUrl,
+                    Event: eventForItem
                 };
             });
         };
