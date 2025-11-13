@@ -83,6 +83,9 @@ export default function MediaDetailModal({
   
   // Progressive loading effect: Load full resolution in background
   useEffect(() => {
+    // Track if this effect is still valid (component hasn't moved to different image)
+    let isCurrent = true;
+    
     // Only for images with midsize URLs
     if (media.PType === 1 && media.PMidsizeUrl && media.PMidsizeUrl !== media.PBlobUrl) {
       // Start with midsize
@@ -92,6 +95,9 @@ export default function MediaDetailModal({
       // Preload the midsize to get dimensions first
       const midsizeImg = new Image();
       midsizeImg.onload = () => {
+        // Check if we're still on the same image
+        if (!isCurrent) return;
+        
         // Store dimensions from midsize image (keep these for layout stability)
         setImageDimensions({
           width: midsizeImg.naturalWidth,
@@ -101,12 +107,16 @@ export default function MediaDetailModal({
         // Now preload full resolution in background
         const fullResImg = new Image();
         fullResImg.onload = () => {
+          // Check if we're still on the same image before swapping
+          if (!isCurrent) return;
+          
           // Seamlessly swap to full resolution without changing container size
           // The full-res image will render at midsize dimensions but with full quality
           setCurrentImageSrc(media.PBlobUrl);
           setIsLoadingFullRes(false);
         };
         fullResImg.onerror = () => {
+          if (!isCurrent) return;
           // If full res fails, keep midsize
           console.warn('Failed to load full resolution, keeping midsize');
           setIsLoadingFullRes(false);
@@ -122,6 +132,7 @@ export default function MediaDetailModal({
       // Still need to get dimensions for layout stability
       const img = new Image();
       img.onload = () => {
+        if (!isCurrent) return;
         setImageDimensions({
           width: img.naturalWidth,
           height: img.naturalHeight
@@ -129,6 +140,11 @@ export default function MediaDetailModal({
       };
       img.src = media.PBlobUrl;
     }
+    
+    // Cleanup function - mark this effect as stale if component unmounts or media changes
+    return () => {
+      isCurrent = false;
+    };
   }, [media.PFileName, media.PBlobUrl, media.PMidsizeUrl, media.PType]);
   
   const [allPeople, setAllPeople] = useState<Person[]>([]);
