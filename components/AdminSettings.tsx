@@ -62,6 +62,8 @@ export default function AdminSettings({ onRequestsChange }: AdminSettingsProps) 
   } | null>(null);
   const [midsizeProgress, setMidsizeProgress] = useState<any>(null);
   const [isGeneratingMidsize, setIsGeneratingMidsize] = useState(false);
+  const [isRegenerating, setIsRegenerating] = useState(false);
+  const [regenerateProgress, setRegenerateProgress] = useState<any>(null);
 
   useEffect(() => {
     fetchUsers();
@@ -174,6 +176,53 @@ export default function AdminSettings({ onRequestsChange }: AdminSettingsProps) 
         console.error('Error polling progress:', err);
         clearInterval(pollInterval);
         setIsGeneratingMidsize(false);
+      }
+    }, 2000); // Poll every 2 seconds
+  };
+
+  const startRegenerateMidsize = async () => {
+    if (!confirm('This will regenerate ALL existing midsize images with correct EXIF orientation. This may take a while. Continue?')) {
+      return;
+    }
+
+    try {
+      setIsRegenerating(true);
+      const response = await fetch('/api/regenerate-midsize', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+      });
+      
+      const data = await response.json();
+      
+      if (response.ok) {
+        alert('Regeneration started! Check progress below.');
+        pollRegenerateProgress();
+      } else {
+        alert(`Error: ${data.error}`);
+        setIsRegenerating(false);
+      }
+    } catch (err: any) {
+      console.error('Error starting regeneration:', err);
+      alert(`Error: ${err.message}`);
+      setIsRegenerating(false);
+    }
+  };
+
+  const pollRegenerateProgress = async () => {
+    const pollInterval = setInterval(async () => {
+      try {
+        const response = await fetch('/api/regenerate-midsize/progress');
+        const data = await response.json();
+        setRegenerateProgress(data);
+        
+        if (!data.isRunning) {
+          clearInterval(pollInterval);
+          setIsRegenerating(false);
+        }
+      } catch (err) {
+        console.error('Error polling regenerate progress:', err);
+        clearInterval(pollInterval);
+        setIsRegenerating(false);
       }
     }, 2000); // Poll every 2 seconds
   };
@@ -999,6 +1048,79 @@ export default function AdminSettings({ onRequestsChange }: AdminSettingsProps) 
           ⚠️ Note: Processing creates 1080px versions and uploads them to blob storage. 
           This operation may take several minutes for large batches. Progress updates every 2 seconds.
         </p>
+
+        {/* Regenerate Midsize Section */}
+        <div style={{ 
+          marginTop: '2rem', 
+          paddingTop: '2rem', 
+          borderTop: '2px solid #dee2e6' 
+        }}>
+          <h3 style={{ marginBottom: '1rem' }}>🔄 Fix Rotated Midsize Images</h3>
+          <p style={{ marginBottom: '1rem', fontSize: '0.95rem', color: '#666' }}>
+            If some midsize images appear rotated incorrectly, use this to regenerate them with proper EXIF orientation handling.
+          </p>
+
+          {regenerateProgress && (
+            <div style={{
+              padding: '1rem',
+              background: '#e7f3ff',
+              borderRadius: '4px',
+              marginBottom: '1rem',
+              border: '1px solid #007bff'
+            }}>
+              <h4 style={{ marginTop: 0, marginBottom: '0.5rem' }}>
+                {regenerateProgress.isRunning ? '⏳ Regenerating...' : '✅ Complete'}
+              </h4>
+              <div style={{ marginBottom: '0.5rem' }}>
+                <strong>Progress:</strong> {regenerateProgress.processed} / {regenerateProgress.total}
+              </div>
+              <div style={{ marginBottom: '0.5rem' }}>
+                <strong>✓ Succeeded:</strong> {regenerateProgress.succeeded} | 
+                <strong style={{ marginLeft: '1rem' }}>✗ Failed:</strong> {regenerateProgress.failed} |
+                <strong style={{ marginLeft: '1rem' }}>⊘ Skipped:</strong> {regenerateProgress.skipped}
+              </div>
+              {regenerateProgress.errors && regenerateProgress.errors.length > 0 && (
+                <details style={{ marginTop: '0.5rem' }}>
+                  <summary style={{ cursor: 'pointer', color: '#dc3545' }}>
+                    View {regenerateProgress.errors.length} error(s)
+                  </summary>
+                  <ul style={{ marginTop: '0.5rem', fontSize: '0.9rem' }}>
+                    {regenerateProgress.errors.slice(0, 10).map((err: any, idx: number) => (
+                      <li key={idx}>
+                        <strong>{err.file}:</strong> {err.error}
+                      </li>
+                    ))}
+                    {regenerateProgress.errors.length > 10 && (
+                      <li>... and {regenerateProgress.errors.length - 10} more</li>
+                    )}
+                  </ul>
+                </details>
+              )}
+            </div>
+          )}
+
+          <button
+            onClick={startRegenerateMidsize}
+            disabled={isRegenerating}
+            style={{
+              padding: '10px 20px',
+              backgroundColor: isRegenerating ? '#ccc' : '#ff9800',
+              color: 'white',
+              border: 'none',
+              borderRadius: '4px',
+              cursor: isRegenerating ? 'not-allowed' : 'pointer',
+              fontSize: '1rem',
+              fontWeight: 'bold'
+            }}
+          >
+            {isRegenerating ? '⏳ Regenerating...' : '🔄 Regenerate All Midsize Images'}
+          </button>
+
+          <p style={{ marginTop: '1rem', fontSize: '0.85rem', color: '#856404', background: '#fff3cd', padding: '0.75rem', borderRadius: '4px', border: '1px solid #ffc107' }}>
+            <strong>⚠️ Warning:</strong> This will regenerate ALL existing midsize images. 
+            This may take 30-60 minutes depending on the number of images.
+          </p>
+        </div>
       </div>
 
       {/* Pending Requests Section */}
