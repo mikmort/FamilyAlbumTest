@@ -933,7 +933,8 @@ export default function AdminSettings({ onRequestsChange }: AdminSettingsProps) 
         )}
       </div>
 
-      {/* Midsize Image Generation Section */}
+      {/* MIDSIZE IMAGE GENERATION SECTION - HIDDEN - Uncomment below to enable */}
+      {false && (
       <div className="card" style={{ marginBottom: '2rem', background: '#f0fff4', borderColor: '#28a745' }}>
         <h2 style={{ marginTop: 0 }}>🖼️ Midsize Image Generation</h2>
         <p style={{ color: '#666', marginBottom: '1rem' }}>
@@ -1157,6 +1158,8 @@ export default function AdminSettings({ onRequestsChange }: AdminSettingsProps) 
           </p>
         </div>
       </div>
+      )}
+      {/* END MIDSIZE SECTION */}
 
       {/* Pending Requests Section */}
       {pendingRequests.length > 0 && (
