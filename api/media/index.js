@@ -586,8 +586,15 @@ module.exports = async function (context, req) {
                     context.log(`Using existing thumbnail: ${foundThumbnailPath}`);
                     blobPath = foundThumbnailPath;
                 }
+                } catch (thumbnailError) {
+                    // Error during thumbnail generation/retrieval
+                    context.log.error(`❌ Error in thumbnail generation: ${thumbnailError.message}`);
+                    context.log.error(`Stack: ${thumbnailError.stack}`);
+                    context.log.warn(`Falling back to original file: ${foundPath}`);
+                    // Fall back to original file
+                    blobPath = foundPath;
                 } finally {
-                    // Release the lock when done
+                    // Always release the lock, even if there was an error
                     releaseThumbnailLock(foundPath);
                 }
             } else {

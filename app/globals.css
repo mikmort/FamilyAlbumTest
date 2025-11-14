@@ -249,7 +249,7 @@ button {
 }
 
 .video-indicator::before {
-  content: '▶';
+  content: '\25B6';  /* Unicode for play triangle */
   font-size: 16px;
 }
 
