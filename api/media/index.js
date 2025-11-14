@@ -591,8 +591,21 @@ module.exports = async function (context, req) {
                     context.log.error(`❌ Error in thumbnail generation: ${thumbnailError.message}`);
                     context.log.error(`Stack: ${thumbnailError.stack}`);
                     context.log.warn(`Falling back to original file: ${foundPath}`);
-                    // Fall back to original file
-                    blobPath = foundPath;
+                    
+                    // Fall back to original file - use foundPath which was set earlier
+                    // If for some reason foundPath is null, this will cause issues downstream
+                    if (foundPath) {
+                        blobPath = foundPath;
+                        context.log(`✓ Using fallback blob path: ${blobPath}`);
+                    } else {
+                        context.log.error(`❌ CRITICAL: foundPath is null, cannot fall back`);
+                        // This shouldn't happen since we check blobFound before entering thumbnail logic
+                        context.res = {
+                            status: 500,
+                            body: { error: 'Thumbnail generation failed and original file path is unavailable' }
+                        };
+                        return;
+                    }
                 } finally {
                     // Always release the lock, even if there was an error
                     releaseThumbnailLock(foundPath);
