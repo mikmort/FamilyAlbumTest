@@ -776,162 +776,7 @@ export default function AdminSettings({ onRequestsChange }: AdminSettingsProps) 
         <p className="manager-subtitle">Manage user permissions and access</p>
       </div>
 
-      {/* Face Recognition Training Section */}
-      <div className="card" style={{ marginBottom: '2rem', background: '#f0f8ff', borderColor: '#007bff' }}>
-        <h2 style={{ marginTop: 0 }}>🧠 Face Recognition Training</h2>
-        <p style={{ color: '#666', marginBottom: '0.5rem' }}>
-          Train the face recognition AI on confirmed face tags to improve accuracy and performance.
-        </p>
-        <p style={{ color: '#666', fontSize: '0.9rem', marginBottom: '0.5rem', fontStyle: 'italic' }}>
-          Uses intelligent sampling: prioritizes most recent photos and solo/duo shots for optimal training quality.
-        </p>
-        <p style={{ color: '#007bff', fontSize: '0.9rem', marginBottom: '1rem', fontWeight: '500' }}>
-          💡 Smart sampling: 5-10 photos for people with few photos, up to 60 photos for those with thousands. Logarithmic scaling ensures efficiency!
-        </p>
-        
-        {/* Model Selection */}
-        <div style={{ marginBottom: '1rem' }}>
-          <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '600', color: '#333' }}>
-            Face Recognition Model:
-          </label>
-          <div style={{ display: 'flex', gap: '1rem' }}>
-            <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer', padding: '0.5rem', border: '2px solid', borderColor: faceModel === 'insightface' ? '#007bff' : '#ddd', borderRadius: '8px', background: faceModel === 'insightface' ? '#e7f3ff' : 'white' }}>
-              <input
-                type="radio"
-                value="insightface"
-                checked={faceModel === 'insightface'}
-                onChange={(e) => setFaceModel(e.target.value as 'insightface' | 'face-api-js')}
-                disabled={isTraining}
-                style={{ marginRight: '0.5rem' }}
-              />
-              <div>
-                <div style={{ fontWeight: '600', color: '#007bff' }}>InsightFace (Recommended)</div>
-                <div style={{ fontSize: '0.85rem', color: '#666' }}>512-dim ArcFace · 99.8% accuracy · Better across ages</div>
-              </div>
-            </label>
-            <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer', padding: '0.5rem', border: '2px solid', borderColor: faceModel === 'face-api-js' ? '#007bff' : '#ddd', borderRadius: '8px', background: faceModel === 'face-api-js' ? '#e7f3ff' : 'white' }}>
-              <input
-                type="radio"
-                value="face-api-js"
-                checked={faceModel === 'face-api-js'}
-                onChange={(e) => setFaceModel(e.target.value as 'insightface' | 'face-api-js')}
-                disabled={isTraining}
-                style={{ marginRight: '0.5rem' }}
-              />
-              <div>
-                <div style={{ fontWeight: '600', color: '#666' }}>face-api.js (Legacy)</div>
-                <div style={{ fontSize: '0.85rem', color: '#666' }}>128-dim FaceNet · Browser-based · Faster but less accurate</div>
-              </div>
-            </label>
-          </div>
-        </div>
-        
-        {/* Checkpoint Resume Banner */}
-        {incompleteSession && !isTraining && (
-          <div style={{
-            padding: '1rem',
-            background: '#fff3cd',
-            border: '1px solid #ffc107',
-            borderRadius: '8px',
-            marginBottom: '1rem'
-          }}>
-            <div style={{ fontWeight: '600', color: '#856404', marginBottom: '0.5rem' }}>
-              ⚠️ Incomplete Training Session Found
-            </div>
-            <div style={{ fontSize: '0.9rem', color: '#856404', marginBottom: '0.75rem' }}>
-              Progress: {incompleteSession.processedPhotos?.length || 0} of {incompleteSession.totalPhotos} photos processed
-              {incompleteSession.totalPeople && ` (${incompleteSession.totalPeople} people)`}
-            </div>
-            <div style={{ display: 'flex', gap: '0.5rem' }}>
-              <button 
-                className="btn btn-primary"
-                onClick={() => trainFaces(true)}
-                style={{ fontSize: '0.9rem' }}
-              >
-                ▶️ Resume Training
-              </button>
-              <button 
-                className="btn"
-                onClick={() => {
-                  localStorage.removeItem('faceTrainingCheckpoint');
-                  setIncompleteSession(null);
-                }}
-                style={{ fontSize: '0.9rem', background: '#6c757d', color: 'white' }}
-              >
-                🗑️ Clear & Start Over
-              </button>
-            </div>
-          </div>
-        )}
-        
-        <div style={{ display: 'flex', gap: '0.5rem', marginBottom: trainingStatus ? '1rem' : 0 }}>
-          <button 
-            className="btn btn-primary"
-            onClick={() => trainFaces()}
-            disabled={isTraining}
-          >
-            {isTraining ? '⏳ Training...' : '🚀 Train Now'}
-          </button>
-          {isTraining && !isPaused && (
-            <button 
-              className="btn btn-danger"
-              onClick={pauseTraining}
-              style={{ background: '#dc3545' }}
-            >
-              ⏸ Cancel
-            </button>
-          )}
-        </div>
-        
-        {trainingStatus && (
-          <div style={{ 
-            padding: '1rem', 
-            background: 'white', 
-            borderRadius: '8px', 
-            border: '1px solid #ddd',
-            marginTop: '1rem'
-          }}>
-            <div style={{ 
-              fontSize: '0.95rem', 
-              color: trainingResult?.success ? '#28a745' : '#666',
-              fontWeight: '500'
-            }}>
-              {trainingStatus}
-            </div>
-            {trainingResult?.success && trainingResult.details && (
-              <div style={{ marginTop: '0.75rem', fontSize: '0.9rem' }}>
-                {trainingResult.seedData && trainingResult.seedData.photosProcessed > 0 && (
-                  <div style={{ marginBottom: '0.75rem', padding: '0.5rem', background: '#e7f3ff', borderRadius: '4px' }}>
-                    <strong>Seeding from existing tags:</strong>
-                    <ul style={{ marginTop: '0.25rem', marginBottom: 0, paddingLeft: '1.5rem' }}>
-                      <li>Photos processed: {trainingResult.seedData.photosProcessed}</li>
-                      <li>Faces detected: {trainingResult.seedData.facesDetected}</li>
-                      <li>Faces matched: {trainingResult.seedData.facesMatched}</li>
-                      {trainingResult.seedData.facesUnmatched > 0 && (
-                        <li style={{ color: '#856404' }}>Unmatched faces: {trainingResult.seedData.facesUnmatched}</li>
-                      )}
-                    </ul>
-                  </div>
-                )}
-                <strong>Training results:</strong>
-                <ul style={{ marginTop: '0.5rem', marginBottom: 0, paddingLeft: '1.5rem' }}>
-                  <li>Persons updated: {trainingResult.personsUpdated}</li>
-                  {trainingResult.details.slice(0, 5).map((detail: any, idx: number) => (
-                    <li key={idx}>
-                      {detail.personName}: {detail.encodingCount}/{detail.totalFaces} faces ({detail.samplePercentage}% sample)
-                    </li>
-                  ))}
-                  {trainingResult.details.length > 5 && (
-                    <li style={{ color: '#666', fontStyle: 'italic' }}>
-                      ... and {trainingResult.details.length - 5} more
-                    </li>
-                  )}
-                </ul>
-              </div>
-            )}
-          </div>
-        )}
-      </div>
+      {/* Face Recognition section moved to bottom, after all user management sections */}
 
       {/* MIDSIZE IMAGE GENERATION SECTION - HIDDEN - Uncomment below to enable */}
       {false && (
@@ -1406,6 +1251,164 @@ export default function AdminSettings({ onRequestsChange }: AdminSettingsProps) 
           </div>
         </div>
       </div>
+
+      {/* Face Recognition Training Section - MOVED AFTER USER MANAGEMENT */}
+      <div className="card" style={{ marginBottom: '2rem', background: '#f0f8ff', borderColor: '#007bff' }}>
+        <h2 style={{ marginTop: 0 }}>🧠 Face Recognition Training</h2>
+        <p style={{ color: '#666', marginBottom: '0.5rem' }}>
+          Train the face recognition AI on confirmed face tags to improve accuracy and performance.
+        </p>
+        <p style={{ color: '#666', fontSize: '0.9rem', marginBottom: '0.5rem', fontStyle: 'italic' }}>
+          Uses intelligent sampling: prioritizes most recent photos and solo/duo shots for optimal training quality.
+        </p>
+        <p style={{ color: '#007bff', fontSize: '0.9rem', marginBottom: '1rem', fontWeight: '500' }}>
+          💡 Smart sampling: 5-10 photos for people with few photos, up to 60 photos for those with thousands. Logarithmic scaling ensures efficiency!
+        </p>
+        
+        {/* Model Selection */}
+        <div style={{ marginBottom: '1rem' }}>
+          <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '600', color: '#333' }}>
+            Face Recognition Model:
+          </label>
+          <div style={{ display: 'flex', gap: '1rem' }}>
+            <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer', padding: '0.5rem', border: '2px solid', borderColor: faceModel === 'insightface' ? '#007bff' : '#ddd', borderRadius: '8px', background: faceModel === 'insightface' ? '#e7f3ff' : 'white' }}>
+              <input
+                type="radio"
+                value="insightface"
+                checked={faceModel === 'insightface'}
+                onChange={(e) => setFaceModel(e.target.value as 'insightface' | 'face-api-js')}
+                disabled={isTraining}
+                style={{ marginRight: '0.5rem' }}
+              />
+              <div>
+                <div style={{ fontWeight: '600', color: '#007bff' }}>InsightFace (Recommended)</div>
+                <div style={{ fontSize: '0.85rem', color: '#666' }}>512-dim ArcFace · 99.8% accuracy · Better across ages</div>
+              </div>
+            </label>
+            <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer', padding: '0.5rem', border: '2px solid', borderColor: faceModel === 'face-api-js' ? '#007bff' : '#ddd', borderRadius: '8px', background: faceModel === 'face-api-js' ? '#e7f3ff' : 'white' }}>
+              <input
+                type="radio"
+                value="face-api-js"
+                checked={faceModel === 'face-api-js'}
+                onChange={(e) => setFaceModel(e.target.value as 'insightface' | 'face-api-js')}
+                disabled={isTraining}
+                style={{ marginRight: '0.5rem' }}
+              />
+              <div>
+                <div style={{ fontWeight: '600', color: '#666' }}>face-api.js (Legacy)</div>
+                <div style={{ fontSize: '0.85rem', color: '#666' }}>128-dim FaceNet · Browser-based · Faster but less accurate</div>
+              </div>
+            </label>
+          </div>
+        </div>
+        
+        {/* Checkpoint Resume Banner */}
+        {incompleteSession && !isTraining && (
+          <div style={{
+            padding: '1rem',
+            background: '#fff3cd',
+            border: '1px solid #ffc107',
+            borderRadius: '8px',
+            marginBottom: '1rem'
+          }}>
+            <div style={{ fontWeight: '600', color: '#856404', marginBottom: '0.5rem' }}>
+              ⚠️ Incomplete Training Session Found
+            </div>
+            <div style={{ fontSize: '0.9rem', color: '#856404', marginBottom: '0.75rem' }}>
+              Progress: {incompleteSession.processedPhotos?.length || 0} of {incompleteSession.totalPhotos} photos processed
+              {incompleteSession.totalPeople && ` (${incompleteSession.totalPeople} people)`}
+            </div>
+            <div style={{ display: 'flex', gap: '0.5rem' }}>
+              <button 
+                className="btn btn-primary"
+                onClick={() => trainFaces(true)}
+                style={{ fontSize: '0.9rem' }}
+              >
+                ▶️ Resume Training
+              </button>
+              <button 
+                className="btn"
+                onClick={() => {
+                  localStorage.removeItem('faceTrainingCheckpoint');
+                  setIncompleteSession(null);
+                }}
+                style={{ fontSize: '0.9rem', background: '#6c757d', color: 'white' }}
+              >
+                🗑️ Clear & Start Over
+              </button>
+            </div>
+          </div>
+        )}
+        
+        <div style={{ display: 'flex', gap: '0.5rem', marginBottom: trainingStatus ? '1rem' : 0 }}>
+          <button 
+            className="btn btn-primary"
+            onClick={() => trainFaces()}
+            disabled={isTraining}
+          >
+            {isTraining ? '⏳ Training...' : '🚀 Train Now'}
+          </button>
+          {isTraining && !isPaused && (
+            <button 
+              className="btn btn-danger"
+              onClick={pauseTraining}
+              style={{ background: '#dc3545' }}
+            >
+              ⏸ Cancel
+            </button>
+          )}
+        </div>
+        
+        {trainingStatus && (
+          <div style={{ 
+            padding: '1rem', 
+            background: 'white', 
+            borderRadius: '8px', 
+            border: '1px solid #ddd',
+            marginTop: '1rem'
+          }}>
+            <div style={{ 
+              fontSize: '0.95rem', 
+              color: trainingResult?.success ? '#28a745' : '#666',
+              fontWeight: '500'
+            }}>
+              {trainingStatus}
+            </div>
+            {trainingResult?.success && trainingResult.details && (
+              <div style={{ marginTop: '0.75rem', fontSize: '0.9rem' }}>
+                {trainingResult.seedData && trainingResult.seedData.photosProcessed > 0 && (
+                  <div style={{ marginBottom: '0.75rem', padding: '0.5rem', background: '#e7f3ff', borderRadius: '4px' }}>
+                    <strong>Seeding from existing tags:</strong>
+                    <ul style={{ marginTop: '0.25rem', marginBottom: 0, paddingLeft: '1.5rem' }}>
+                      <li>Photos processed: {trainingResult.seedData.photosProcessed}</li>
+                      <li>Faces detected: {trainingResult.seedData.facesDetected}</li>
+                      <li>Faces matched: {trainingResult.seedData.facesMatched}</li>
+                      {trainingResult.seedData.facesUnmatched > 0 && (
+                        <li style={{ color: '#856404' }}>Unmatched faces: {trainingResult.seedData.facesUnmatched}</li>
+                      )}
+                    </ul>
+                  </div>
+                )}
+                <strong>Training results:</strong>
+                <ul style={{ marginTop: '0.5rem', marginBottom: 0, paddingLeft: '1.5rem' }}>
+                  <li>Persons updated: {trainingResult.personsUpdated}</li>
+                  {trainingResult.details.slice(0, 5).map((detail: any, idx: number) => (
+                    <li key={idx}>
+                      {detail.personName}: {detail.encodingCount}/{detail.totalFaces} faces ({detail.samplePercentage}% sample)
+                    </li>
+                  ))}
+                  {trainingResult.details.length > 5 && (
+                    <li style={{ color: '#666', fontStyle: 'italic' }}>
+                      ... and {trainingResult.details.length - 5} more
+                    </li>
+                  )}
+                </ul>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
     </div>
   );
 }
