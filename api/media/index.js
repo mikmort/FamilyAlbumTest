@@ -10,10 +10,13 @@ const thumbnailGenerationLocks = new Map();
 
 // Make sharp optional - only needed for thumbnail generation
 let sharp = null;
+let sharpAvailable = false;
 try {
     sharp = require('sharp');
+    sharpAvailable = true;
+    console.log('✅ Sharp module loaded successfully');
 } catch (err) {
-    console.warn('Sharp module not available - thumbnail generation disabled');
+    console.warn('⚠️ Sharp module not available - thumbnail generation disabled:', err.message);
 }
 
 // Make ffmpeg optional - only needed for video thumbnail generation
@@ -54,6 +57,10 @@ function releaseThumbnailLock(filepath) {
 }
 
 module.exports = async function (context, req) {
+    // Log every request for debugging
+    context.log(`📍 Media API called: ${req.method} ${req.url}`);
+    context.log(`   Sharp available: ${sharpAvailable}, FFmpeg available: ${!!ffmpeg}`);
+    
     // Check authorization for all endpoints
     // Read operations (GET) require 'Read' role
     // Write operations (POST, PUT, DELETE) require 'Full' role
@@ -62,6 +69,7 @@ module.exports = async function (context, req) {
     
     const authResult = await checkAuthorization(context, requiredRole);
     if (!authResult.authorized) {
+        context.log(`❌ Authorization failed for ${method} ${req.url}`);
         context.res = {
             status: authResult.status,
             headers: { 'Content-Type': 'application/json' },
@@ -69,6 +77,8 @@ module.exports = async function (context, req) {
         };
         return;
     }
+    context.log(`✅ Authorization passed for user: ${authResult.user?.userDetails || 'unknown'}`);
+
 
     // Temporary debug endpoint: /api/media/debug/list
     if (req.url && req.url.startsWith('/api/media/debug/list')) {
@@ -384,8 +394,10 @@ module.exports = async function (context, req) {
             // If thumbnail requested, check if it exists
             // Use the actual found blob name (foundPath) for thumbnail operations
             if (thumbnail) {
+                context.log(`🔍 Thumbnail requested for: ${foundPath}`);
                 // Acquire lock to prevent concurrent generation of the same thumbnail
                 await acquireThumbnailLock(foundPath);
+                context.log(`🔒 Lock acquired for: ${foundPath}`);
                 
                 try {
                     // Use full path (including directory) to avoid conflicts with duplicate filenames
@@ -616,18 +628,19 @@ module.exports = async function (context, req) {
             }
             
             // At this point, blobPath contains the actual blob name (either original or thumbnail)
-            context.log(`Downloading blob: "${blobPath}"`);
+            context.log(`📥 Preparing to download blob: "${blobPath}"`);
             
             try {
                 // Get blob client
                 const containerClient = getContainerClient();
                 const blobClient = containerClient.getBlobClient(blobPath);
                 
-                context.log(`Attempting to download blob: "${blobPath}"`);
+                context.log(`🔍 Getting blob properties for: "${blobPath}"`);
                 
                 // Get blob properties first to get the size
                 const properties = await blobClient.getProperties();
                 const fileSize = properties.contentLength;
+                context.log(`✓ Blob properties retrieved. Size: ${fileSize} bytes`);
                 
                 // Determine content type - prioritize file extension over blob metadata
                 const contentType = getContentType(blobPath);
