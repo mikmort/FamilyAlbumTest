@@ -848,20 +848,22 @@ export default function ProcessNewFiles() {
                   
                   {filteredEvents.length === 0 ? (
                     <div className="autocomplete-item disabled">
-                      <em>No matching events found</em>
+                      <em>{eventSearch ? 'No matching events found' : 'No events in database'}</em>
                     </div>
                   ) : (
                     filteredEvents.map(event => (
                       <div
                         key={event.ID}
-                        className="autocomplete-item"
+                        className="autocomplete-item autocomplete-item-columns"
                         onClick={() => {
                           setSelectedEvent(event.ID);
                           setEventSearch('');
                           setEventDropdownOpen(false);
                         }}
                       >
-                        {event.neName} <span className="count">({event.neCount} photos)</span>
+                        <span className="person-name-col">{event.neName}</span>
+                        <span className="person-relation-col">{event.neRelation || '—'}</span>
+                        <span className="person-count-col">{event.neCount}</span>
                       </div>
                     ))
                   )}

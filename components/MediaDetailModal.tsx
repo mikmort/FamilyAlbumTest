@@ -134,6 +134,10 @@ export default function MediaDetailModal({
   const [peopleSearchFilter, setPeopleSearchFilter] = useState('');
   const [showPositionSelector, setShowPositionSelector] = useState(false);
   
+  // Event selector state
+  const [eventSearch, setEventSearch] = useState('');
+  const [eventDropdownOpen, setEventDropdownOpen] = useState(false);
+  
   // Inline creation state
   const [showCreatePerson, setShowCreatePerson] = useState(false);
   const [showCreateEvent, setShowCreateEvent] = useState(false);
@@ -216,6 +220,18 @@ export default function MediaDetailModal({
       fetchEvents();
     }
   }, [editing]);
+
+  // Close event dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      if (!target.closest('.autocomplete-wrapper')) {
+        setEventDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   // Load face detection suggestions when modal opens (for images only)
   useEffect(() => {
@@ -1333,42 +1349,98 @@ export default function MediaDetailModal({
             </div>
 
             <div className="form-group">
-              <label>Event:</label>
+              <label>Event {allEvents.length > 0 && `(${allEvents.length} available)`}</label>
               {editing ? (
                 loadingEvents ? (
                   <div className="loading-spinner"></div>
                 ) : (
+                  (() => {
+                    // Filter events based on search - prioritize starts-with, then contains, then rest
+                    const filteredEvents = eventSearch
+                      ? [
+                          ...allEvents.filter(event => event.neName.toLowerCase().startsWith(eventSearch.toLowerCase())).sort((a, b) => a.neName.localeCompare(b.neName)),
+                          ...allEvents.filter(event => !event.neName.toLowerCase().startsWith(eventSearch.toLowerCase()) && event.neName.toLowerCase().includes(eventSearch.toLowerCase())).sort((a, b) => a.neName.localeCompare(b.neName)),
+                          ...allEvents.filter(event => !event.neName.toLowerCase().includes(eventSearch.toLowerCase())).sort((a, b) => a.neName.localeCompare(b.neName))
+                        ]
+                      : allEvents.slice().sort((a, b) => a.neName.localeCompare(b.neName));
+                    
+                    return (
                   <>
-                    <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.5rem' }}>
-                      <select
-                        value={selectedEvent}
+                    <div className="autocomplete-wrapper">
+                      <input
+                        type="text"
+                        value={eventSearch}
                         onChange={(e) => {
-                          const newEventId = e.target.value ? parseInt(e.target.value) : '';
-                          setSelectedEvent(newEventId);
-                          // Update event name preview
-                          if (newEventId) {
-                            const event = allEvents.find(ev => ev.ID === newEventId);
-                            setCurrentEventName(event?.neName || null);
-                          } else {
-                            setCurrentEventName(null);
-                          }
+                          setEventSearch(e.target.value);
+                          setEventDropdownOpen(true);
                         }}
-                        style={{ flex: 1 }}
-                      >
-                        <option value="">-- No Event --</option>
-                        {allEvents.map((event) => (
-                          <option key={event.ID} value={event.ID}>
-                            {event.neName} ({event.neCount} photos)
-                          </option>
-                        ))}
-                      </select>
-                      <button
-                        className="btn btn-secondary"
-                        onClick={() => setShowCreateEvent(true)}
-                        title="Create new event"
-                      >
-                        + New
-                      </button>
+                        onFocus={() => setEventDropdownOpen(true)}
+                        placeholder={selectedEvent ? (allEvents.find(e => e.ID === selectedEvent)?.neName || '') : "Type to search events..."}
+                        className="autocomplete-input"
+                      />
+                      {eventDropdownOpen && (
+                        <div className="autocomplete-dropdown">
+                          <div 
+                            className="autocomplete-item"
+                            onClick={() => {
+                              setSelectedEvent('');
+                              setCurrentEventName(null);
+                              setEventSearch('');
+                              setEventDropdownOpen(false);
+                            }}
+                          >
+                            <em>-- No Event --</em>
+                          </div>
+                          <div 
+                            className="autocomplete-item create-new"
+                            onClick={() => {
+                              setShowCreateEvent(true);
+                              setEventDropdownOpen(false);
+                            }}
+                          >
+                            <strong>+ Create New Event</strong>
+                          </div>
+                          {filteredEvents.length === 0 ? (
+                            <div className="autocomplete-item disabled">
+                              <em>{eventSearch ? 'No matching events found' : 'No events in database'}</em>
+                            </div>
+                          ) : (
+                            filteredEvents.map(event => (
+                              <div
+                                key={event.ID}
+                                className="autocomplete-item autocomplete-item-columns"
+                                onClick={() => {
+                                  setSelectedEvent(event.ID);
+                                  setCurrentEventName(event.neName);
+                                  setEventSearch('');
+                                  setEventDropdownOpen(false);
+                                }}
+                              >
+                                <span className="person-name-col">{event.neName}</span>
+                                <span className="person-relation-col">{event.neRelation || '—'}</span>
+                                <span className="person-count-col">{event.neCount}</span>
+                              </div>
+                            ))
+                          )}
+                        </div>
+                      )}
+                      {selectedEvent && (
+                        <div className="selected-tags">
+                          <span className="tag">
+                            {allEvents.find(e => e.ID === selectedEvent)?.neName || ''}
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setSelectedEvent('');
+                                setCurrentEventName(null);
+                              }}
+                              className="tag-remove"
+                            >
+                              ×
+                            </button>
+                          </span>
+                        </div>
+                      )}
                     </div>
                     
                     {/* Inline Event Creation Form */}
@@ -1411,6 +1483,8 @@ export default function MediaDetailModal({
                       </div>
                     )}
                   </>
+                    );
+                  })()
                 )
               ) : (
                 <p>{currentEventName || 'Not set'}</p>
