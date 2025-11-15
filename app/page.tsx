@@ -65,6 +65,55 @@ export default function Home() {
     checkAuthStatus();
   }, []);
 
+  // Sync view state with browser history
+  useEffect(() => {
+    // Push initial state
+    if (typeof window !== 'undefined') {
+      const initialState = { view, selectedMedia: selectedMedia?.PFileName, recentDays };
+      window.history.replaceState(initialState, '', window.location.pathname);
+    }
+  }, []); // Only on mount
+
+  // Update browser history when view changes
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    
+    const state = { view, selectedMedia: selectedMedia?.PFileName, recentDays };
+    const currentState = window.history.state;
+    
+    // Only push new state if it's different from current state
+    if (!currentState || currentState.view !== view || currentState.selectedMedia !== selectedMedia?.PFileName) {
+      window.history.pushState(state, '', window.location.pathname);
+    }
+  }, [view, selectedMedia, recentDays]);
+
+  // Handle browser back/forward buttons
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const handlePopState = (event: PopStateEvent) => {
+      if (event.state) {
+        setView(event.state.view || 'home');
+        setRecentDays(event.state.recentDays || null);
+        
+        // Clear media selection when going back
+        if (event.state.view !== 'gallery' || !event.state.selectedMedia) {
+          setSelectedMedia(null);
+          setStartFullscreen(false);
+        }
+      } else {
+        // No state means we're at the initial page load
+        setView('home');
+        setSelectedMedia(null);
+        setStartFullscreen(false);
+        setRecentDays(null);
+      }
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
+
   // Handle URL parameters (e.g., ?file=xyz.jpg&fullscreen=true)
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -145,10 +194,10 @@ export default function Home() {
   };
 
   const handleBack = () => {
-    setView('home');
-    setSelectedMedia(null);
-    setStartFullscreen(false);
-    setRecentDays(null);
+    // Use browser back button instead of manually setting view
+    if (typeof window !== 'undefined') {
+      window.history.back();
+    }
   };
 
   const handleMediaClick = (media: MediaItem, allMedia: MediaItem[]) => {
@@ -340,14 +389,13 @@ export default function Home() {
               updatedMedia={lastUpdatedMedia}
               onMediaClick={handleMediaClick}
               onMediaFullscreen={handleMediaFullscreen}
-              onNavigateHome={() => setView('home')}
             />
           </div>
         )}
 
         {view === 'manage-people' && (
           <>
-            <button className="btn btn-secondary mb-2" onClick={() => setView('home')}>
+            <button className="btn btn-secondary mb-2" onClick={handleBack}>
               ← Back
             </button>
             <PeopleManager />
@@ -356,7 +404,7 @@ export default function Home() {
 
         {view === 'manage-events' && (
           <>
-            <button className="btn btn-secondary mb-2" onClick={() => setView('home')}>
+            <button className="btn btn-secondary mb-2" onClick={handleBack}>
               ← Back
             </button>
             <EventManager />
@@ -365,7 +413,7 @@ export default function Home() {
 
         {view === 'process-files' && (
           <>
-            <button className="btn btn-secondary mb-2" onClick={() => setView('home')}>
+            <button className="btn btn-secondary mb-2" onClick={handleBack}>
               ← Back
             </button>
             <ProcessNewFiles />
@@ -374,7 +422,7 @@ export default function Home() {
 
         {view === 'upload-media' && (
           <>
-            <button className="btn btn-secondary mb-2" onClick={() => setView('home')}>
+            <button className="btn btn-secondary mb-2" onClick={handleBack}>
               ← Back
             </button>
             <UploadMedia onProcessFiles={() => setView('process-files')} />
@@ -383,7 +431,7 @@ export default function Home() {
 
         {view === 'new-media' && (
           <>
-            <button className="btn btn-secondary mb-2" onClick={() => setView('home')}>
+            <button className="btn btn-secondary mb-2" onClick={handleBack}>
               ← Back
             </button>
             <NewMediaView 
@@ -395,7 +443,7 @@ export default function Home() {
 
         {view === 'admin-settings' && isAdmin && (
           <>
-            <button className="btn btn-secondary mb-2" onClick={() => setView('home')}>
+            <button className="btn btn-secondary mb-2" onClick={handleBack}>
               ← Back
             </button>
             <AdminSettings onRequestsChange={checkAuthStatus} />
