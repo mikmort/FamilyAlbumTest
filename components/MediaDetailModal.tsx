@@ -1355,13 +1355,9 @@ export default function MediaDetailModal({
                   <div className="loading-spinner"></div>
                 ) : (
                   (() => {
-                    // Filter events based on search - prioritize starts-with, then contains, then rest
+                    // Filter events - only show events that start with search string or come alphabetically after it
                     const filteredEvents = eventSearch
-                      ? [
-                          ...allEvents.filter(event => event.neName.toLowerCase().startsWith(eventSearch.toLowerCase())).sort((a, b) => a.neName.localeCompare(b.neName)),
-                          ...allEvents.filter(event => !event.neName.toLowerCase().startsWith(eventSearch.toLowerCase()) && event.neName.toLowerCase().includes(eventSearch.toLowerCase())).sort((a, b) => a.neName.localeCompare(b.neName)),
-                          ...allEvents.filter(event => !event.neName.toLowerCase().includes(eventSearch.toLowerCase())).sort((a, b) => a.neName.localeCompare(b.neName))
-                        ]
+                      ? allEvents.filter(event => event.neName.toLowerCase().startsWith(eventSearch.toLowerCase())).sort((a, b) => a.neName.localeCompare(b.neName))
                       : allEvents.slice().sort((a, b) => a.neName.localeCompare(b.neName));
                     
                     return (

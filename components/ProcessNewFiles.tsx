@@ -520,13 +520,9 @@ export default function ProcessNewFiles() {
     setPeopleDropdownOpen(false);
   };
 
-  // Filter events based on search - prioritize starts-with, then contains, then rest
+  // Filter events - only show events that start with search string
   const filteredEvents = eventSearch
-    ? [
-        ...events.filter(event => event.neName.toLowerCase().startsWith(eventSearch.toLowerCase())).sort((a, b) => a.neName.localeCompare(b.neName)),
-        ...events.filter(event => !event.neName.toLowerCase().startsWith(eventSearch.toLowerCase()) && event.neName.toLowerCase().includes(eventSearch.toLowerCase())).sort((a, b) => a.neName.localeCompare(b.neName)),
-        ...events.filter(event => !event.neName.toLowerCase().includes(eventSearch.toLowerCase())).sort((a, b) => a.neName.localeCompare(b.neName))
-      ]
+    ? events.filter(event => event.neName.toLowerCase().startsWith(eventSearch.toLowerCase())).sort((a, b) => a.neName.localeCompare(b.neName))
     : events.slice().sort((a, b) => a.neName.localeCompare(b.neName));
 
   // Filter people based on search - prioritize starts-with, then contains, then rest

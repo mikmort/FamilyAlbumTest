@@ -253,10 +253,9 @@ export default function PeopleSelector({
       return events.sort((a, b) => a.neName.localeCompare(b.neName));
     }
     
-    // Use fuzzy search
-    const results = eventsFuse.search(eventSearch);
-    return results.map(result => result.item);
-  }, [events, eventSearch, eventsFuse]);
+    // Only show events that start with the search string
+    return events.filter(event => event.neName.toLowerCase().startsWith(eventSearch.toLowerCase())).sort((a, b) => a.neName.localeCompare(b.neName));
+  }, [events, eventSearch]);
 
   const getSelectedPeopleNames = () => {
     return selectedPeople.map(id => people.find(p => p.ID === id)?.neName).filter(Boolean);
