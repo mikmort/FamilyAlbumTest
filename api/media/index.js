@@ -1578,9 +1578,9 @@ module.exports = async function (context, req) {
                     willUpdate: currentEventID !== normalizedEventID 
                 });
 
-                // If event changed, update PPeopleList
+                // If event changed, update PPeopleList AND NamePhoto table
                 if (currentEventID !== normalizedEventID) {
-                    context.log('=== EVENT CHANGED - UPDATING PPeopleList ===');
+                    context.log('=== EVENT CHANGED - UPDATING PPeopleList AND NamePhoto ===');
                     eventChanged = true;
                     
                     // Verify the new event exists if provided
@@ -1621,6 +1621,52 @@ module.exports = async function (context, req) {
                     `, { filename: dbFileName, peopleList: newPPeopleList });
                     
                     context.log('✅ PPeopleList updated successfully');
+                    
+                    // CRITICAL: Also update NamePhoto table to keep it in sync
+                    // Remove old event from NamePhoto if it exists
+                    if (currentEventID) {
+                        context.log(`Removing old event ${currentEventID} from NamePhoto...`);
+                        await execute(`
+                            DELETE FROM dbo.NamePhoto
+                            WHERE npFileName = @filename AND npID = @eventId
+                        `, { filename: dbFileName, eventId: currentEventID });
+                        
+                        // Update neCount for old event
+                        await execute(`
+                            UPDATE dbo.NameEvent
+                            SET neCount = (
+                                SELECT COUNT(DISTINCT npFileName)
+                                FROM dbo.NamePhoto
+                                WHERE npID = @eventId
+                            )
+                            WHERE ID = @eventId
+                        `, { eventId: currentEventID });
+                        context.log('✅ Old event removed from NamePhoto');
+                    }
+                    
+                    // Add new event to NamePhoto if provided
+                    if (normalizedEventID) {
+                        context.log(`Adding new event ${normalizedEventID} to NamePhoto...`);
+                        await execute(`
+                            IF NOT EXISTS (SELECT 1 FROM dbo.NamePhoto WHERE npFileName = @filename AND npID = @eventId)
+                            BEGIN
+                                INSERT INTO dbo.NamePhoto (npFileName, npID, npPosition)
+                                VALUES (@filename, @eventId, 0)
+                            END
+                        `, { filename: dbFileName, eventId: normalizedEventID });
+                        
+                        // Update neCount for new event
+                        await execute(`
+                            UPDATE dbo.NameEvent
+                            SET neCount = (
+                                SELECT COUNT(DISTINCT npFileName)
+                                FROM dbo.NamePhoto
+                                WHERE npID = @eventId
+                            )
+                            WHERE ID = @eventId
+                        `, { eventId: normalizedEventID });
+                        context.log('✅ New event added to NamePhoto');
+                    }
                 }
                 context.log('=== EVENT UPDATE END ===');
             }
