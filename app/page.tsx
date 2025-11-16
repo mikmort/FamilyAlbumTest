@@ -65,49 +65,19 @@ export default function Home() {
     checkAuthStatus();
   }, []);
 
-  // Sync view state with browser history
-  useEffect(() => {
-    // Push initial state
-    if (typeof window !== 'undefined') {
-      const initialState = { view, selectedMedia: selectedMedia?.PFileName, recentDays };
-      window.history.replaceState(initialState, '', window.location.pathname);
-    }
-  }, []); // Only on mount
+  // Note: Browser history management removed to fix back button reliability
+  // Using explicit view state navigation instead
 
-  // Update browser history when view changes
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-    
-    const state = { view, selectedMedia: selectedMedia?.PFileName, recentDays };
-    const currentState = window.history.state;
-    
-    // Only push new state if it's different from current state
-    if (!currentState || currentState.view !== view || currentState.selectedMedia !== selectedMedia?.PFileName) {
-      window.history.pushState(state, '', window.location.pathname);
-    }
-  }, [view, selectedMedia, recentDays]);
-
-  // Handle browser back/forward buttons
+  // Handle browser back/forward buttons (for external navigation)
   useEffect(() => {
     if (typeof window === 'undefined') return;
 
-    const handlePopState = (event: PopStateEvent) => {
-      if (event.state) {
-        setView(event.state.view || 'home');
-        setRecentDays(event.state.recentDays || null);
-        
-        // Clear media selection when going back
-        if (event.state.view !== 'gallery' || !event.state.selectedMedia) {
-          setSelectedMedia(null);
-          setStartFullscreen(false);
-        }
-      } else {
-        // No state means we're at the initial page load
-        setView('home');
-        setSelectedMedia(null);
-        setStartFullscreen(false);
-        setRecentDays(null);
-      }
+    const handlePopState = () => {
+      // If user presses browser back button, go to home
+      setView('home');
+      setSelectedMedia(null);
+      setStartFullscreen(false);
+      setRecentDays(null);
     };
 
     window.addEventListener('popstate', handlePopState);
@@ -194,10 +164,18 @@ export default function Home() {
   };
 
   const handleBack = () => {
-    // Use browser back button instead of manually setting view
-    if (typeof window !== 'undefined') {
-      window.history.back();
+    // Explicitly navigate based on context instead of relying on browser history
+    // If we came from "Recent Uploads" or have recentDays set, go to home
+    // Otherwise, go to selection page
+    if (recentDays) {
+      setView('home');
+      setRecentDays(null);
+    } else {
+      setView('select');
     }
+    // Clear any selected media
+    setSelectedMedia(null);
+    setStartFullscreen(false);
   };
 
   const handleMediaClick = (media: MediaItem, allMedia: MediaItem[]) => {
