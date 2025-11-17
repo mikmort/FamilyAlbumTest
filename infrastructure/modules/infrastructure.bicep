@@ -146,6 +146,11 @@ resource blobService 'Microsoft.Storage/storageAccounts/blobServices@2023-01-01'
       enabled: true
       days: 7 // Keep deleted files for 7 days
     }
+    isVersioningEnabled: true // Enable blob versioning for overwrite protection
+    containerDeleteRetentionPolicy: {
+      enabled: true
+      days: 7 // Keep deleted containers for 7 days
+    }
   }
 }
 
