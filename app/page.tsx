@@ -3,6 +3,7 @@
 
 import { useState, useEffect } from 'react';
 import Navigation from '@/components/Navigation';
+import Logo from '@/components/Logo';
 import UserInfo from '@/components/UserInfo';
 import PeopleSelector from '@/components/PeopleSelector';
 import ThumbnailGallery from '@/components/ThumbnailGallery';
@@ -272,14 +273,17 @@ export default function Home() {
     <>
 
       <div className="app-header">
-        <Navigation
-          onHome={() => setView('home')}
-          onSelectPeople={() => setView('select')}
-          onUploadMedia={() => setView('upload-media')}
-          onNewMedia={() => setView('new-media')}
-          onSettings={() => setShowSettingsMenu(true)}
-          newMediaCount={newMediaCount}
-        />
+        <div style={{ display: 'flex', alignItems: 'center', gap: '2rem' }}>
+          <Logo onClick={() => setView('home')} size="medium" />
+          <Navigation
+            onHome={() => setView('home')}
+            onSelectPeople={() => setView('select')}
+            onUploadMedia={() => setView('upload-media')}
+            onNewMedia={() => setView('new-media')}
+            onSettings={() => setShowSettingsMenu(true)}
+            newMediaCount={newMediaCount}
+          />
+        </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
           <button
             onClick={() => setShowSettingsMenu(true)}
