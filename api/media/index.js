@@ -1227,10 +1227,35 @@ module.exports = async function (context, req) {
                 
                 // Parse current PPeopleList - handle null/undefined
                 const peopleListStr = picture.PPeopleList || '';
-                const currentPeopleIds = peopleListStr 
+                const currentAllIds = peopleListStr 
                     ? peopleListStr.split(',').map(s => s.trim()).filter(Boolean).map(s => parseInt(s, 10))
                     : [];
-                context.log('Parsed people IDs:', currentPeopleIds);
+                context.log('Parsed all IDs from PPeopleList:', currentAllIds);
+                
+                // Query NameEvent to separate events from people
+                // PPeopleList format: eventID,personID,personID (event is first if present)
+                let eventId = null;
+                let currentPeopleIds = [...currentAllIds];
+                
+                if (currentAllIds.length > 0) {
+                    const idsToCheck = currentAllIds.join(',');
+                    const typeCheckQuery = `
+                        SELECT ID, neType
+                        FROM dbo.NameEvent
+                        WHERE ID IN (${idsToCheck})
+                    `;
+                    const typeResults = await query(typeCheckQuery);
+                    context.log('Type check results:', typeResults);
+                    
+                    // Separate events and people
+                    const eventIds = typeResults.filter(r => r.neType === 'E').map(r => r.ID);
+                    if (eventIds.length > 0) {
+                        eventId = eventIds[0]; // Should only be one event per photo
+                        currentPeopleIds = currentAllIds.filter(id => !eventIds.includes(id));
+                        context.log('Found event ID:', eventId);
+                        context.log('People IDs (excluding event):', currentPeopleIds);
+                    }
+                }
                 
                 // Check if person is already tagged
                 if (currentPeopleIds.includes(personId)) {
@@ -1247,6 +1272,7 @@ module.exports = async function (context, req) {
                 context.log('Insert position:', clampedPos);
                 
                 // Check if this is the first real person being tagged (currently only has ID=1 "No Tagged People")
+                // Must check people IDs only, excluding any event
                 const isCurrentlyUntagged = currentPeopleIds.length === 1 && currentPeopleIds[0] === 1;
                 
                 if (isCurrentlyUntagged) {
@@ -1321,8 +1347,11 @@ module.exports = async function (context, req) {
                     context.log('⚠️ NamePhoto record already exists, skipping insert');
                 }
 
-                // Update PPeopleList and PNameCount in Pictures table
-                const newPeopleList = currentPeopleIds.join(',');
+                // Build new PPeopleList: eventID (if exists), then all people IDs
+                // Format: "eventID,personID,personID" or just "personID,personID"
+                const newPeopleList = eventId 
+                    ? [eventId, ...currentPeopleIds].join(',')
+                    : currentPeopleIds.join(',');
                 context.log('New PPeopleList:', newPeopleList);
                 context.log('New PNameCount:', currentPeopleIds.length);
                 
