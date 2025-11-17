@@ -173,7 +173,7 @@ module.exports = async function (context, req) {
         const randomSuggestionResult = await query(randomSuggestionQuery, { weekSeed: weeksSinceEpoch });
         const randomSuggestion = randomSuggestionResult.length > 0 ? randomSuggestionResult[0] : null;
 
-        // Helper function to transform media items with URLs and Event data
+        // Helper function to transform media items with URLs, Event data, and TaggedPeople
         const transformMedia = (mediaItems) => {
             return mediaItems.map(item => {
                 let blobPath = (item.PFileName || '').replace(/\\/g, '/').replace(/\/\//g, '/');
@@ -200,10 +200,37 @@ module.exports = async function (context, req) {
                     }
                 }
                 
+                // Build TaggedPeople array from PPeopleList
+                // PPeopleList contains comma-separated IDs that map to NameEvent records
+                // Only include people (neType === 'N'), exclude events (neType === 'E')
+                let orderedTagged = [];
+                if (item.PPeopleList) {
+                    const tokens = item.PPeopleList.split(',').map(s => s.trim()).filter(Boolean);
+                    for (const tok of tokens) {
+                        if (!tok) continue;
+                        
+                        // All tokens in PPeopleList are numeric IDs
+                        if (/^\d+$/.test(tok)) {
+                            const id = parseInt(tok, 10);
+                            const lookup = eventLookup[id];
+                            
+                            // Only add people (neType === 'N'), exclude events (neType === 'E')
+                            if (lookup && lookup.neType === 'N') {
+                                orderedTagged.push({
+                                    ID: lookup.ID,
+                                    neName: lookup.neName,
+                                    neRelation: lookup.neRelation
+                                });
+                            }
+                        }
+                    }
+                }
+                
                 return {
                     ...item,
                     PBlobUrl: blobUrl,
                     PThumbnailUrl: thumbnailUrl,
+                    TaggedPeople: orderedTagged,
                     Event: eventForItem
                 };
             });
