@@ -859,9 +859,10 @@ export default function MediaDetailModal({
           onMouseLeave={() => setShowNavigationArrows(false)}
         >
           <button
-            onClick={() => {
-              setIsFullScreen(false);
-              setShowNavigationArrows(false);
+            onClick={(e) => {
+              e.stopPropagation();
+              // Close the entire modal, not just fullscreen
+              onClose();
             }}
             className="fullscreen-close"
           >
