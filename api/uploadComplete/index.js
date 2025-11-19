@@ -214,19 +214,22 @@ module.exports = async function (context, req) {
 
         // Generate API URLs (without 'media/' prefix - it's added by blob storage lookup)
         // For new uploads without directory structure, just use the filename
-        const apiUrl = `/api/media/${fileName}`;
-        const apiThumbUrl = `/api/media/${fileName}?thumbnail=true`;
+        // URL-encode the filename to handle special characters like #, ?, &, etc.
+        const encodedFileName = encodeURIComponent(fileName);
+        const apiUrl = `/api/media/${encodedFileName}`;
+        const apiThumbUrl = `/api/media/${encodedFileName}?thumbnail=true`;
         
         // Check if midsize version exists (for images >1MB that were resized)
         let apiMidsizeUrl = null;
         if (mediaType === 1) {
             const fileExt = fileName.substring(fileName.lastIndexOf('.'));
             const midsizeFileName = `${fileName.substring(0, fileName.lastIndexOf('.'))}-midsize${fileExt}`;
+            const encodedMidsizeFileName = encodeURIComponent(midsizeFileName);
             const midsizeBlobName = `media/${midsizeFileName}`;
             const midsizeBlobClient = containerClient.getBlockBlobClient(midsizeBlobName);
             const midsizeExists = await midsizeBlobClient.exists();
             if (midsizeExists) {
-                apiMidsizeUrl = `/api/media/${midsizeFileName}`;
+                apiMidsizeUrl = `/api/media/${encodedMidsizeFileName}`;
                 context.log(`✓ Midsize version found: ${apiMidsizeUrl}`);
             } else {
                 context.log(`No midsize version found for ${fileName}`);

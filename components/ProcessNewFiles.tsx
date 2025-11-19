@@ -671,7 +671,23 @@ export default function ProcessNewFiles() {
               <>
                 <img 
                   ref={imageRef}
-                  src={currentFile.uiBlobUrl} 
+                  src={(() => {
+                    // Handle URLs that may not be properly encoded
+                    // If URL is already encoded (%XX), use as-is
+                    // Otherwise, encode the filename part
+                    const url = currentFile.uiBlobUrl;
+                    if (url.includes('%')) {
+                      return url; // Already encoded
+                    }
+                    // Extract and encode the filename part after /api/media/
+                    const prefix = '/api/media/';
+                    if (url.startsWith(prefix)) {
+                      const filename = url.substring(prefix.length).split('?')[0];
+                      const queryString = url.includes('?') ? url.substring(url.indexOf('?')) : '';
+                      return prefix + encodeURIComponent(filename) + queryString;
+                    }
+                    return url; // Return as-is if format unexpected
+                  })()} 
                   alt={currentFile.uiFileName}
                   className="preview-image"
                   crossOrigin="anonymous"
@@ -742,7 +758,23 @@ export default function ProcessNewFiles() {
               </>
             ) : (
               <video 
-                src={currentFile.uiBlobUrl} 
+                src={(() => {
+                  // Handle URLs that may not be properly encoded
+                  // If URL is already encoded (%XX), use as-is
+                  // Otherwise, encode the filename part
+                  const url = currentFile.uiBlobUrl;
+                  if (url.includes('%')) {
+                    return url; // Already encoded
+                  }
+                  // Extract and encode the filename part after /api/media/
+                  const prefix = '/api/media/';
+                  if (url.startsWith(prefix)) {
+                    const filename = url.substring(prefix.length).split('?')[0];
+                    const queryString = url.includes('?') ? url.substring(url.indexOf('?')) : '';
+                    return prefix + encodeURIComponent(filename) + queryString;
+                  }
+                  return url; // Return as-is if format unexpected
+                })()} 
                 controls
                 className="preview-video"
               />
