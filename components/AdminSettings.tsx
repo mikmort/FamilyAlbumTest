@@ -473,12 +473,12 @@ export default function AdminSettings({ onRequestsChange }: AdminSettingsProps) 
           return;
         }
         
-        // Fetch next batch (50 people per batch to keep request time under 30 seconds)
+        // Fetch next batch (10 people per batch to keep request time under 30 seconds)
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 60000); // 60 second timeout
         
         try {
-          const batchResponse = await fetch(`/api/faces-tagged-photos?smartSample=true&batch=${currentBatch}&batchSize=50`, {
+          const batchResponse = await fetch(`/api/faces-tagged-photos?smartSample=true&batch=${currentBatch}&batchSize=10`, {
             signal: controller.signal
           });
           clearTimeout(timeoutId);

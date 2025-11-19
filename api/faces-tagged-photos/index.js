@@ -51,18 +51,24 @@ function calculateSampleSize(totalPhotos) {
  * }
  */
 module.exports = async function (context, req) {
-  context.log('Get tagged photos processing request');
+  const startTime = Date.now();
+  context.log('Get tagged photos processing request', { 
+    batch: req.query.batch, 
+    batchSize: req.query.batchSize 
+  });
 
   try {
     // Check authorization - requires Full role
     const { authorized, user, error } = await checkAuthorization(context, 'Full');
     if (!authorized) {
+      context.log.warn('Authorization failed', { error, timeElapsed: Date.now() - startTime });
       context.res = {
         status: 403,
         body: { error }
       };
       return;
     }
+    context.log('Authorization successful', { user: user.Email, timeElapsed: Date.now() - startTime });
   } catch (authError) {
     context.log.error('Authorization error:', authError);
     context.res = {
@@ -79,6 +85,8 @@ module.exports = async function (context, req) {
     // Batch pagination support for processing all persons
     const batch = req.query.batch ? parseInt(req.query.batch) : 0;
     const batchSize = req.query.batchSize ? parseInt(req.query.batchSize) : 100;
+    
+    context.log('Query parameters', { smartSample, maxPerPerson, batch, batchSize, timeElapsed: Date.now() - startTime });
 
     // Common CTE definition (without WITH keyword - we'll add it per query)
     const photoPersonPairsCTE = `
@@ -311,7 +319,11 @@ module.exports = async function (context, req) {
 
       const validPhotos = photosWithUrls.filter(p => p !== null);
       
-      context.log(`Returning ${validPhotos.length} photos with SAS URLs`);
+      const totalTime = Date.now() - startTime;
+      context.log(`Returning ${validPhotos.length} photos with SAS URLs`, { 
+        totalTimeMs: totalTime,
+        totalTimeSec: (totalTime / 1000).toFixed(2)
+      });
 
       context.res = {
         status: 200,
@@ -324,6 +336,7 @@ module.exports = async function (context, req) {
           limited: currentPhotoCount >= MAX_TOTAL_PHOTOS,
           personsProcessed: processedPersons,
           totalPersons: totalPersons,
+          executionTimeMs: totalTime,
           batch: {
             current: batch,
             size: batchSize,
@@ -449,6 +462,13 @@ module.exports = async function (context, req) {
 
   } catch (err) {
     context.log.error('Error fetching tagged photos:', err);
+    context.log.error('Error stack:', err.stack);
+    context.log.error('Error details:', {
+      message: err.message,
+      code: err.code,
+      number: err.number,
+      state: err.state
+    });
     
     // Check if this is a database warmup error
     if (err instanceof DatabaseWarmupError || isDatabaseWarmupError(err)) {
@@ -465,7 +485,8 @@ module.exports = async function (context, req) {
         status: 500,
         body: {
           success: false,
-          error: err.message || 'Error fetching tagged photos'
+          error: err.message || 'Error fetching tagged photos',
+          details: process.env.DEV_MODE === 'true' ? err.stack : undefined
         }
       };
     }
