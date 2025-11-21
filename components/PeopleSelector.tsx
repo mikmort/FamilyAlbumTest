@@ -192,6 +192,11 @@ export default function PeopleSelector({
       const newIds = [...selectedPeople, personId];
       const newNames = people.filter(p => newIds.includes(p.ID)).map(p => p.neName);
       onSelectedPeopleChange(newIds, newNames);
+      
+      // Automatically uncheck "No People Tagged" when a person is selected
+      if (showNoPeople) {
+        onShowNoPeopleChange(false);
+      }
     }
   };
 
