@@ -470,30 +470,20 @@ export default function MediaDetailModal({
         throw new Error(errorMessage);
       }
 
-      // Fetch the updated media details from server to get refreshed TaggedPeople array
-      const detailsResponse = await fetch(`/api/media/${encodedPath}`);
-      if (detailsResponse.ok) {
-        const updatedMedia = await detailsResponse.json();
-        console.log('✅ Fetched updated media after tagging:', updatedMedia.TaggedPeople);
-        
-        // Update local state with server data
-        setTaggedPeople(updatedMedia.TaggedPeople || []);
+      // When adding first real person, remove "No People Tagged" (ID=1) from local state
+      // The API already handles this in the database
+      const currentTagged = taggedPeople.filter(p => p.ID !== 1);
+      
+      // Find the person details and add to list
+      const person = allPeople.find(p => p.ID === personId);
+      if (person) {
+        const newTaggedPeople = [...currentTagged];
+        newTaggedPeople.splice(positionValue, 0, { ID: person.ID, neName: person.neName, neRelation: person.neRelation });
+        setTaggedPeople(newTaggedPeople);
         
         // Update parent component if callback provided
         if (onUpdate) {
-          onUpdate(updatedMedia);
-        }
-      } else {
-        // Fallback: update locally if fetch fails
-        const person = allPeople.find(p => p.ID === personId);
-        if (person) {
-          const newTaggedPeople = [...taggedPeople];
-          newTaggedPeople.splice(positionValue, 0, { ID: person.ID, neName: person.neName, neRelation: person.neRelation });
-          setTaggedPeople(newTaggedPeople);
-          
-          if (onUpdate) {
-            onUpdate({ ...media, TaggedPeople: newTaggedPeople });
-          }
+          onUpdate({ ...media, TaggedPeople: newTaggedPeople });
         }
       }
       
@@ -565,27 +555,20 @@ export default function MediaDetailModal({
         throw new Error(errorData.message || 'Failed to remove person tag');
       }
 
-      // Fetch the updated media details from server to get refreshed TaggedPeople array
-      const detailsResponse = await fetch(`/api/media/${encodedPath}`);
-      if (detailsResponse.ok) {
-        const updatedMedia = await detailsResponse.json();
-        console.log('✅ Fetched updated media after removing tag:', updatedMedia.TaggedPeople);
-        
-        // Update local state with server data
-        setTaggedPeople(updatedMedia.TaggedPeople || []);
-        
-        // Update parent component if callback provided
-        if (onUpdate) {
-          onUpdate(updatedMedia);
-        }
-      } else {
-        // Fallback: update locally if fetch fails
-        const newTaggedPeople = taggedPeople.filter(p => p.ID !== personId);
-        setTaggedPeople(newTaggedPeople);
-        
-        if (onUpdate) {
-          onUpdate({ ...media, TaggedPeople: newTaggedPeople });
-        }
+      // Remove the person from local state
+      const newTaggedPeople = taggedPeople.filter(p => p.ID !== personId);
+      
+      // If no people left, add "No People Tagged" (ID=1)
+      // The API already handles this in the database
+      if (newTaggedPeople.length === 0) {
+        newTaggedPeople.push({ ID: 1, neName: 'No People Tagged', neRelation: '' });
+      }
+      
+      setTaggedPeople(newTaggedPeople);
+      
+      // Update parent component if callback provided
+      if (onUpdate) {
+        onUpdate({ ...media, TaggedPeople: newTaggedPeople });
       }
     } catch (error) {
       console.error('❌ MediaDetailModal handleRemovePerson error:', error);
