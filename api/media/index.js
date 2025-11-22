@@ -510,6 +510,7 @@ module.exports = async function (context, req) {
                                 context.log(`Resizing thumbnail with sharp`);
                                 finalThumbnail = await sharp(thumbnailBuffer)
                                     .rotate() // Auto-rotate based on EXIF orientation
+                                    .withMetadata({ orientation: 1 }) // Strip EXIF orientation to prevent double-rotation
                                     .resize(300, null, {
                                         fit: 'inside',
                                         withoutEnlargement: true
@@ -567,6 +568,7 @@ module.exports = async function (context, req) {
                             try {
                                 const thumbnailBuffer = await sharp(originalBuffer)
                                     .rotate() // Auto-rotate based on EXIF orientation
+                                    .withMetadata({ orientation: 1 }) // Strip EXIF orientation to prevent double-rotation
                                     .resize(300, null, {
                                         fit: 'inside',
                                         withoutEnlargement: true
