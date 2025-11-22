@@ -1820,6 +1820,7 @@ module.exports = async function (context, req) {
                     context.log('❌ File not found in database');
                     context.res = {
                         status: 404,
+                        headers: { 'Content-Type': 'application/json' },
                         body: { error: 'Media file not found in database' }
                     };
                     return;
@@ -1946,6 +1947,7 @@ module.exports = async function (context, req) {
 
                 context.res = {
                     status: 200,
+                    headers: { 'Content-Type': 'application/json' },
                     body: {
                         success: true,
                         message: 'Media file deleted successfully',
@@ -1963,6 +1965,7 @@ module.exports = async function (context, req) {
                 context.log.error('Error stack:', deleteError.stack);
                 context.res = {
                     status: 500,
+                    headers: { 'Content-Type': 'application/json' },
                     body: { 
                         error: 'Failed to delete media',
                         message: deleteError.message,
