@@ -451,6 +451,11 @@ export default function Home() {
               setSelectedMedia(updatedMedia);
               // Notify ThumbnailGallery to update its cache
               setLastUpdatedMedia(updatedMedia);
+              
+              // If "No People Tagged" filter is active and we just tagged a person, clear the filter
+              if (showNoPeople && updatedMedia.TaggedPeople && updatedMedia.TaggedPeople.length > 0) {
+                setShowNoPeople(false);
+              }
             }}
             onDelete={(deletedMedia) => {
               // Remove the deleted item from the list
