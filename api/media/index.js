@@ -840,14 +840,18 @@ module.exports = async function (context, req) {
             }
 
             // Filter for photos with no people
-            // This includes photos with ONLY ID=1 ("No Tagged People") or truly no people tagged
+            // This should include photos with:
+            // 1. ONLY ID=1 ("No Tagged People") in PPeopleList
+            // 2. ONLY an event ID (no people) in PPeopleList
+            // 3. Legacy photos with no tags at all
             if (noPeople) {
                 whereClauses.push(`
                     (
                         -- Option 1: Only tagged with ID=1 ("No Tagged People")
                         (p.PPeopleList = '1' AND p.PNameCount = 1)
                         OR
-                        -- Option 2: Legacy photos with no tags at all
+                        -- Option 2: Only has event (no people) or empty
+                        -- Photos where NO people (neType='N') are tagged in NamePhoto
                         (
                             NOT EXISTS (
                                 SELECT 1 FROM dbo.NamePhoto np 
@@ -855,7 +859,8 @@ module.exports = async function (context, req) {
                                 WHERE np.npFileName = p.PFileName
                                 AND ne.neType = 'N'
                             )
-                            AND (p.PNameCount = 0 OR p.PNameCount IS NULL)
+                            -- Must have PNameCount = 0 or only event in PPeopleList
+                            AND (p.PNameCount = 0 OR p.PNameCount IS NULL OR p.PNameCount = 1)
                         )
                     )
                 `);
