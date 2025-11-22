@@ -202,7 +202,7 @@ function ThumbnailGallery({
         // Check "No People Tagged" filter
         if (noPeople) {
           // Item should have ID=1 "No People Tagged" or no people at all
-          const hasNoPeopleTag = updatedMedia.TaggedPeople?.some(p => p.ID === 1);
+          const hasNoPeopleTag = updatedMedia.TaggedPeople?.some(p => p.ID === 1) ?? false;
           const hasNoPeople = !updatedMedia.TaggedPeople || updatedMedia.TaggedPeople.length === 0 || hasNoPeopleTag;
           matchesFilter = hasNoPeople;
         }
