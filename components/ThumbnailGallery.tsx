@@ -201,10 +201,15 @@ function ThumbnailGallery({
         
         // Check "No People Tagged" filter
         if (noPeople) {
-          // Item should have ID=1 "No People Tagged" or no people at all
-          const hasNoPeopleTag = updatedMedia.TaggedPeople?.some(p => p.ID === 1) ?? false;
-          const hasNoPeople = !updatedMedia.TaggedPeople || updatedMedia.TaggedPeople.length === 0 || hasNoPeopleTag;
-          matchesFilter = hasNoPeople;
+          // Item matches if it has no real people (only ID=1, or empty, or only events)
+          // Real people are any IDs that are NOT ID=1
+          const realPeople = (updatedMedia.TaggedPeople || []).filter(p => p.ID !== 1);
+          matchesFilter = realPeople.length === 0;
+          console.log(`🔍 No People filter check:`, {
+            taggedPeople: updatedMedia.TaggedPeople,
+            realPeople,
+            matchesFilter
+          });
         }
         
         // Check people filter
