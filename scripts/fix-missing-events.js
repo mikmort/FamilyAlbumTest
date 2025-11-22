@@ -7,6 +7,23 @@
  * Usage: node scripts/fix-missing-events.js
  */
 
+// Load environment variables from api/local.settings.json if it exists
+const fs = require('fs');
+const path = require('path');
+
+const localSettingsPath = path.join(__dirname, '..', 'api', 'local.settings.json');
+if (fs.existsSync(localSettingsPath)) {
+    const settings = JSON.parse(fs.readFileSync(localSettingsPath, 'utf8'));
+    Object.keys(settings.Values || {}).forEach(key => {
+        if (!process.env[key]) {
+            process.env[key] = settings.Values[key];
+        }
+    });
+    console.log('📝 Loaded settings from api/local.settings.json\n');
+} else {
+    console.log('⚠️  No api/local.settings.json found, using environment variables\n');
+}
+
 const { query, execute } = require('../api/shared/db');
 
 async function fixMissingEvents() {

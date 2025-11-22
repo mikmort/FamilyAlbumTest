@@ -1436,12 +1436,38 @@ module.exports = async function (context, req) {
                 const dbFileName = picture.PFileName;
                 context.log('Found database filename:', dbFileName);
                 
-                // Parse current PPeopleList
-                const currentPeopleIds = picture.PPeopleList 
+                // Parse current PPeopleList and separate events from people
+                const allIds = picture.PPeopleList 
                     ? picture.PPeopleList.split(',').map(s => s.trim()).filter(Boolean).map(s => parseInt(s, 10))
                     : [];
                 
-                // Check if person is in the list
+                context.log('All IDs from PPeopleList:', allIds);
+                
+                // Query NameEvent to separate events from people
+                let eventId = null;
+                let currentPeopleIds = [...allIds];
+                
+                if (allIds.length > 0) {
+                    const idsToCheck = allIds.join(',');
+                    const typeCheckQuery = `
+                        SELECT ID, neType
+                        FROM dbo.NameEvent
+                        WHERE ID IN (${idsToCheck})
+                    `;
+                    const typeResults = await query(typeCheckQuery);
+                    context.log('Type check results:', typeResults);
+                    
+                    // Separate events and people
+                    const eventIds = typeResults.filter(r => r.neType === 'E').map(r => r.ID);
+                    if (eventIds.length > 0) {
+                        eventId = eventIds[0]; // Should only be one event per photo
+                        currentPeopleIds = allIds.filter(id => !eventIds.includes(id));
+                        context.log('Found event ID:', eventId);
+                        context.log('People IDs (excluding event):', currentPeopleIds);
+                    }
+                }
+                
+                // Check if person is in the people list
                 const personIndex = currentPeopleIds.indexOf(personId);
                 if (personIndex === -1) {
                     context.res = {
@@ -1460,14 +1486,18 @@ module.exports = async function (context, req) {
 
                 // Remove person from the list
                 currentPeopleIds.splice(personIndex, 1);
+                context.log('People IDs after removal:', currentPeopleIds);
                 
-                // If no people left, add "No Tagged People" (ID=1)
+                // If no people left (excluding events), add "No Tagged People" (ID=1)
                 let newPeopleList;
                 let newNameCount;
                 
                 if (currentPeopleIds.length === 0) {
                     context.log('Last person removed, adding "No Tagged People" (ID=1)');
-                    newPeopleList = '1';
+                    
+                    // Build PPeopleList: eventID (if exists), then ID=1 for "No Tagged People"
+                    // Format: "eventID,1" or just "1"
+                    newPeopleList = eventId ? `${eventId},1` : '1';
                     newNameCount = 1;
                     
                     // Insert "No Tagged People" into NamePhoto
@@ -1487,7 +1517,10 @@ module.exports = async function (context, req) {
                         WHERE ID = 1
                     `);
                 } else {
-                    newPeopleList = currentPeopleIds.join(',');
+                    // Build PPeopleList: eventID (if exists), then people IDs
+                    newPeopleList = eventId 
+                        ? [eventId, ...currentPeopleIds].join(',')
+                        : currentPeopleIds.join(',');
                     newNameCount = currentPeopleIds.length;
                 }
                 

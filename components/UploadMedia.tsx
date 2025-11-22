@@ -26,7 +26,7 @@ export default function UploadMedia({ onProcessFiles }: UploadMediaProps) {
         const item = items[i];
         if (item.kind === 'file') {
           const file = item.getAsFile();
-          if (file && (file.type.startsWith('image/') || file.type.startsWith('video/'))) {
+          if (file && (file.type.startsWith('image/') || file.type.startsWith('video/') || file.type.startsWith('audio/'))) {
             newFiles.push(file);
           }
         }
@@ -56,7 +56,7 @@ export default function UploadMedia({ onProcessFiles }: UploadMediaProps) {
     setIsDragging(false);
 
     const droppedFiles = Array.from(e.dataTransfer.files).filter(
-      file => file.type.startsWith('image/') || file.type.startsWith('video/')
+      file => file.type.startsWith('image/') || file.type.startsWith('video/') || file.type.startsWith('audio/')
     );
 
     if (droppedFiles.length > 0) {
@@ -68,7 +68,7 @@ export default function UploadMedia({ onProcessFiles }: UploadMediaProps) {
     const selectedFiles = e.target.files;
     if (selectedFiles) {
       const newFiles = Array.from(selectedFiles).filter(
-        file => file.type.startsWith('image/') || file.type.startsWith('video/')
+        file => file.type.startsWith('image/') || file.type.startsWith('video/') || file.type.startsWith('audio/')
       );
       setFiles(prev => [...prev, ...newFiles]);
     }
@@ -265,15 +265,18 @@ export default function UploadMedia({ onProcessFiles }: UploadMediaProps) {
         onClick={() => fileInputRef.current?.click()}
       >
         <div className="drop-zone-content">
-          <p>📁 Drag and drop images or videos here</p>
+          <p>📁 Drag and drop images, videos, or audio files here</p>
           <p>or click to browse</p>
           <p style={{ fontSize: '0.9rem', color: '#666' }}>You can also paste (Ctrl+V) images from clipboard</p>
+          <p style={{ fontSize: '0.85rem', color: '#888', marginTop: '0.5rem' }}>
+            Supported: Images (JPG, PNG, GIF), Videos (MP4, MOV), Audio (MP3, M4A, WAV, OGG)
+          </p>
         </div>
         <input
           ref={fileInputRef}
           type="file"
           multiple
-          accept="image/*,video/*"
+          accept="image/*,video/*,audio/*"
           onChange={handleFileSelect}
           style={{ display: 'none' }}
         />
@@ -339,7 +342,7 @@ export default function UploadMedia({ onProcessFiles }: UploadMediaProps) {
                       {formatFileSize(file.size)}
                     </td>
                     <td style={{ padding: '0.75rem', textAlign: 'center', fontSize: '0.85rem' }}>
-                      {file.type.startsWith('image/') ? '🖼️' : '🎬'}
+                      {file.type.startsWith('image/') ? '🖼️' : file.type.startsWith('video/') ? '🎬' : '🎙️'}
                     </td>
                     <td style={{ padding: '0.75rem', textAlign: 'center', fontSize: '0.85rem' }}>
                       {uploadStatus[file.name] ? (

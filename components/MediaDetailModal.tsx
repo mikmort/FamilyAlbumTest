@@ -470,16 +470,30 @@ export default function MediaDetailModal({
         throw new Error(errorMessage);
       }
 
-      // Find the person details
-      const person = allPeople.find(p => p.ID === personId);
-      if (person) {
-        const newTaggedPeople = [...taggedPeople];
-        newTaggedPeople.splice(positionValue, 0, { ID: person.ID, neName: person.neName, neRelation: person.neRelation });
-        setTaggedPeople(newTaggedPeople);
+      // Fetch the updated media details from server to get refreshed TaggedPeople array
+      const detailsResponse = await fetch(`/api/media/${encodedPath}`);
+      if (detailsResponse.ok) {
+        const updatedMedia = await detailsResponse.json();
+        console.log('✅ Fetched updated media after tagging:', updatedMedia.TaggedPeople);
+        
+        // Update local state with server data
+        setTaggedPeople(updatedMedia.TaggedPeople || []);
         
         // Update parent component if callback provided
         if (onUpdate) {
-          onUpdate({ ...media, TaggedPeople: newTaggedPeople });
+          onUpdate(updatedMedia);
+        }
+      } else {
+        // Fallback: update locally if fetch fails
+        const person = allPeople.find(p => p.ID === personId);
+        if (person) {
+          const newTaggedPeople = [...taggedPeople];
+          newTaggedPeople.splice(positionValue, 0, { ID: person.ID, neName: person.neName, neRelation: person.neRelation });
+          setTaggedPeople(newTaggedPeople);
+          
+          if (onUpdate) {
+            onUpdate({ ...media, TaggedPeople: newTaggedPeople });
+          }
         }
       }
       
@@ -551,12 +565,27 @@ export default function MediaDetailModal({
         throw new Error(errorData.message || 'Failed to remove person tag');
       }
 
-      const newTaggedPeople = taggedPeople.filter(p => p.ID !== personId);
-      setTaggedPeople(newTaggedPeople);
-      
-      // Update parent component if callback provided
-      if (onUpdate) {
-        onUpdate({ ...media, TaggedPeople: newTaggedPeople });
+      // Fetch the updated media details from server to get refreshed TaggedPeople array
+      const detailsResponse = await fetch(`/api/media/${encodedPath}`);
+      if (detailsResponse.ok) {
+        const updatedMedia = await detailsResponse.json();
+        console.log('✅ Fetched updated media after removing tag:', updatedMedia.TaggedPeople);
+        
+        // Update local state with server data
+        setTaggedPeople(updatedMedia.TaggedPeople || []);
+        
+        // Update parent component if callback provided
+        if (onUpdate) {
+          onUpdate(updatedMedia);
+        }
+      } else {
+        // Fallback: update locally if fetch fails
+        const newTaggedPeople = taggedPeople.filter(p => p.ID !== personId);
+        setTaggedPeople(newTaggedPeople);
+        
+        if (onUpdate) {
+          onUpdate({ ...media, TaggedPeople: newTaggedPeople });
+        }
       }
     } catch (error) {
       console.error('❌ MediaDetailModal handleRemovePerson error:', error);
