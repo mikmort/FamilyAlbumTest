@@ -319,8 +319,8 @@ module.exports = async function (context, req) {
 
                 // Now create thumbnail FROM THE ROTATED BUFFER (not from original)
                 // This way the thumbnail is created from an already-rotated image
+                // rotatedBuffer already has no EXIF metadata, so no need to strip again
                 const thumbnailBuffer = await sharp(rotatedBuffer)
-                    .withMetadata(false) // Ensure no EXIF metadata in thumbnail
                     .resize(null, 200, {
                         fit: 'inside',
                         withoutEnlargement: true
