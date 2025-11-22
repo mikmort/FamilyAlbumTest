@@ -441,13 +441,8 @@ export default function Home() {
               setStartFullscreen(false);
             }}
             onUpdate={(updatedMedia) => {
-              // Update the media in the list
-              setMediaList(prevList => 
-                prevList.map(item => 
-                  item.PFileName === updatedMedia.PFileName ? updatedMedia : item
-                )
-              );
-              // Update selectedMedia so it has the latest data
+              // Don't update mediaList - ThumbnailGallery manages its own filtered list
+              // Just update selectedMedia so the modal has the latest data
               setSelectedMedia(updatedMedia);
               // Notify ThumbnailGallery to update its cache
               setLastUpdatedMedia(updatedMedia);

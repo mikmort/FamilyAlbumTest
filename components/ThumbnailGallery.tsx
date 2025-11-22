@@ -195,14 +195,57 @@ function ThumbnailGallery({
   // Update allMedia when an item is updated externally (e.g., from modal)
   useEffect(() => {
     if (updatedMedia) {
-      setAllMedia(prevMedia => 
-        prevMedia.map(item => 
-          item.PFileName === updatedMedia.PFileName ? updatedMedia : item
-        )
-      );
-      console.log(`📝 ThumbnailGallery: Updated ${updatedMedia.PFileName} with event:`, updatedMedia.Event);
+      setAllMedia(prevMedia => {
+        // Check if the updated item still matches the current filters
+        let matchesFilter = true;
+        
+        // Check "No People Tagged" filter
+        if (noPeople) {
+          // Item should have ID=1 "No People Tagged" or no people at all
+          const hasNoPeopleTag = updatedMedia.TaggedPeople?.some(p => p.ID === 1);
+          const hasNoPeople = !updatedMedia.TaggedPeople || updatedMedia.TaggedPeople.length === 0 || hasNoPeopleTag;
+          matchesFilter = hasNoPeople;
+        }
+        
+        // Check people filter
+        if (matchesFilter && peopleIds.length > 0) {
+          const taggedIds = (updatedMedia.TaggedPeople || []).map(p => p.ID);
+          if (exclusiveFilter) {
+            // AND logic - must have ALL selected people
+            matchesFilter = peopleIds.every(id => taggedIds.includes(id));
+          } else {
+            // OR logic - must have at least ONE selected person
+            matchesFilter = peopleIds.some(id => taggedIds.includes(id));
+          }
+        }
+        
+        // Check event filter
+        if (matchesFilter && eventId !== null) {
+          matchesFilter = updatedMedia.Event?.ID === eventId;
+        }
+        
+        console.log(`📝 ThumbnailGallery: Updated ${updatedMedia.PFileName}`, {
+          matchesFilter,
+          noPeople,
+          peopleIds,
+          eventId,
+          taggedPeople: updatedMedia.TaggedPeople,
+          event: updatedMedia.Event
+        });
+        
+        if (matchesFilter) {
+          // Item still matches - update it in place
+          return prevMedia.map(item => 
+            item.PFileName === updatedMedia.PFileName ? updatedMedia : item
+          );
+        } else {
+          // Item no longer matches - remove it from the list
+          console.log(`🗑️ Removing ${updatedMedia.PFileName} - no longer matches filter`);
+          return prevMedia.filter(item => item.PFileName !== updatedMedia.PFileName);
+        }
+      });
     }
-  }, [updatedMedia]);
+  }, [updatedMedia, noPeople, peopleIds, eventId, exclusiveFilter]);
 
   // Detect if error is a warmup/timeout error
   const isWarmingUp = useMemo(() => {
