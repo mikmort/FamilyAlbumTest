@@ -269,10 +269,10 @@ module.exports = async function (context, req) {
                 context.log(`Original image size: ${originalSizeMB.toFixed(2)} MB`);
 
                 // Create the full-size rotated image FIRST
-                // Use rotate() to apply EXIF orientation, then strip the EXIF orientation tag
+                // Use rotate() to apply EXIF orientation, then strip ALL metadata including orientation
                 const rotatedBuffer = await sharp(buffer, { failOnError: false })
                     .rotate() // Auto-rotate based on EXIF
-                    .withMetadata({ orientation: 1 }) // Strip EXIF orientation to prevent double-rotation
+                    .withMetadata(false) // Remove ALL EXIF data including orientation
                     .jpeg({ quality: 95, mozjpeg: true })
                     .toBuffer();
 
@@ -320,6 +320,7 @@ module.exports = async function (context, req) {
                 // Now create thumbnail FROM THE ROTATED BUFFER (not from original)
                 // This way the thumbnail is created from an already-rotated image
                 const thumbnailBuffer = await sharp(rotatedBuffer)
+                    .withMetadata(false) // Ensure no EXIF metadata in thumbnail
                     .resize(null, 200, {
                         fit: 'inside',
                         withoutEnlargement: true
