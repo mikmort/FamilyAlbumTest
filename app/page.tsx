@@ -452,6 +452,14 @@ export default function Home() {
               // Notify ThumbnailGallery to update its cache
               setLastUpdatedMedia(updatedMedia);
             }}
+            onDelete={(deletedMedia) => {
+              // Remove the deleted item from the list
+              setMediaList(prevList => 
+                prevList.filter(item => item.PFileName !== deletedMedia.PFileName)
+              );
+              // Notify ThumbnailGallery to update its cache (triggers re-render)
+              setLastUpdatedMedia(deletedMedia);
+            }}
             onMediaChange={setSelectedMedia}
             startFullscreen={startFullscreen}
           />

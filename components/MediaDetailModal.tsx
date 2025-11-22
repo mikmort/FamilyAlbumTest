@@ -9,6 +9,7 @@ interface MediaDetailModalProps {
   onClose: () => void;
   onUpdate?: (updatedMedia: MediaItem) => void;
   onMediaChange?: (media: MediaItem) => void;
+  onDelete?: (deletedMedia: MediaItem) => void;
   startFullscreen?: boolean;
 }
 
@@ -18,6 +19,7 @@ export default function MediaDetailModal({
   onClose,
   onUpdate,
   onMediaChange,
+  onDelete,
   startFullscreen = false,
 }: MediaDetailModalProps) {
   const [editing, setEditing] = useState(false);
@@ -687,11 +689,13 @@ export default function MediaDetailModal({
       const result = await response.json();
       console.log('DELETE success:', result);
 
-      // Success - no notification needed, just close and refresh
-      onClose(); // Close the modal
+      // Notify parent component about the deletion
+      if (onDelete) {
+        onDelete(media);
+      }
       
-      // Refresh the page to update the gallery
-      window.location.reload();
+      // Close the modal
+      onClose();
     } catch (error: any) {
       console.error('Delete failed:', error);
       console.error('Error stack:', error.stack);
