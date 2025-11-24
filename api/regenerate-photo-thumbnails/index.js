@@ -83,11 +83,14 @@ module.exports = async function (context, req) {
                 const photoBuffer = await downloadBlob(blobPath);
                 context.log(`Downloaded photo: ${photoBuffer.length} bytes`);
 
-                // Create rotated buffer with EXIF orientation set to 1
+                // Create rotated buffer using two-step process
                 // This matches the logic in api/upload/index.js
-                const rotatedBuffer = await sharp(photoBuffer, { failOnError: false })
+                const rotatedOnce = await sharp(photoBuffer, { failOnError: false })
                     .rotate() // Auto-rotate based on EXIF
-                    .withMetadata({ orientation: 1 }) // Keep metadata but set orientation to 1
+                    .toBuffer();
+                
+                const rotatedBuffer = await sharp(rotatedOnce)
+                    .withMetadata({}) // Strip all metadata
                     .jpeg({ quality: 95, mozjpeg: true })
                     .toBuffer();
 

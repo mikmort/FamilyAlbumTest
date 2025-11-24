@@ -508,9 +508,10 @@ module.exports = async function (context, req) {
                             let finalThumbnail = thumbnailBuffer;
                             if (sharp) {
                                 context.log(`Resizing thumbnail with sharp`);
-                                finalThumbnail = await sharp(thumbnailBuffer)
-                                    .rotate() // Auto-rotate based on EXIF orientation
-                                    .withMetadata({ orientation: 1 }) // Keep metadata but set orientation to 1
+                                // Two-step process: rotate first, then strip metadata
+                                const rotated = await sharp(thumbnailBuffer).rotate().toBuffer();
+                                finalThumbnail = await sharp(rotated)
+                                    .withMetadata({}) // Strip all metadata
                                     .resize(300, null, {
                                         fit: 'inside',
                                         withoutEnlargement: true
@@ -566,9 +567,10 @@ module.exports = async function (context, req) {
                         // Generate thumbnail using sharp for images (300px width, maintain aspect ratio)
                         if (sharp) {
                             try {
-                                const thumbnailBuffer = await sharp(originalBuffer)
-                                    .rotate() // Auto-rotate based on EXIF orientation
-                                    .withMetadata({ orientation: 1 }) // Keep metadata but set orientation to 1
+                                // Two-step process: rotate first, then strip metadata
+                                const rotated = await sharp(originalBuffer).rotate().toBuffer();
+                                const thumbnailBuffer = await sharp(rotated)
+                                    .withMetadata({}) // Strip all metadata
                                     .resize(300, null, {
                                         fit: 'inside',
                                         withoutEnlargement: true

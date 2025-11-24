@@ -268,11 +268,15 @@ module.exports = async function (context, req) {
                 const originalSizeMB = buffer.length / (1024 * 1024);
                 context.log(`Original image size: ${originalSizeMB.toFixed(2)} MB`);
 
-                // Create the full-size rotated image FIRST
-                // Use rotate() to apply EXIF orientation, then explicitly set orientation to 1 (normal)
-                const rotatedBuffer = await sharp(buffer, { failOnError: false })
+                // Create the full-size rotated image using a two-step process
+                // Step 1: Rotate based on EXIF orientation
+                const rotatedOnce = await sharp(buffer, { failOnError: false })
                     .rotate() // Auto-rotate based on EXIF
-                    .withMetadata({ orientation: 1 }) // Keep metadata but set orientation to 1 (no rotation)
+                    .toBuffer();
+                
+                // Step 2: Strip ALL EXIF metadata from the rotated image
+                const rotatedBuffer = await sharp(rotatedOnce)
+                    .withMetadata({}) // Remove all metadata
                     .jpeg({ quality: 95, mozjpeg: true })
                     .toBuffer();
 
