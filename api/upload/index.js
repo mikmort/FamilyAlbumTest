@@ -269,10 +269,17 @@ module.exports = async function (context, req) {
                 context.log(`Original image size: ${originalSizeMB.toFixed(2)} MB`);
 
                 // Create the full-size rotated image using a two-step process
-                // Step 1: Rotate based on EXIF orientation
-                const rotatedOnce = await sharp(buffer, { failOnError: false })
-                    .rotate() // Auto-rotate based on EXIF
-                    .toBuffer();
+                // Step 1: Rotate based on EXIF orientation - use explicit approach
+                let rotatedOnce;
+                if (originalMetadata.orientation && originalMetadata.orientation !== 1) {
+                    context.log(`Applying rotation for EXIF orientation: ${originalMetadata.orientation}`);
+                    rotatedOnce = await sharp(buffer, { failOnError: false })
+                        .rotate() // Auto-rotate based on EXIF
+                        .toBuffer();
+                } else {
+                    context.log(`No rotation needed (orientation is 1 or undefined)`);
+                    rotatedOnce = buffer;
+                }
                 
                 // Step 2: Strip ALL EXIF metadata from the rotated image
                 const rotatedBuffer = await sharp(rotatedOnce)
@@ -321,21 +328,19 @@ module.exports = async function (context, req) {
                     context.log(`Skipping midsize creation (size: ${originalSizeMB.toFixed(2)}MB, dimensions: ${width}x${height})`);
                 }
 
-                // Now create thumbnail - use fresh rotation from original to avoid any buffer issues
-                // Step 1: Rotate the original buffer
-                const thumbRotated = await sharp(buffer, { failOnError: false })
-                    .rotate() // Auto-rotate based on EXIF
-                    .toBuffer();
-                
-                // Step 2: Resize and strip metadata
-                const thumbnailBuffer = await sharp(thumbRotated)
+                // Now create thumbnail - CRITICAL: rotate and resize in one operation, then strip metadata
+                // If we rotate first to a buffer, then resize, Sharp might not preserve the rotation
+                const thumbnailBuffer = await sharp(buffer, { failOnError: false })
+                    .rotate() // Auto-rotate based on EXIF (this reads EXIF from original buffer)
                     .resize(null, 200, {
                         fit: 'inside',
                         withoutEnlargement: true
                     })
-                    .withMetadata({}) // Strip all metadata
+                    .withMetadata({}) // Strip all metadata AFTER rotation and resize
                     .jpeg({ quality: 80 })
                     .toBuffer();
+                
+                context.log(`Thumbnail created with rotation in single operation`);
 
                 const thumbMetadata = await sharp(thumbnailBuffer).metadata();
                 context.log(`Thumbnail created from rotated buffer - dimensions: ${thumbMetadata.width}x${thumbMetadata.height}, orientation: ${thumbMetadata.orientation || 'undefined'}`);
