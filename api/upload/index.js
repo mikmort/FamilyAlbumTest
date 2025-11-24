@@ -323,12 +323,13 @@ module.exports = async function (context, req) {
 
                 // Now create thumbnail FROM THE ROTATED BUFFER (not from original)
                 // This way the thumbnail is created from an already-rotated image
-                // rotatedBuffer already has no EXIF metadata, so no need to strip again
+                // Explicitly strip metadata from thumbnail as well
                 const thumbnailBuffer = await sharp(rotatedBuffer)
                     .resize(null, 200, {
                         fit: 'inside',
                         withoutEnlargement: true
                     })
+                    .withMetadata({}) // Explicitly strip all metadata from thumbnail
                     .jpeg({ quality: 80 })
                     .toBuffer();
 
