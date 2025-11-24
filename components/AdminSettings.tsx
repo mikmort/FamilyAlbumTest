@@ -64,6 +64,8 @@ export default function AdminSettings({ onRequestsChange }: AdminSettingsProps) 
   const [isGeneratingMidsize, setIsGeneratingMidsize] = useState(false);
   const [isRegenerating, setIsRegenerating] = useState(false);
   const [regenerateProgress, setRegenerateProgress] = useState<any>(null);
+  const [isRegeneratingThumbnails, setIsRegeneratingThumbnails] = useState(false);
+  const [thumbnailRegenerateResult, setThumbnailRegenerateResult] = useState<any>(null);
 
   useEffect(() => {
     fetchUsers();
@@ -225,6 +227,37 @@ export default function AdminSettings({ onRequestsChange }: AdminSettingsProps) 
         setIsRegenerating(false);
       }
     }, 2000); // Poll every 2 seconds
+  };
+
+  const regenerateThumbnails = async () => {
+    if (!confirm('This will regenerate ALL photo thumbnails with correct EXIF orientation. This may take several minutes. Continue?')) {
+      return;
+    }
+
+    try {
+      setIsRegeneratingThumbnails(true);
+      setThumbnailRegenerateResult(null);
+      
+      const response = await fetch('/api/regenerate-photo-thumbnails', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ all: true })
+      });
+      
+      const data = await response.json();
+      
+      if (response.ok) {
+        setThumbnailRegenerateResult(data);
+        alert(`Thumbnail regeneration complete!\n\nSuccess: ${data.success}\nFailed: ${data.failed}\nSkipped: ${data.skipped}`);
+      } else {
+        alert(`Error: ${data.error}`);
+      }
+    } catch (err: any) {
+      console.error('Error regenerating thumbnails:', err);
+      alert(`Error: ${err.message}`);
+    } finally {
+      setIsRegeneratingThumbnails(false);
+    }
   };
 
   const addUser = async () => {
@@ -1024,6 +1057,57 @@ export default function AdminSettings({ onRequestsChange }: AdminSettingsProps) 
             <strong style={{ color: getRoleColor('Read') }}>Read:</strong> View-only access, can browse and download photos
           </div>
         </div>
+      </div>
+
+      {/* Thumbnail Regeneration Section */}
+      <div className="card" style={{ marginBottom: '2rem', background: '#fff9e6', borderColor: '#ffc107' }}>
+        <h2 style={{ marginTop: 0 }}>🖼️ Thumbnail Regeneration</h2>
+        <p style={{ color: '#666', marginBottom: '1rem' }}>
+          Regenerate photo thumbnails with correct EXIF orientation. Use this if thumbnails appear rotated incorrectly.
+        </p>
+        
+        <button 
+          className="btn btn-warning"
+          onClick={regenerateThumbnails}
+          disabled={isRegeneratingThumbnails}
+          style={{ background: '#ffc107', color: '#000', fontWeight: '600' }}
+        >
+          {isRegeneratingThumbnails ? '⏳ Regenerating...' : '🔄 Regenerate All Thumbnails'}
+        </button>
+
+        {thumbnailRegenerateResult && (
+          <div style={{ 
+            marginTop: '1rem',
+            padding: '1rem', 
+            background: 'white', 
+            borderRadius: '8px', 
+            border: '1px solid #ddd'
+          }}>
+            <div style={{ fontSize: '0.95rem', fontWeight: '500', marginBottom: '0.5rem' }}>
+              ✅ Regeneration Complete
+            </div>
+            <ul style={{ margin: 0, paddingLeft: '1.5rem', fontSize: '0.9rem' }}>
+              <li>Total photos: {thumbnailRegenerateResult.total}</li>
+              <li style={{ color: '#28a745' }}>Success: {thumbnailRegenerateResult.success}</li>
+              {thumbnailRegenerateResult.failed > 0 && (
+                <li style={{ color: '#dc3545' }}>Failed: {thumbnailRegenerateResult.failed}</li>
+              )}
+              {thumbnailRegenerateResult.skipped > 0 && (
+                <li style={{ color: '#6c757d' }}>Skipped: {thumbnailRegenerateResult.skipped}</li>
+              )}
+            </ul>
+            {thumbnailRegenerateResult.errors && thumbnailRegenerateResult.errors.length > 0 && (
+              <details style={{ marginTop: '0.5rem', fontSize: '0.85rem' }}>
+                <summary style={{ cursor: 'pointer', color: '#dc3545' }}>View Errors</summary>
+                <ul style={{ marginTop: '0.5rem', paddingLeft: '1.5rem' }}>
+                  {thumbnailRegenerateResult.errors.map((err: any, idx: number) => (
+                    <li key={idx}>{err.fileName}: {err.error}</li>
+                  ))}
+                </ul>
+              </details>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Face Recognition Training Section - MOVED AFTER USER MANAGEMENT */}
