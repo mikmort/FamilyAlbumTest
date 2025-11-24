@@ -321,15 +321,19 @@ module.exports = async function (context, req) {
                     context.log(`Skipping midsize creation (size: ${originalSizeMB.toFixed(2)}MB, dimensions: ${width}x${height})`);
                 }
 
-                // Now create thumbnail FROM THE ROTATED BUFFER (not from original)
-                // This way the thumbnail is created from an already-rotated image
-                // Explicitly strip metadata from thumbnail as well
-                const thumbnailBuffer = await sharp(rotatedBuffer)
+                // Now create thumbnail - use fresh rotation from original to avoid any buffer issues
+                // Step 1: Rotate the original buffer
+                const thumbRotated = await sharp(buffer, { failOnError: false })
+                    .rotate() // Auto-rotate based on EXIF
+                    .toBuffer();
+                
+                // Step 2: Resize and strip metadata
+                const thumbnailBuffer = await sharp(thumbRotated)
                     .resize(null, 200, {
                         fit: 'inside',
                         withoutEnlargement: true
                     })
-                    .withMetadata({}) // Explicitly strip all metadata from thumbnail
+                    .withMetadata({}) // Strip all metadata
                     .jpeg({ quality: 80 })
                     .toBuffer();
 
