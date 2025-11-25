@@ -195,6 +195,12 @@ module.exports = async function (context, req) {
             return;
         }
 
+        // Check filename for HEIC FIRST, before Sharp detection
+        const lowerFileName = fileName.toLowerCase();
+        const isHeicByFilename = lowerFileName.endsWith('.heic') || lowerFileName.endsWith('.heif');
+        
+        context.log(`Initial filename check: ${fileName}, isHEIC: ${isHeicByFilename}`);
+
         // Detect actual file type from buffer (in case of misidentification)
         let actualContentType = contentType;
         
@@ -221,13 +227,18 @@ module.exports = async function (context, req) {
             context.log('Could not detect image format with Sharp, using original content type');
             // If Sharp can't read it, it might be a video - keep original content type
         }
+        
+        // Override actualContentType if filename indicates HEIC
+        if (isHeicByFilename) {
+            actualContentType = 'image/heic';
+            context.log(`Filename ends with .heic/.heif - forcing actualContentType to image/heic`);
+        }
 
         context.log(`File: ${fileName}, ContentType: ${contentType}, ActualContentType: ${actualContentType}`);
 
         // Convert HEIC files to JPG - do this BEFORE checking for duplicates
         let needsHeicConversion = false;
         let fileNameToCheck = fileName;
-        const lowerFileName = fileName.toLowerCase();
         
         if (lowerFileName.endsWith('.heic') || lowerFileName.endsWith('.heif') || 
             actualContentType === 'image/heic' || actualContentType === 'image/heif') {
