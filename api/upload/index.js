@@ -238,7 +238,11 @@ module.exports = async function (context, req) {
                 fileNameToCheck = fileName.substring(0, lastDotIndex) + '.jpg';
             }
             actualContentType = 'image/jpeg';
-            context.log(`✅ HEIC file detected. Will convert to JPG: ${fileName} -> ${fileNameToCheck}`);
+            context.log(`✅ HEIC file detected. Converting to JPG: ${fileName} -> ${fileNameToCheck}`);
+            context.log(`   Lower filename: ${lowerFileName}`);
+            context.log(`   actualContentType: ${actualContentType}`);
+        } else {
+            context.log(`ℹ️ Not a HEIC file. Extension: ${lowerFileName.endsWith('.heic') || lowerFileName.endsWith('.heif')}, ContentType: ${actualContentType}`);
         }
         
         // Convert AVI files to MP4 - do this BEFORE checking for duplicates
