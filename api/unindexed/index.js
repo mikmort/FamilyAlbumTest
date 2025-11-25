@@ -194,12 +194,14 @@ module.exports = async function (context, req) {
           INSERT INTO Pictures (
             PFileName, PFileDirectory, PDescription, PMonth, PYear,
             PPeopleList, PNameCount, PThumbnailUrl, PType, PTime,
-            PBlobUrl, PReviewed, PDateEntered, PLastModifiedDate, PMidsizeUrl
+            PBlobUrl, PReviewed, PDateEntered, PLastModifiedDate, PMidsizeUrl,
+            PWidth, PHeight
           )
           VALUES (
             @fileName, @directory, @description, @month, @year,
             @peopleList, @nameCount, @thumbUrl, @type, @time,
-            @blobUrl, @reviewed, GETDATE(), GETDATE(), @midsizeUrl
+            @blobUrl, @reviewed, GETDATE(), GETDATE(), @midsizeUrl,
+            @width, @height
           )
         `, {
           fileName,
@@ -214,7 +216,9 @@ module.exports = async function (context, req) {
           time: vtime || 0,
           blobUrl: blobUrl || '',
           reviewed: 1,
-          midsizeUrl: midsizeUrl || null // NEW: progressive loading support
+          midsizeUrl: midsizeUrl || null, // NEW: progressive loading support
+          width: width || null,
+          height: height || null
         });
 
         // 2. Insert into NamePhoto for each tagged person (or "No Tagged People")

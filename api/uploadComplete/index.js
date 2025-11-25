@@ -337,6 +337,9 @@ module.exports = async function (context, req) {
                 const metadata = await sharp(buffer).metadata();
                 width = metadata.width || 0;
                 height = metadata.height || 0;
+                
+                context.log(`📐 Image dimensions: ${width} x ${height}`);
+                context.log(`Metadata format: ${metadata.format}, space: ${metadata.space}`);
 
                 // Extract date from EXIF if available
                 if (metadata.exif) {
@@ -491,6 +494,16 @@ module.exports = async function (context, req) {
         }
 
         // Add to UnindexedFiles table for processing
+        context.log(`📊 Inserting into UnindexedFiles:`, {
+            fileName,
+            mediaType,
+            width,
+            height,
+            duration,
+            month,
+            year
+        });
+        
         const insertQuery = `
             INSERT INTO dbo.UnindexedFiles 
                 (uiFileName, uiDirectory, uiThumbUrl, uiType, uiWidth, uiHeight, uiVtime, uiStatus, uiBlobUrl, uiMonth, uiYear, uiUploadedBy, uiMidsizeUrl)
