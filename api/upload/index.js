@@ -293,9 +293,16 @@ module.exports = async function (context, req) {
 
                 // Create the full-size rotated image using a two-step process
                 // Step 1: Rotate based on EXIF orientation - use explicit approach
+                // For HEIC files, ALWAYS process even if no rotation needed (to convert format)
                 let rotatedOnce;
-                if (originalMetadata.orientation && originalMetadata.orientation !== 1) {
-                    context.log(`Applying rotation for EXIF orientation: ${originalMetadata.orientation}`);
+                const needsFormatConversion = originalMetadata.format === 'heic' || originalMetadata.format === 'heif';
+                
+                if ((originalMetadata.orientation && originalMetadata.orientation !== 1) || needsFormatConversion) {
+                    if (needsFormatConversion) {
+                        context.log(`HEIC/HEIF detected - converting to JPEG (orientation: ${originalMetadata.orientation || 'none'})`);
+                    } else {
+                        context.log(`Applying rotation for EXIF orientation: ${originalMetadata.orientation}`);
+                    }
                     rotatedOnce = await sharp(buffer, { failOnError: false })
                         .rotate() // Auto-rotate based on EXIF
                         .toBuffer();
