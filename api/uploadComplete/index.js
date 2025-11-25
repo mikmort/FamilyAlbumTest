@@ -284,6 +284,15 @@ module.exports = async function (context, req) {
                 // Use originalFileName if available (contains .heic extension before rename)
                 const checkName = originalFileName || fileName;
                 const lowerCheckName = checkName.toLowerCase();
+                
+                context.log('🔍 HEIC Conversion Check:');
+                context.log('  originalFileName:', originalFileName);
+                context.log('  fileName:', fileName);
+                context.log('  checkName:', checkName);
+                context.log('  lowerCheckName:', lowerCheckName);
+                context.log('  ends with .heic?', lowerCheckName.endsWith('.heic'));
+                context.log('  ends with .heif?', lowerCheckName.endsWith('.heif'));
+                
                 if (lowerCheckName.endsWith('.heic') || lowerCheckName.endsWith('.heif')) {
                     context.log(`⚠️ Detected HEIC file (original: ${originalFileName || fileName}). Converting to JPG...`);
                     try {
