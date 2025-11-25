@@ -86,8 +86,18 @@ module.exports = async function (context, req) {
 
         context.log('Requested filename:', fileName);
 
-        // Convert AVI, MOV, and MPG files to MP4 (change extension before generating SAS URL)
+        // Convert HEIC/HEIF files to JPG (change extension before generating SAS URL)
         const lowerFileName = fileName.toLowerCase();
+        if (lowerFileName.endsWith('.heic') || lowerFileName.endsWith('.heif')) {
+            const lastDotIndex = fileName.lastIndexOf('.');
+            if (lastDotIndex !== -1) {
+                const originalName = fileName;
+                fileName = fileName.substring(0, lastDotIndex) + '.jpg';
+                context.log(`HEIC file detected. Changed extension: ${originalName} -> ${fileName}`);
+            }
+        }
+
+        // Convert AVI, MOV, and MPG files to MP4 (change extension before generating SAS URL)
         if (lowerFileName.endsWith('.avi') || lowerFileName.endsWith('.mov') || 
             lowerFileName.endsWith('.mpg') || lowerFileName.endsWith('.mpeg')) {
             const lastDotIndex = fileName.lastIndexOf('.');

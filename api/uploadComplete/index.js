@@ -256,7 +256,36 @@ module.exports = async function (context, req) {
                 for await (const chunk of downloadResponse.readableStreamBody) {
                     chunks.push(chunk);
                 }
-                const buffer = Buffer.concat(chunks);
+                let buffer = Buffer.concat(chunks);
+
+                // Check if this is a HEIC/HEIF file and convert to JPG
+                const lowerFileName = fileName.toLowerCase();
+                if (lowerFileName.endsWith('.heic') || lowerFileName.endsWith('.heif')) {
+                    context.log(`⚠️ Detected HEIC file uploaded as JPG: ${fileName}. Converting...`);
+                    try {
+                        // Convert HEIC to JPG using Sharp
+                        const jpgBuffer = await sharp(buffer)
+                            .rotate() // Auto-rotate based on EXIF
+                            .withMetadata({}) // Strip EXIF after rotation
+                            .jpeg({ quality: 95, mozjpeg: true })
+                            .toBuffer();
+                        
+                        context.log(`✓ Converted HEIC to JPG: ${buffer.length} -> ${jpgBuffer.length} bytes`);
+                        
+                        // Upload the converted JPG back to blob storage (overwrite)
+                        await blockBlobClient.uploadData(jpgBuffer, {
+                            blobHTTPHeaders: {
+                                blobContentType: 'image/jpeg'
+                            }
+                        });
+                        
+                        context.log(`✓ Uploaded converted JPG: ${fileName}`);
+                        buffer = jpgBuffer; // Use converted buffer for metadata extraction
+                    } catch (convErr) {
+                        context.log.error(`❌ Failed to convert HEIC: ${convErr.message}`);
+                        // Continue with original buffer
+                    }
+                }
 
                 // Get metadata including EXIF
                 const metadata = await sharp(buffer).metadata();
