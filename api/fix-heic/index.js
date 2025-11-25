@@ -1,6 +1,7 @@
 const { checkAuthorization } = require('../shared/auth');
 const { getContainerClient } = require('../shared/storage');
 const sharp = require('sharp');
+const heicConvert = require('heic-convert');
 
 module.exports = async function (context, req) {
     context.log('Fix HEIC function triggered');
@@ -51,28 +52,46 @@ module.exports = async function (context, req) {
         
         context.log(`Downloaded ${buffer.length} bytes`);
 
-        // Just try to process it - Sharp will either convert it or fail with a clear error
-        context.log('Attempting to process with Sharp...');
+        // Convert HEIC to JPEG using heic-convert library
+        context.log('Converting HEIC to JPEG with heic-convert...');
+        let jpegBuffer;
+        try {
+            jpegBuffer = await heicConvert({
+                buffer: buffer,
+                format: 'JPEG',
+                quality: 0.95
+            });
+            
+            context.log(`✓ HEIC converted: ${buffer.length} -> ${jpegBuffer.length} bytes`);
+        } catch (heicErr) {
+            context.log.error('❌ HEIC conversion failed:', heicErr.message);
+            context.res = {
+                status: 500,
+                body: { 
+                    error: 'HEIC conversion failed',
+                    details: heicErr.message,
+                    message: `Could not convert HEIC file: ${heicErr.message}`
+                }
+            };
+            return;
+        }
+
+        // Now process with Sharp for rotation and optimization
+        context.log('Processing with Sharp for rotation...');
         let jpgBuffer;
         try {
-            jpgBuffer = await sharp(buffer)
+            jpgBuffer = await sharp(jpegBuffer)
                 .rotate() // Auto-rotate based on EXIF
                 .withMetadata({}) // Strip EXIF after rotation
                 .jpeg({ quality: 95, mozjpeg: true })
                 .toBuffer();
             
-            context.log(`✓ Processed: ${buffer.length} -> ${jpgBuffer.length} bytes`);
-        } catch (processErr) {
-            context.log.error('❌ Processing failed:', processErr.message);
-            context.res = {
-                status: 500,
-                body: { 
-                    error: 'Processing failed',
-                    details: processErr.message,
-                    message: `Sharp could not process this file. Error: ${processErr.message}`
-                }
-            };
-            return;
+            context.log(`✓ Sharp processing: ${jpegBuffer.length} -> ${jpgBuffer.length} bytes`);
+        } catch (sharpErr) {
+            context.log.error('❌ Sharp processing failed:', sharpErr.message);
+            // Use the heic-convert output if Sharp fails
+            jpgBuffer = jpegBuffer;
+            context.log('Using heic-convert output directly');
         }
 
         // Upload the converted JPG back to blob storage (overwrite)

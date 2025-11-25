@@ -7,6 +7,7 @@ const exifReader = require('exif-reader');
 const ffmpeg = require('fluent-ffmpeg');
 const ffmpegPath = require('@ffmpeg-installer/ffmpeg').path;
 const { Readable } = require('stream');
+const heicConvert = require('heic-convert');
 
 ffmpeg.setFfmpegPath(ffmpegPath);
 
@@ -296,8 +297,19 @@ module.exports = async function (context, req) {
                 if (lowerCheckName.endsWith('.heic') || lowerCheckName.endsWith('.heif')) {
                     context.log(`⚠️ Detected HEIC file (original: ${originalFileName || fileName}). Converting to JPG...`);
                     try {
-                        // Convert HEIC to JPG using Sharp
-                        const jpgBuffer = await sharp(buffer)
+                        // First convert HEIC to JPEG using heic-convert
+                        context.log('Step 1: Converting HEIC to JPEG with heic-convert...');
+                        const jpegBuffer = await heicConvert({
+                            buffer: buffer,
+                            format: 'JPEG',
+                            quality: 0.95
+                        });
+                        
+                        context.log(`✓ HEIC converted: ${buffer.length} -> ${jpegBuffer.length} bytes`);
+                        
+                        // Then process with Sharp for rotation and optimization
+                        context.log('Step 2: Processing with Sharp for rotation...');
+                        const jpgBuffer = await sharp(jpegBuffer)
                             .rotate() // Auto-rotate based on EXIF
                             .withMetadata({}) // Strip EXIF after rotation
                             .jpeg({ quality: 95, mozjpeg: true })
@@ -316,6 +328,7 @@ module.exports = async function (context, req) {
                         buffer = jpgBuffer; // Use converted buffer for metadata extraction
                     } catch (convErr) {
                         context.log.error(`❌ Failed to convert HEIC: ${convErr.message}`);
+                        context.log.error(`Full error:`, convErr);
                         // Continue with original buffer
                     }
                 }
