@@ -519,23 +519,30 @@ export default function ProcessNewFiles() {
     setError('');
 
     try {
+      console.log('Calling fix-heic API for:', currentFile.uiFileName);
       const res = await fetch(`/api/fix-heic/${encodeURIComponent(currentFile.uiFileName)}`, {
         method: 'POST'
       });
 
+      console.log('Fix-heic response status:', res.status);
       const data = await res.json();
+      console.log('Fix-heic response data:', data);
       
       if (data.success) {
-        alert(`✓ Fixed! Converted ${data.originalSize} bytes to ${data.convertedSize} bytes`);
+        alert(`✓ Fixed! Converted ${data.originalSize} bytes to ${data.convertedSize} bytes.\n\nRefreshing preview...`);
         // Reload the file to show updated preview
         await loadAllFiles();
       } else {
         console.error('❌ Fix HEIC API error:', data);
-        setError(data.error || 'Failed to fix HEIC file');
+        const errorMsg = data.message || data.error || 'Failed to fix HEIC file';
+        alert(`Error: ${errorMsg}\n\nActual format: ${data.actualFormat || 'unknown'}`);
+        setError(errorMsg);
       }
     } catch (err: any) {
       console.error('❌ ProcessNewFiles handleFixHeic error:', err);
-      setError(err.message || 'Failed to fix HEIC file');
+      const errorMsg = err.message || 'Failed to fix HEIC file';
+      alert(`Error: ${errorMsg}`);
+      setError(errorMsg);
     } finally {
       setProcessing(false);
     }

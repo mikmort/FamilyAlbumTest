@@ -51,32 +51,32 @@ module.exports = async function (context, req) {
         
         context.log(`Downloaded ${buffer.length} bytes`);
 
-        // Try to detect if it's actually HEIC data
-        const metadata = await sharp(buffer).metadata();
-        context.log('File format detected:', metadata.format);
-
-        if (metadata.format !== 'heif') {
+        // Just try to process it - Sharp will either convert it or fail with a clear error
+        context.log('Attempting to process with Sharp...');
+        let jpgBuffer;
+        try {
+            jpgBuffer = await sharp(buffer)
+                .rotate() // Auto-rotate based on EXIF
+                .withMetadata({}) // Strip EXIF after rotation
+                .jpeg({ quality: 95, mozjpeg: true })
+                .toBuffer();
+            
+            context.log(`✓ Processed: ${buffer.length} -> ${jpgBuffer.length} bytes`);
+        } catch (processErr) {
+            context.log.error('❌ Processing failed:', processErr.message);
             context.res = {
-                status: 400,
+                status: 500,
                 body: { 
-                    error: 'File is not HEIC format', 
-                    actualFormat: metadata.format 
+                    error: 'Processing failed',
+                    details: processErr.message,
+                    message: `Sharp could not process this file. Error: ${processErr.message}`
                 }
             };
             return;
         }
 
-        // Convert HEIC to JPG
-        context.log('Converting HEIC to JPG...');
-        const jpgBuffer = await sharp(buffer)
-            .rotate() // Auto-rotate based on EXIF
-            .withMetadata({}) // Strip EXIF after rotation
-            .jpeg({ quality: 95, mozjpeg: true })
-            .toBuffer();
-        
-        context.log(`Converted: ${buffer.length} -> ${jpgBuffer.length} bytes`);
-
         // Upload the converted JPG back to blob storage (overwrite)
+        context.log('Uploading converted file...');
         await blockBlobClient.uploadData(jpgBuffer, {
             blobHTTPHeaders: {
                 blobContentType: 'image/jpeg'
