@@ -95,9 +95,9 @@ module.exports = async function (context, req) {
 
         const blobUrl = blockBlobClient.url;
         
-        // Check if this is a HEIC file (which should be treated as image even if contentType is wrong)
-        const lowerFileName = fileName.toLowerCase();
-        const isHeic = lowerFileName.endsWith('.heic') || lowerFileName.endsWith('.heif');
+        // Check if this is a HEIC file by contentType (since filename was changed to .jpg in getUploadUrl)
+        const lowerContentType = (contentType || '').toLowerCase();
+        const isHeic = lowerContentType.includes('heic') || lowerContentType.includes('heif');
         
         let mediaType = (contentType?.startsWith('image/') || isHeic) ? 1 : 2;
 
