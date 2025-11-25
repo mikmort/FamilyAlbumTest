@@ -550,7 +550,7 @@ module.exports = async function (context, req) {
         context.res = {
             status: 201,
             headers: {
-                'X-Upload-Version': '2.1-MIDSIZE',
+                'X-Upload-Version': '3.0-HEIC-FIX',
                 'X-Original-Filename': fileName,
                 'X-Final-Filename': uniqueFilename
             },
