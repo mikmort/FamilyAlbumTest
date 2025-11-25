@@ -94,7 +94,12 @@ module.exports = async function (context, req) {
         }
 
         const blobUrl = blockBlobClient.url;
-        let mediaType = contentType?.startsWith('image/') ? 1 : 2;
+        
+        // Check if this is a HEIC file (which should be treated as image even if contentType is wrong)
+        const lowerFileName = fileName.toLowerCase();
+        const isHeic = lowerFileName.endsWith('.heic') || lowerFileName.endsWith('.heif');
+        
+        let mediaType = (contentType?.startsWith('image/') || isHeic) ? 1 : 2;
 
         // Check if this is a video file that needs conversion to MP4
         // This happens when user uploads .AVI, .MOV, or .MPG but we changed extension to .mp4 in getUploadUrl
