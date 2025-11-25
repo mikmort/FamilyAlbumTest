@@ -281,9 +281,11 @@ module.exports = async function (context, req) {
                 let buffer = Buffer.concat(chunks);
 
                 // Check if this is a HEIC/HEIF file and convert to JPG
-                const lowerFileName = fileName.toLowerCase();
-                if (lowerFileName.endsWith('.heic') || lowerFileName.endsWith('.heif')) {
-                    context.log(`⚠️ Detected HEIC file uploaded as JPG: ${fileName}. Converting...`);
+                // Use originalFileName if available (contains .heic extension before rename)
+                const checkName = originalFileName || fileName;
+                const lowerCheckName = checkName.toLowerCase();
+                if (lowerCheckName.endsWith('.heic') || lowerCheckName.endsWith('.heif')) {
+                    context.log(`⚠️ Detected HEIC file (original: ${originalFileName || fileName}). Converting to JPG...`);
                     try {
                         // Convert HEIC to JPG using Sharp
                         const jpgBuffer = await sharp(buffer)
