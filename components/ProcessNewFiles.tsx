@@ -508,6 +508,39 @@ export default function ProcessNewFiles() {
     }
   };
 
+  const handleFixHeic = async () => {
+    if (!currentFile) return;
+    
+    if (!confirm(`Fix HEIC conversion for "${currentFile.uiFileName}"?\n\nThis will convert the raw HEIC data to proper JPEG format.`)) {
+      return;
+    }
+
+    setProcessing(true);
+    setError('');
+
+    try {
+      const res = await fetch(`/api/fix-heic/${encodeURIComponent(currentFile.uiFileName)}`, {
+        method: 'POST'
+      });
+
+      const data = await res.json();
+      
+      if (data.success) {
+        alert(`✓ Fixed! Converted ${data.originalSize} bytes to ${data.convertedSize} bytes`);
+        // Reload the file to show updated preview
+        await loadAllFiles();
+      } else {
+        console.error('❌ Fix HEIC API error:', data);
+        setError(data.error || 'Failed to fix HEIC file');
+      }
+    } catch (err: any) {
+      console.error('❌ ProcessNewFiles handleFixHeic error:', err);
+      setError(err.message || 'Failed to fix HEIC file');
+    } finally {
+      setProcessing(false);
+    }
+  };
+
   const togglePerson = (personID: number) => {
     setSelectedPeople(prev => {
       if (prev.includes(personID)) {
@@ -989,6 +1022,16 @@ export default function ProcessNewFiles() {
             >
               {processing ? 'Processing...' : 'Save & Continue'}
             </button>
+            {currentFile?.uiFileName.toLowerCase().endsWith('.jpg') && (
+              <button
+                onClick={handleFixHeic}
+                disabled={processing}
+                className="btn btn-warning"
+                title="Fix HEIC files that were uploaded with wrong format"
+              >
+                🔧 Fix HEIC
+              </button>
+            )}
             <button
               onClick={handleDelete}
               disabled={processing}
