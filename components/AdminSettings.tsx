@@ -260,6 +260,34 @@ export default function AdminSettings({ onRequestsChange }: AdminSettingsProps) 
     }
   };
 
+  const fixMissingDimensions = async () => {
+    if (!confirm('This will extract and update dimensions for all pictures with missing width/height. Continue?')) {
+      return;
+    }
+
+    try {
+      setIsRegeneratingThumbnails(true); // Reuse loading state
+      
+      const response = await fetch('/api/fix-missing-dimensions', {
+        method: 'POST'
+      });
+      
+      const data = await response.json();
+      
+      if (response.ok) {
+        const msg = `Dimension fix complete!\n\nTotal: ${data.total}\nFixed: ${data.fixed}\nFailed: ${data.failed}`;
+        alert(msg);
+      } else {
+        alert(`Error: ${data.error}`);
+      }
+    } catch (err: any) {
+      console.error('Error fixing dimensions:', err);
+      alert(`Error: ${err.message}`);
+    } finally {
+      setIsRegeneratingThumbnails(false);
+    }
+  };
+
   const addUser = async () => {
     if (!newEmail) {
       alert('Email is required');
@@ -1061,19 +1089,38 @@ export default function AdminSettings({ onRequestsChange }: AdminSettingsProps) 
 
       {/* Thumbnail Regeneration Section */}
       <div className="card" style={{ marginBottom: '2rem', background: '#fff9e6', borderColor: '#ffc107' }}>
-        <h2 style={{ marginTop: 0 }}>🖼️ Thumbnail Regeneration</h2>
-        <p style={{ color: '#666', marginBottom: '1rem' }}>
-          Regenerate photo thumbnails with correct EXIF orientation. Use this if thumbnails appear rotated incorrectly.
-        </p>
+        <h2 style={{ marginTop: 0 }}>🖼️ Image Maintenance</h2>
         
-        <button 
-          className="btn btn-warning"
-          onClick={regenerateThumbnails}
-          disabled={isRegeneratingThumbnails}
-          style={{ background: '#ffc107', color: '#000', fontWeight: '600' }}
-        >
-          {isRegeneratingThumbnails ? '⏳ Regenerating...' : '🔄 Regenerate All Thumbnails'}
-        </button>
+        <div style={{ marginBottom: '1.5rem' }}>
+          <h3 style={{ fontSize: '1.1rem', marginBottom: '0.5rem' }}>Thumbnail Regeneration</h3>
+          <p style={{ color: '#666', marginBottom: '1rem' }}>
+            Regenerate photo thumbnails with correct EXIF orientation. Use this if thumbnails appear rotated incorrectly.
+          </p>
+          
+          <button 
+            className="btn btn-warning"
+            onClick={regenerateThumbnails}
+            disabled={isRegeneratingThumbnails}
+            style={{ marginRight: '1rem' }}
+          >
+            {isRegeneratingThumbnails ? '⏳ Processing...' : '🔄 Regenerate All Thumbnails'}
+          </button>
+        </div>
+
+        <div>
+          <h3 style={{ fontSize: '1.1rem', marginBottom: '0.5rem' }}>Fix Missing Dimensions</h3>
+          <p style={{ color: '#666', marginBottom: '1rem' }}>
+            Extract and update dimensions for pictures with missing width/height information.
+          </p>
+          
+          <button 
+            className="btn btn-primary"
+            onClick={fixMissingDimensions}
+            disabled={isRegeneratingThumbnails}
+          >
+            {isRegeneratingThumbnails ? '⏳ Processing...' : '📐 Fix Missing Dimensions'}
+          </button>
+        </div>
 
         {thumbnailRegenerateResult && (
           <div style={{ 
