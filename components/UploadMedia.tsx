@@ -204,6 +204,7 @@ export default function UploadMedia({ onProcessFiles }: UploadMediaProps) {
           body: JSON.stringify({
             fileName: uniqueFileName,
             contentType: file.type || 'application/octet-stream',
+            originalFileName: file.name, // Send original filename for HEIC detection
             fileModifiedDate: file.lastModified ? new Date(file.lastModified).toISOString() : null
           }),
         });

@@ -55,7 +55,7 @@ module.exports = async function (context, req) {
     }
 
     try {
-        const { fileName, contentType, fileModifiedDate } = req.body;
+        const { fileName, contentType, originalFileName, fileModifiedDate } = req.body;
         
         context.log('📦 Request body received:', JSON.stringify(req.body, null, 2));
         context.log('📅 fileModifiedDate value:', fileModifiedDate);
@@ -95,14 +95,23 @@ module.exports = async function (context, req) {
 
         const blobUrl = blockBlobClient.url;
         
-        // Check if this is a HEIC file by contentType (since filename was changed to .jpg in getUploadUrl)
+        // Check if this is a HEIC file by original filename (before rename in getUploadUrl)
+        const checkFileName = originalFileName || fileName;
+        const lowerFileName = checkFileName.toLowerCase();
+        const isHeicFile = lowerFileName.endsWith('.heic') || lowerFileName.endsWith('.heif');
+        
+        // Also check contentType as fallback
         const lowerContentType = (contentType || '').toLowerCase();
-        const isHeic = lowerContentType.includes('heic') || lowerContentType.includes('heif');
+        const isHeicContentType = lowerContentType.includes('heic') || lowerContentType.includes('heif');
+        
+        const isHeic = isHeicFile || isHeicContentType;
         
         context.log('🔍 HEIC Detection Debug:');
         context.log('  fileName:', fileName);
+        context.log('  originalFileName:', originalFileName);
         context.log('  contentType:', contentType);
-        context.log('  lowerContentType:', lowerContentType);
+        context.log('  isHeicFile:', isHeicFile);
+        context.log('  isHeicContentType:', isHeicContentType);
         context.log('  isHeic:', isHeic);
         context.log('  contentType?.startsWith("image/"):', contentType?.startsWith('image/'));
         
