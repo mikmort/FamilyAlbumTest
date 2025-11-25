@@ -276,7 +276,7 @@ export default function UploadMedia({ onProcessFiles }: UploadMediaProps) {
           ref={fileInputRef}
           type="file"
           multiple
-          accept="image/*,video/*,audio/*"
+          accept="image/*,video/*,audio/*,.heic,.heif"
           onChange={handleFileSelect}
           style={{ display: 'none' }}
         />

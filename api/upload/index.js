@@ -220,10 +220,25 @@ module.exports = async function (context, req) {
 
         context.log(`File: ${fileName}, ContentType: ${contentType}, ActualContentType: ${actualContentType}`);
 
-        // Convert AVI files to MP4 - do this BEFORE checking for duplicates
-        let needsVideoConversion = false;
+        // Convert HEIC files to JPG - do this BEFORE checking for duplicates
+        let needsHeicConversion = false;
         let fileNameToCheck = fileName;
         const lowerFileName = fileName.toLowerCase();
+        
+        if (lowerFileName.endsWith('.heic') || lowerFileName.endsWith('.heif') || 
+            actualContentType === 'image/heic' || actualContentType === 'image/heif') {
+            needsHeicConversion = true;
+            // Change extension to .jpg
+            const lastDotIndex = fileName.lastIndexOf('.');
+            if (lastDotIndex !== -1) {
+                fileNameToCheck = fileName.substring(0, lastDotIndex) + '.jpg';
+            }
+            actualContentType = 'image/jpeg';
+            context.log(`✅ HEIC file detected. Will convert to JPG: ${fileName} -> ${fileNameToCheck}`);
+        }
+        
+        // Convert AVI files to MP4 - do this BEFORE checking for duplicates
+        let needsVideoConversion = false;
         if (lowerFileName.endsWith('.avi') || 
             actualContentType === 'video/x-msvideo' || 
             actualContentType === 'video/avi' ||
