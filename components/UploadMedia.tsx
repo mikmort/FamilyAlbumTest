@@ -26,8 +26,12 @@ export default function UploadMedia({ onProcessFiles }: UploadMediaProps) {
         const item = items[i];
         if (item.kind === 'file') {
           const file = item.getAsFile();
-          if (file && (file.type.startsWith('image/') || file.type.startsWith('video/') || file.type.startsWith('audio/'))) {
-            newFiles.push(file);
+          if (file) {
+            const isMedia = file.type.startsWith('image/') || file.type.startsWith('video/') || file.type.startsWith('audio/');
+            const isHeic = file.name.toLowerCase().endsWith('.heic') || file.name.toLowerCase().endsWith('.heif');
+            if (isMedia || isHeic) {
+              newFiles.push(file);
+            }
           }
         }
       }
@@ -55,9 +59,11 @@ export default function UploadMedia({ onProcessFiles }: UploadMediaProps) {
     e.preventDefault();
     setIsDragging(false);
 
-    const droppedFiles = Array.from(e.dataTransfer.files).filter(
-      file => file.type.startsWith('image/') || file.type.startsWith('video/') || file.type.startsWith('audio/')
-    );
+    const droppedFiles = Array.from(e.dataTransfer.files).filter(file => {
+      const isMedia = file.type.startsWith('image/') || file.type.startsWith('video/') || file.type.startsWith('audio/');
+      const isHeic = file.name.toLowerCase().endsWith('.heic') || file.name.toLowerCase().endsWith('.heif');
+      return isMedia || isHeic;
+    });
 
     if (droppedFiles.length > 0) {
       setFiles(prev => [...prev, ...droppedFiles]);
@@ -67,9 +73,11 @@ export default function UploadMedia({ onProcessFiles }: UploadMediaProps) {
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFiles = e.target.files;
     if (selectedFiles) {
-      const newFiles = Array.from(selectedFiles).filter(
-        file => file.type.startsWith('image/') || file.type.startsWith('video/') || file.type.startsWith('audio/')
-      );
+      const newFiles = Array.from(selectedFiles).filter(file => {
+        const isMedia = file.type.startsWith('image/') || file.type.startsWith('video/') || file.type.startsWith('audio/');
+        const isHeic = file.name.toLowerCase().endsWith('.heic') || file.name.toLowerCase().endsWith('.heif');
+        return isMedia || isHeic;
+      });
       setFiles(prev => [...prev, ...newFiles]);
     }
   };
