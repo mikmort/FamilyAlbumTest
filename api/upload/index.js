@@ -197,25 +197,29 @@ module.exports = async function (context, req) {
 
         // Detect actual file type from buffer (in case of misidentification)
         let actualContentType = contentType;
-        if (contentType.startsWith('image/')) {
-            try {
-                const metadata = await sharp(buffer).metadata();
-                // Map sharp format to MIME type
-                const formatMap = {
-                    'jpeg': 'image/jpeg',
-                    'jpg': 'image/jpeg',
-                    'png': 'image/png',
-                    'webp': 'image/webp',
-                    'gif': 'image/gif',
-                    'tiff': 'image/tiff'
-                };
-                if (metadata.format && formatMap[metadata.format]) {
-                    actualContentType = formatMap[metadata.format];
-                    context.log(`Detected actual format: ${metadata.format}, MIME: ${actualContentType}`);
-                }
-            } catch (err) {
-                context.log('Could not detect image format, using original content type');
+        
+        // Try to detect format for all files, not just those marked as images
+        // This helps identify HEIC files that browsers might send with wrong MIME type
+        try {
+            const metadata = await sharp(buffer).metadata();
+            // Map sharp format to MIME type
+            const formatMap = {
+                'jpeg': 'image/jpeg',
+                'jpg': 'image/jpeg',
+                'png': 'image/png',
+                'webp': 'image/webp',
+                'gif': 'image/gif',
+                'tiff': 'image/tiff',
+                'heic': 'image/heic',
+                'heif': 'image/heif'
+            };
+            if (metadata.format && formatMap[metadata.format]) {
+                actualContentType = formatMap[metadata.format];
+                context.log(`Detected actual format: ${metadata.format}, MIME: ${actualContentType}`);
             }
+        } catch (err) {
+            context.log('Could not detect image format with Sharp, using original content type');
+            // If Sharp can't read it, it might be a video - keep original content type
         }
 
         context.log(`File: ${fileName}, ContentType: ${contentType}, ActualContentType: ${actualContentType}`);
