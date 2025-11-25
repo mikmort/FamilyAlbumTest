@@ -735,7 +735,11 @@ export default function MediaDetailModal({
       const data = await response.json();
       
       if (response.ok) {
-        alert(`✓ Thumbnail rotated 90° clockwise!\n\nPlease refresh the page to see the change.`);
+        alert(`✓ Thumbnail rotated 90° clockwise!`);
+        
+        // Force refresh the page to show updated thumbnail
+        // Add a cache buster to ensure the browser reloads the thumbnail
+        window.location.reload();
       } else {
         throw new Error(data.error || 'Failed to rotate thumbnail');
       }

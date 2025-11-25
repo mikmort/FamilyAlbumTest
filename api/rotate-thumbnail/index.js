@@ -29,14 +29,12 @@ module.exports = async function (context, req) {
 
         const containerClient = getContainerClient();
         
-        // Get thumbnail filename (same as original but with -thumb.jpg suffix)
-        const lastDotIndex = fileName.lastIndexOf('.');
-        const baseName = lastDotIndex !== -1 ? fileName.substring(0, lastDotIndex) : fileName;
-        const thumbFileName = `${baseName}-thumb.jpg`;
+        // Thumbnails are stored in thumbnails/media/{filename}
+        const thumbnailPath = `thumbnails/media/${fileName}`;
         
-        context.log(`Thumbnail file: ${thumbFileName}`);
+        context.log(`Thumbnail path: ${thumbnailPath}`);
 
-        const blockBlobClient = containerClient.getBlockBlobClient(`media/${thumbFileName}`);
+        const blockBlobClient = containerClient.getBlockBlobClient(thumbnailPath);
 
         // Check if blob exists
         const exists = await blockBlobClient.exists();
@@ -75,13 +73,13 @@ module.exports = async function (context, req) {
             }
         });
 
-        context.log(`✓ Successfully rotated thumbnail: ${thumbFileName}`);
+        context.log(`✓ Successfully rotated thumbnail: ${thumbnailPath}`);
 
         context.res = {
             status: 200,
             body: {
                 success: true,
-                fileName: thumbFileName,
+                thumbnailPath: thumbnailPath,
                 originalSize: buffer.length,
                 rotatedSize: rotatedBuffer.length
             }
