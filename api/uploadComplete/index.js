@@ -99,7 +99,15 @@ module.exports = async function (context, req) {
         const lowerContentType = (contentType || '').toLowerCase();
         const isHeic = lowerContentType.includes('heic') || lowerContentType.includes('heif');
         
+        context.log('🔍 HEIC Detection Debug:');
+        context.log('  fileName:', fileName);
+        context.log('  contentType:', contentType);
+        context.log('  lowerContentType:', lowerContentType);
+        context.log('  isHeic:', isHeic);
+        context.log('  contentType?.startsWith("image/"):', contentType?.startsWith('image/'));
+        
         let mediaType = (contentType?.startsWith('image/') || isHeic) ? 1 : 2;
+        context.log('  mediaType:', mediaType, mediaType === 1 ? '(IMAGE)' : '(VIDEO)');
 
         // Check if this is a video file that needs conversion to MP4
         // This happens when user uploads .AVI, .MOV, or .MPG but we changed extension to .mp4 in getUploadUrl
