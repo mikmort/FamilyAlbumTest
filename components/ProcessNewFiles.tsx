@@ -548,46 +548,6 @@ export default function ProcessNewFiles() {
     }
   };
 
-  const handleRotateThumbnail = async () => {
-    if (!currentFile) return;
-    
-    if (!confirm(`Rotate thumbnail 90° clockwise for "${currentFile.uiFileName}"?`)) {
-      return;
-    }
-
-    setProcessing(true);
-    setError('');
-
-    try {
-      console.log('Calling rotate-thumbnail API for:', currentFile.uiFileName);
-      const res = await fetch(`/api/rotate-thumbnail/${encodeURIComponent(currentFile.uiFileName)}`, {
-        method: 'POST'
-      });
-
-      console.log('Rotate-thumbnail response status:', res.status);
-      const data = await res.json();
-      console.log('Rotate-thumbnail response data:', data);
-      
-      if (data.success) {
-        alert(`✓ Thumbnail rotated 90° clockwise!\n\nRefreshing preview...`);
-        // Reload the file to show updated preview
-        await loadAllFiles();
-      } else {
-        console.error('❌ Rotate thumbnail API error:', data);
-        const errorMsg = data.error || 'Failed to rotate thumbnail';
-        alert(`Error: ${errorMsg}`);
-        setError(errorMsg);
-      }
-    } catch (err: any) {
-      console.error('❌ ProcessNewFiles handleRotateThumbnail error:', err);
-      const errorMsg = err.message || 'Failed to rotate thumbnail';
-      alert(`Error: ${errorMsg}`);
-      setError(errorMsg);
-    } finally {
-      setProcessing(false);
-    }
-  };
-
   const togglePerson = (personID: number) => {
     setSelectedPeople(prev => {
       if (prev.includes(personID)) {
@@ -1068,14 +1028,6 @@ export default function ProcessNewFiles() {
               className="btn btn-primary"
             >
               {processing ? 'Processing...' : 'Save & Continue'}
-            </button>
-            <button
-              onClick={handleRotateThumbnail}
-              disabled={processing}
-              className="btn btn-warning"
-              title="Rotate thumbnail 90° clockwise if it appears rotated"
-            >
-              🔄 Rotate Thumbnail
             </button>
             <button
               onClick={handleDelete}

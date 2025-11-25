@@ -715,6 +715,36 @@ export default function MediaDetailModal({
     }
   };
 
+  const handleRotateThumbnail = async () => {
+    const filename = media.PFileName.split(/[\/\\]/).pop() || media.PFileName;
+    
+    if (!confirm(`Rotate thumbnail 90° clockwise for "${filename}"?`)) {
+      return;
+    }
+
+    try {
+      const normalizedPath = media.PFileName.replace(/\\/g, '/');
+      const fileName = normalizedPath.split('/').pop() || normalizedPath;
+      
+      console.log('Rotating thumbnail for:', fileName);
+      
+      const response = await fetch(`/api/rotate-thumbnail/${encodeURIComponent(fileName)}`, {
+        method: 'POST',
+      });
+
+      const data = await response.json();
+      
+      if (response.ok) {
+        alert(`✓ Thumbnail rotated 90° clockwise!\n\nPlease refresh the page to see the change.`);
+      } else {
+        throw new Error(data.error || 'Failed to rotate thumbnail');
+      }
+    } catch (error: any) {
+      console.error('Rotate thumbnail failed:', error);
+      alert(`Failed to rotate thumbnail: ${error.message}`);
+    }
+  };
+
   const handleCreatePerson = async () => {
     if (!newPersonName.trim()) {
       alert('Please enter a name');
@@ -1812,6 +1842,9 @@ export default function MediaDetailModal({
                 <>
                   <button className="btn btn-primary" onClick={() => setEditing(true)}>
                     Edit
+                  </button>
+                  <button className="btn btn-warning" onClick={handleRotateThumbnail} style={{ marginLeft: '0.5rem' }}>
+                    🔄 Rotate Thumbnail
                   </button>
                   <button className="btn btn-danger" onClick={handleDelete} style={{ marginLeft: '0.5rem' }}>
                     Delete Picture
