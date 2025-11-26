@@ -741,9 +741,21 @@ export default function MediaDetailModal({
         const cacheBuster = Date.now();
         sessionStorage.setItem('thumbnailRotated', cacheBuster.toString());
         
-        // Wait a moment for the blob to be fully written, then show preview with fresh URL
-        setTimeout(() => {
+        // Wait 1.5 seconds for Azure to fully write the rotated blob, then fetch fresh version
+        setTimeout(async () => {
+          // Force fetch the rotated thumbnail with no-cache headers
           const previewUrl = `${media.PThumbnailUrl}?v=${cacheBuster}`;
+          
+          try {
+            // Pre-fetch with no-cache to ensure we get the rotated version
+            await fetch(previewUrl, { 
+              cache: 'no-store',
+              headers: { 'Cache-Control': 'no-cache' }
+            });
+          } catch (e) {
+            console.log('Pre-fetch completed');
+          }
+          
           setRotatedPreviewUrl(previewUrl);
           setShowRotationPreview(true);
           
@@ -755,7 +767,7 @@ export default function MediaDetailModal({
             // Navigate to gallery page with cache-busting parameter
             window.location.href = `/?_refresh=${cacheBuster}`;
           }, 4000);
-        }, 500);
+        }, 1500);
       } else {
         throw new Error(data.error || 'Failed to rotate thumbnail');
       }
@@ -1908,18 +1920,33 @@ export default function MediaDetailModal({
             <p style={{ marginBottom: '1rem', color: '#6c757d' }}>
               Preview of rotated thumbnail:
             </p>
-            <img
-              src={rotatedPreviewUrl}
-              alt="Rotated thumbnail preview"
-              style={{
-                maxWidth: '100%',
-                maxHeight: '400px',
-                border: '2px solid #28a745',
-                borderRadius: '4px',
-                objectFit: 'contain',
-              }}
-            />
-            <p style={{ marginTop: '1rem', color: '#6c757d', fontSize: '0.9rem' }}>
+            <div style={{ 
+              minHeight: '200px', 
+              display: 'flex', 
+              alignItems: 'center', 
+              justifyContent: 'center',
+              backgroundColor: '#f8f9fa',
+              borderRadius: '4px',
+              marginBottom: '1rem'
+            }}>
+              <img
+                src={rotatedPreviewUrl}
+                alt="Rotated thumbnail preview"
+                onLoad={() => console.log('Thumbnail loaded:', rotatedPreviewUrl)}
+                onError={(e) => console.error('Thumbnail failed to load:', rotatedPreviewUrl, e)}
+                style={{
+                  maxWidth: '100%',
+                  maxHeight: '400px',
+                  border: '2px solid #28a745',
+                  borderRadius: '4px',
+                  objectFit: 'contain',
+                }}
+              />
+            </div>
+            <p style={{ color: '#6c757d', fontSize: '0.8rem', marginBottom: '0.5rem' }}>
+              {rotatedPreviewUrl}
+            </p>
+            <p style={{ color: '#6c757d', fontSize: '0.9rem' }}>
               Reloading gallery in a moment...
             </p>
           </div>
