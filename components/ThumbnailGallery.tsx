@@ -29,11 +29,6 @@ const ThumbnailItem = memo(({
   onItemClick: () => void;
   onItemContextMenu: (e: React.MouseEvent) => void;
   cacheBuster?: string;
-}) => { 
-}: { 
-  item: MediaItem;
-  onItemClick: () => void;
-  onItemContextMenu: (e: React.MouseEvent) => void;
 }) => {
   return (
     <div
