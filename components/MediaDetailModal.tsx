@@ -737,25 +737,25 @@ export default function MediaDetailModal({
       const data = await response.json();
       
       if (response.ok) {
-        // Show preview popup with cache-busted URL
-        const cacheBuster = Date.now();
-        const previewUrl = `${media.PThumbnailUrl}?v=${cacheBuster}`;
-        setRotatedPreviewUrl(previewUrl);
-        setShowRotationPreview(true);
-        
         // Use sessionStorage to signal the gallery to reload with cache-bust
+        const cacheBuster = Date.now();
         sessionStorage.setItem('thumbnailRotated', cacheBuster.toString());
         
-        // After 2 seconds, close modal and reload
+        // Wait a moment for the blob to be fully written, then show preview with fresh URL
         setTimeout(() => {
-          setShowRotationPreview(false);
-          onClose();
+          const previewUrl = `${media.PThumbnailUrl}?v=${cacheBuster}`;
+          setRotatedPreviewUrl(previewUrl);
+          setShowRotationPreview(true);
           
-          // Reload the page with cache-busting parameter
-          const currentUrl = new URL(window.location.href);
-          currentUrl.searchParams.set('_refresh', cacheBuster.toString());
-          window.location.href = currentUrl.toString();
-        }, 2000);
+          // After 4 seconds, close modal and navigate back to gallery
+          setTimeout(() => {
+            setShowRotationPreview(false);
+            onClose();
+            
+            // Navigate to gallery page with cache-busting parameter
+            window.location.href = `/?_refresh=${cacheBuster}`;
+          }, 4000);
+        }, 500);
       } else {
         throw new Error(data.error || 'Failed to rotate thumbnail');
       }
