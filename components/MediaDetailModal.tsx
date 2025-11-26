@@ -32,6 +32,8 @@ export default function MediaDetailModal({
   const retryTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const [showNavigationArrows, setShowNavigationArrows] = useState(false);
   const [isLoadingMedia, setIsLoadingMedia] = useState(false);
+  const [showRotationPreview, setShowRotationPreview] = useState(false);
+  const [rotatedPreviewUrl, setRotatedPreviewUrl] = useState<string | null>(null);
   
   // Progressive loading: Show midsize first, then swap to full resolution
   const [currentImageSrc, setCurrentImageSrc] = useState<string>(() => {
@@ -735,11 +737,25 @@ export default function MediaDetailModal({
       const data = await response.json();
       
       if (response.ok) {
-        alert(`✓ Thumbnail rotated 90° clockwise!`);
+        // Show preview popup with cache-busted URL
+        const cacheBuster = Date.now();
+        const previewUrl = `${media.PThumbnailUrl}?v=${cacheBuster}`;
+        setRotatedPreviewUrl(previewUrl);
+        setShowRotationPreview(true);
         
-        // Force refresh the page to show updated thumbnail
-        // Add a cache buster to ensure the browser reloads the thumbnail
-        window.location.reload();
+        // Use sessionStorage to signal the gallery to reload with cache-bust
+        sessionStorage.setItem('thumbnailRotated', cacheBuster.toString());
+        
+        // After 2 seconds, close modal and reload
+        setTimeout(() => {
+          setShowRotationPreview(false);
+          onClose();
+          
+          // Reload the page with cache-busting parameter
+          const currentUrl = new URL(window.location.href);
+          currentUrl.searchParams.set('_refresh', cacheBuster.toString());
+          window.location.href = currentUrl.toString();
+        }, 2000);
       } else {
         throw new Error(data.error || 'Failed to rotate thumbnail');
       }
@@ -1860,6 +1876,55 @@ export default function MediaDetailModal({
         </div>
       </div>
       </div>
+
+      {/* Rotation Preview Popup */}
+      {showRotationPreview && rotatedPreviewUrl && (
+        <div
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(0, 0, 0, 0.9)',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 10000,
+            padding: '2rem',
+          }}
+        >
+          <div
+            style={{
+              backgroundColor: 'white',
+              padding: '2rem',
+              borderRadius: '8px',
+              textAlign: 'center',
+              maxWidth: '600px',
+            }}
+          >
+            <h3 style={{ marginBottom: '1rem', color: '#28a745' }}>✓ Thumbnail Rotated!</h3>
+            <p style={{ marginBottom: '1rem', color: '#6c757d' }}>
+              Preview of rotated thumbnail:
+            </p>
+            <img
+              src={rotatedPreviewUrl}
+              alt="Rotated thumbnail preview"
+              style={{
+                maxWidth: '100%',
+                maxHeight: '400px',
+                border: '2px solid #28a745',
+                borderRadius: '4px',
+                objectFit: 'contain',
+              }}
+            />
+            <p style={{ marginTop: '1rem', color: '#6c757d', fontSize: '0.9rem' }}>
+              Reloading gallery in a moment...
+            </p>
+          </div>
+        </div>
+      )}
     </>
   );
 }

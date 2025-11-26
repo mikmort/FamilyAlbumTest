@@ -22,7 +22,14 @@ interface ThumbnailGalleryProps {
 const ThumbnailItem = memo(({ 
   item, 
   onItemClick, 
-  onItemContextMenu 
+  onItemContextMenu,
+  cacheBuster
+}: {
+  item: MediaItem;
+  onItemClick: () => void;
+  onItemContextMenu: (e: React.MouseEvent) => void;
+  cacheBuster?: string;
+}) => { 
 }: { 
   item: MediaItem;
   onItemClick: () => void;
@@ -37,7 +44,7 @@ const ThumbnailItem = memo(({
       <img
         src={
           item.PThumbnailUrl 
-            ? `${item.PThumbnailUrl}${item.PThumbnailUrl.includes('?') ? '&' : '?'}v=${new Date(item.PLastModifiedDate).getTime()}` 
+            ? `${item.PThumbnailUrl}${item.PThumbnailUrl.includes('?') ? '&' : '?'}v=${cacheBuster || new Date(item.PLastModifiedDate).getTime()}` 
             : '/placeholder.svg'
         }
         alt={item.PDescription || item.PFileName}
@@ -119,6 +126,16 @@ function ThumbnailGallery({
   const [allMedia, setAllMedia] = useState<MediaItem[]>([]);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(false);
+  const [cacheBuster, setCacheBuster] = useState<string>('');
+
+  // Check if a thumbnail was rotated and add cache buster
+  useEffect(() => {
+    const rotationTimestamp = sessionStorage.getItem('thumbnailRotated');
+    if (rotationTimestamp) {
+      setCacheBuster(rotationTimestamp);
+      sessionStorage.removeItem('thumbnailRotated');
+    }
+  }, []);
 
   // Memoize the query string to prevent unnecessary re-fetches
   const queryString = useMemo(() => {
@@ -359,6 +376,7 @@ function ThumbnailGallery({
             item={item}
             onItemClick={() => handleMediaClick(item)}
             onItemContextMenu={(e) => handleMediaContextMenu(e, item)}
+            cacheBuster={cacheBuster}
           />
         ))}
       </div>
