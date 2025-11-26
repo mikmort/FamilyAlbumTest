@@ -741,19 +741,30 @@ export default function MediaDetailModal({
         const cacheBuster = Date.now();
         sessionStorage.setItem('thumbnailRotated', cacheBuster.toString());
         
+        console.log('=== ROTATION SUCCESS ===');
+        console.log('Original PThumbnailUrl:', media.PThumbnailUrl);
+        console.log('Cache buster:', cacheBuster);
+        
         // Wait 1.5 seconds for Azure to fully write the rotated blob, then fetch fresh version
         setTimeout(async () => {
-          // Force fetch the rotated thumbnail with no-cache headers
-          const previewUrl = `${media.PThumbnailUrl}?v=${cacheBuster}`;
+          // Construct the preview URL with cache-busting
+          const baseUrl = media.PThumbnailUrl.split('?')[0]; // Remove existing query params
+          const previewUrl = `${baseUrl}?v=${cacheBuster}&nocache=${Math.random()}`;
+          
+          console.log('Preview URL:', previewUrl);
           
           try {
             // Pre-fetch with no-cache to ensure we get the rotated version
-            await fetch(previewUrl, { 
+            const fetchResponse = await fetch(previewUrl, { 
               cache: 'no-store',
-              headers: { 'Cache-Control': 'no-cache' }
+              headers: { 
+                'Cache-Control': 'no-cache, no-store, must-revalidate',
+                'Pragma': 'no-cache'
+              }
             });
+            console.log('Pre-fetch status:', fetchResponse.status);
           } catch (e) {
-            console.log('Pre-fetch completed');
+            console.log('Pre-fetch error:', e);
           }
           
           setRotatedPreviewUrl(previewUrl);
