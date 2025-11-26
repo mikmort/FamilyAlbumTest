@@ -770,14 +770,8 @@ export default function MediaDetailModal({
           setRotatedPreviewUrl(previewUrl);
           setShowRotationPreview(true);
           
-          // After 4 seconds, close modal and navigate back to gallery
-          setTimeout(() => {
-            setShowRotationPreview(false);
-            onClose();
-            
-            // Navigate to gallery page with cache-busting parameter
-            window.location.href = `/?_refresh=${cacheBuster}`;
-          }, 4000);
+          // Store cacheBuster for manual navigation
+          (window as any).__cacheBuster = cacheBuster;
         }, 1500);
       } else {
         throw new Error(data.error || 'Failed to rotate thumbnail');
@@ -1956,12 +1950,30 @@ export default function MediaDetailModal({
                 }}
               />
             </div>
-            <p style={{ color: '#6c757d', fontSize: '0.8rem', marginBottom: '0.5rem' }}>
+            <p style={{ color: '#6c757d', fontSize: '0.8rem', marginBottom: '0.5rem', wordBreak: 'break-all' }}>
               {rotatedPreviewUrl}
             </p>
-            <p style={{ color: '#6c757d', fontSize: '0.9rem' }}>
-              Reloading gallery in a moment...
-            </p>
+            <button
+              onClick={() => {
+                setShowRotationPreview(false);
+                onClose();
+                const cb = (window as any).__cacheBuster || Date.now();
+                window.location.href = `/?_refresh=${cb}`;
+              }}
+              style={{
+                marginTop: '1rem',
+                padding: '12px 24px',
+                backgroundColor: '#007bff',
+                color: 'white',
+                border: 'none',
+                borderRadius: '4px',
+                cursor: 'pointer',
+                fontSize: '1rem',
+                fontWeight: 'bold'
+              }}
+            >
+              ✓ Continue to Gallery
+            </button>
           </div>
         </div>
       )}
