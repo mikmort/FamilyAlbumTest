@@ -742,37 +742,26 @@ export default function MediaDetailModal({
         sessionStorage.setItem('thumbnailRotated', cacheBuster.toString());
         
         console.log('=== ROTATION SUCCESS ===');
+        console.log('Response data:', data);
+        console.log('Thumbnail URL from API:', data.thumbnailUrl);
         console.log('Original PThumbnailUrl:', media.PThumbnailUrl);
         console.log('Cache buster:', cacheBuster);
         
-        // Wait 1.5 seconds for Azure to fully write the rotated blob, then fetch fresh version
+        // Wait 2 seconds for Azure to fully write and propagate the rotated blob
         setTimeout(async () => {
-          // Construct the preview URL with cache-busting
-          const baseUrl = media.PThumbnailUrl.split('?')[0]; // Remove existing query params
-          const previewUrl = `${baseUrl}?v=${cacheBuster}&nocache=${Math.random()}`;
+          // Use the actual thumbnail blob URL from the API response
+          const previewUrl = data.thumbnailUrl 
+            ? `${data.thumbnailUrl}${data.thumbnailUrl.includes('?') ? '&' : '?'}nocache=${cacheBuster}`
+            : `${media.PThumbnailUrl}?v=${cacheBuster}&nocache=${Math.random()}`;
           
           console.log('Preview URL:', previewUrl);
-          
-          try {
-            // Pre-fetch with no-cache to ensure we get the rotated version
-            const fetchResponse = await fetch(previewUrl, { 
-              cache: 'no-store',
-              headers: { 
-                'Cache-Control': 'no-cache, no-store, must-revalidate',
-                'Pragma': 'no-cache'
-              }
-            });
-            console.log('Pre-fetch status:', fetchResponse.status);
-          } catch (e) {
-            console.log('Pre-fetch error:', e);
-          }
           
           setRotatedPreviewUrl(previewUrl);
           setShowRotationPreview(true);
           
           // Store cacheBuster for manual navigation
           (window as any).__cacheBuster = cacheBuster;
-        }, 1500);
+        }, 2000);
       } else {
         throw new Error(data.error || 'Failed to rotate thumbnail');
       }

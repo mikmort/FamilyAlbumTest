@@ -75,11 +75,16 @@ module.exports = async function (context, req) {
 
         context.log(`✓ Successfully rotated thumbnail: ${thumbnailPath}`);
 
+        // Generate a SAS URL for the rotated thumbnail so frontend can display it
+        const { generateSasUrl } = require('../shared/storage');
+        const thumbnailSasUrl = await generateSasUrl(thumbnailPath);
+
         context.res = {
             status: 200,
             body: {
                 success: true,
                 thumbnailPath: thumbnailPath,
+                thumbnailUrl: thumbnailSasUrl,
                 originalSize: buffer.length,
                 rotatedSize: rotatedBuffer.length
             }
