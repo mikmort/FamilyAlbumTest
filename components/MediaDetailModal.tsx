@@ -741,20 +741,12 @@ export default function MediaDetailModal({
         const cacheBuster = Date.now();
         sessionStorage.setItem('thumbnailRotated', cacheBuster.toString());
         
-        console.log('=== ROTATION SUCCESS ===');
-        console.log('Response data:', data);
-        console.log('Thumbnail URL from API:', data.thumbnailUrl);
-        console.log('Original PThumbnailUrl:', media.PThumbnailUrl);
-        console.log('Cache buster:', cacheBuster);
-        
         // Wait 2 seconds for Azure to fully write and propagate the rotated blob
         setTimeout(async () => {
           // Use the actual thumbnail blob URL from the API response
           const previewUrl = data.thumbnailUrl 
             ? `${data.thumbnailUrl}${data.thumbnailUrl.includes('?') ? '&' : '?'}nocache=${cacheBuster}`
             : `${media.PThumbnailUrl}?v=${cacheBuster}&nocache=${Math.random()}`;
-          
-          console.log('Preview URL:', previewUrl);
           
           setRotatedPreviewUrl(previewUrl);
           setShowRotationPreview(true);
@@ -1928,8 +1920,6 @@ export default function MediaDetailModal({
               <img
                 src={rotatedPreviewUrl}
                 alt="Rotated thumbnail preview"
-                onLoad={() => console.log('Thumbnail loaded:', rotatedPreviewUrl)}
-                onError={(e) => console.error('Thumbnail failed to load:', rotatedPreviewUrl, e)}
                 style={{
                   maxWidth: '100%',
                   maxHeight: '400px',
@@ -1939,9 +1929,6 @@ export default function MediaDetailModal({
                 }}
               />
             </div>
-            <p style={{ color: '#6c757d', fontSize: '0.8rem', marginBottom: '0.5rem', wordBreak: 'break-all' }}>
-              {rotatedPreviewUrl}
-            </p>
             <button
               onClick={() => {
                 setShowRotationPreview(false);
