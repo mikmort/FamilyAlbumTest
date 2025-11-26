@@ -76,8 +76,8 @@ module.exports = async function (context, req) {
         context.log(`✓ Successfully rotated thumbnail: ${thumbnailPath}`);
 
         // Generate a SAS URL for the rotated thumbnail so frontend can display it
-        const { generateSasUrl } = require('../shared/storage');
-        const thumbnailSasUrl = await generateSasUrl(thumbnailPath);
+        const { getBlobSasUrl } = require('../shared/storage');
+        const thumbnailSasUrl = getBlobSasUrl(process.env.AZURE_STORAGE_CONTAINER || 'family-album-media', thumbnailPath);
 
         context.res = {
             status: 200,
