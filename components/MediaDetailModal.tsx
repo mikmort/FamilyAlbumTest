@@ -1084,6 +1084,7 @@ export default function MediaDetailModal({
       )}
 
       {/* Detail Modal */}
+      {!showRotationPreview && (
       <div className="modal-overlay" onClick={onClose}>
       <div className="modal-content" onClick={(e) => e.stopPropagation()}>
         <button
@@ -1888,6 +1889,7 @@ export default function MediaDetailModal({
         </div>
       </div>
       </div>
+      )}
 
       {/* Rotation Preview Popup */}
       {showRotationPreview && rotatedPreviewUrl && (
