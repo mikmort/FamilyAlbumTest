@@ -59,7 +59,9 @@
           "scopes": ["openid", "profile", "email"]
         }
       }
-    }
+    },
+    "rolesSource": "/api/auth-status",
+    "cookieSessionLifetimeInMinutes": 10080
   },
   "navigationFallback": {
     "rewrite": "/index.html",
