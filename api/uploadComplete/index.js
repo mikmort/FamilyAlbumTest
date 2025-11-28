@@ -392,6 +392,54 @@ module.exports = async function (context, req) {
 
                 context.log(`Image dimensions: ${width}x${height}`);
 
+                // Generate midsize version if image is large (>1080px in either dimension)
+                // This provides progressive loading for better UX
+                const originalSizeMB = buffer.length / (1024 * 1024);
+                const shouldCreateMidsize = originalSizeMB > 1 && (width > 1080 || height > 1080);
+                
+                if (shouldCreateMidsize) {
+                    context.log(`🖼️  Generating midsize version (${originalSizeMB.toFixed(2)}MB, ${width}x${height})`);
+                    
+                    try {
+                        // Create midsize version (max 1080px on longest side)
+                        const midsizeBuffer = await sharp(buffer)
+                            .rotate() // Preserve rotation from EXIF
+                            .resize(1080, 1080, {
+                                fit: 'inside',
+                                withoutEnlargement: true
+                            })
+                            .jpeg({ quality: 85, mozjpeg: true })
+                            .toBuffer();
+                        
+                        const midsizeMetadata = await sharp(midsizeBuffer).metadata();
+                        const midsizeSizeMB = midsizeBuffer.length / (1024 * 1024);
+                        context.log(`✓ Midsize created - ${midsizeMetadata.width}x${midsizeMetadata.height}, ${midsizeSizeMB.toFixed(2)}MB`);
+                        
+                        // Upload midsize to blob storage
+                        const fileExt = fileName.substring(fileName.lastIndexOf('.'));
+                        const midsizeFileName = `${fileName.substring(0, fileName.lastIndexOf('.'))}-midsize${fileExt}`;
+                        const midsizeBlobName = `media/${midsizeFileName}`;
+                        const midsizeBlobClient = containerClient.getBlockBlobClient(midsizeBlobName);
+                        
+                        await midsizeBlobClient.uploadData(midsizeBuffer, {
+                            blobHTTPHeaders: {
+                                blobContentType: 'image/jpeg'
+                            }
+                        });
+                        
+                        // Update the API URL for the midsize version
+                        const encodedMidsizeFileName = encodeURIComponent(midsizeFileName);
+                        apiMidsizeUrl = `/api/media/${encodedMidsizeFileName}`;
+                        context.log(`✅ Midsize uploaded: ${apiMidsizeUrl}`);
+                        
+                    } catch (midsizeErr) {
+                        context.log.error('⚠️  Failed to generate midsize (continuing anyway):', midsizeErr.message);
+                        // Don't fail the upload if midsize generation fails
+                    }
+                } else {
+                    context.log(`⏭️  Skipping midsize (${originalSizeMB.toFixed(2)}MB, ${width}x${height})`);
+                }
+
                 // Thumbnail will be generated dynamically via API
                 thumbnailUrl = apiThumbUrl;
 
