@@ -242,14 +242,13 @@ async function processBatch(context, batchSize) {
 
                 // Check dimensions if available - skip small images without downloading
                 if (image.PWidth && image.PHeight && image.PWidth <= 1080 && image.PHeight <= 1080) {
-                    context.log(`Skipping ${image.PFileName} - dimensions ${image.PWidth}x${image.PHeight} <= 1080px`);
+                    context.log(`Skipping ${image.PFileName} - DB dimensions ${image.PWidth}x${image.PHeight} <= 1080px (no download)`);
                     batchProgress.skipped++;
                     batchProgress.processed++;
-                    
-                    // Mark as processed (set PMidsizeUrl to empty string or NULL to indicate "checked but not needed")
-                    // Actually, don't update DB - let it stay NULL since midsize not needed
                     continue;
                 }
+
+                context.log(`Processing ${image.PFileName} - DB dimensions: ${image.PWidth || 'NULL'}x${image.PHeight || 'NULL'}`);
 
                 // Download the image
                 const downloadResponse = await blobClient.download();
