@@ -261,7 +261,7 @@ async function processBatch(context, batchSize) {
 
                 context.log(`Downloaded ${image.PFileName} (${sizeMB.toFixed(2)} MB)`);
 
-                // Skip if <500KB
+                // Skip if file size is <= 500KB
                 if (sizeMB <= 0.5) {
                     context.log(`Skipping ${image.PFileName} - file size ${sizeMB.toFixed(2)}MB <= 0.5MB`);
                     batchProgress.skipped++;
@@ -269,20 +269,8 @@ async function processBatch(context, batchSize) {
                     continue;
                 }
 
-                // Get actual dimensions
+                // Get actual dimensions for resizing
                 const metadata = await sharp(imageBuffer).metadata();
-                const actualWidth = metadata.width || 0;
-                const actualHeight = metadata.height || 0;
-                
-                context.log(`Image dimensions: ${actualWidth}x${actualHeight}`);
-                
-                // Skip if dimensions are <= 1080px
-                if (actualWidth <= 1080 && actualHeight <= 1080) {
-                    context.log(`Skipping ${image.PFileName} - dimensions ${actualWidth}x${actualHeight} <= 1080px`);
-                    batchProgress.skipped++;
-                    batchProgress.processed++;
-                    continue;
-                }
 
                 // Generate midsize (1080px max dimension)
                 // Note: .rotate() without arguments auto-rotates based on EXIF orientation
@@ -369,17 +357,17 @@ async function processBatch(context, batchSize) {
 
                 context.log(`✅ Successfully processed ${image.PFileName}`);
                 batchProgress.succeeded++;
+                batchProgress.processed++;
 
             } catch (err) {
                 context.log.error(`Error processing ${image.PFileName}:`, err.message);
                 batchProgress.failed++;
+                batchProgress.processed++;
                 batchProgress.errors.push({
                     fileName: image.PFileName,
                     error: err.message
                 });
             }
-
-            batchProgress.processed++;
         }
 
         batchProgress.isRunning = false;

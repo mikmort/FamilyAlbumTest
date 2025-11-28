@@ -392,10 +392,10 @@ module.exports = async function (context, req) {
 
                 context.log(`Image dimensions: ${width}x${height}`);
 
-                // Generate midsize version if image is large (>1080px in either dimension)
+                // Generate midsize version if file is >500KB
                 // This provides progressive loading for better UX
                 const originalSizeMB = buffer.length / (1024 * 1024);
-                const shouldCreateMidsize = originalSizeMB > 0.5 && (width > 1080 || height > 1080);
+                const shouldCreateMidsize = originalSizeMB > 0.5;
                 
                 if (shouldCreateMidsize) {
                     context.log(`🖼️  Generating midsize version (${originalSizeMB.toFixed(2)}MB, ${width}x${height})`);
