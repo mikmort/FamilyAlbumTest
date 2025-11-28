@@ -1107,7 +1107,7 @@ export default function AdminSettings({ onRequestsChange }: AdminSettingsProps) 
           </button>
         </div>
 
-        <div>
+        <div style={{ marginBottom: '1.5rem' }}>
           <h3 style={{ fontSize: '1.1rem', marginBottom: '0.5rem' }}>Fix Missing Dimensions</h3>
           <p style={{ color: '#666', marginBottom: '1rem' }}>
             Extract and update dimensions for pictures with missing width/height information.
@@ -1120,6 +1120,71 @@ export default function AdminSettings({ onRequestsChange }: AdminSettingsProps) 
           >
             {isRegeneratingThumbnails ? '⏳ Processing...' : '📐 Fix Missing Dimensions'}
           </button>
+        </div>
+
+        <div>
+          <h3 style={{ fontSize: '1.1rem', marginBottom: '0.5rem' }}>Generate Midsize Images</h3>
+          <p style={{ color: '#666', marginBottom: '1rem' }}>
+            Generate 1080px midsize versions for large images (&gt;1MB and &gt;1080px) to improve loading performance.
+            {midsizeStatus && (
+              <span style={{ display: 'block', marginTop: '0.5rem', fontWeight: '500', color: '#856404' }}>
+                📊 {midsizeStatus.filesNeedingMidsize} images need midsize versions
+              </span>
+            )}
+          </p>
+          
+          <button 
+            className="btn btn-primary"
+            onClick={() => startMidsizeGeneration(50)}
+            disabled={isGeneratingMidsize || (midsizeStatus?.filesNeedingMidsize === 0)}
+          >
+            {isGeneratingMidsize ? '⏳ Generating...' : '🖼️ Generate Midsize Images'}
+          </button>
+
+          {midsizeProgress && midsizeProgress.isRunning && (
+            <div style={{ 
+              marginTop: '1rem',
+              padding: '1rem', 
+              background: 'white', 
+              borderRadius: '8px', 
+              border: '1px solid #ddd'
+            }}>
+              <div style={{ fontSize: '0.95rem', fontWeight: '500', marginBottom: '0.5rem' }}>
+                📈 Progress: {midsizeProgress.processed}/{midsizeProgress.total}
+              </div>
+              <div style={{ fontSize: '0.9rem' }}>
+                <span style={{ color: '#28a745' }}>✅ {midsizeProgress.succeeded} succeeded</span>
+                {' · '}
+                <span style={{ color: '#dc3545' }}>❌ {midsizeProgress.failed} failed</span>
+                {' · '}
+                <span style={{ color: '#6c757d' }}>⏭️ {midsizeProgress.skipped} skipped</span>
+              </div>
+            </div>
+          )}
+
+          {midsizeProgress && !midsizeProgress.isRunning && midsizeProgress.processed > 0 && (
+            <div style={{ 
+              marginTop: '1rem',
+              padding: '1rem', 
+              background: 'white', 
+              borderRadius: '8px', 
+              border: '1px solid #ddd'
+            }}>
+              <div style={{ fontSize: '0.95rem', fontWeight: '500', marginBottom: '0.5rem', color: '#28a745' }}>
+                ✅ Batch Complete
+              </div>
+              <ul style={{ margin: 0, paddingLeft: '1.5rem', fontSize: '0.9rem' }}>
+                <li>Total processed: {midsizeProgress.processed}</li>
+                <li style={{ color: '#28a745' }}>Success: {midsizeProgress.succeeded}</li>
+                {midsizeProgress.failed > 0 && (
+                  <li style={{ color: '#dc3545' }}>Failed: {midsizeProgress.failed}</li>
+                )}
+                {midsizeProgress.skipped > 0 && (
+                  <li style={{ color: '#6c757d' }}>Skipped: {midsizeProgress.skipped}</li>
+                )}
+              </ul>
+            </div>
+          )}
         </div>
 
         {thumbnailRegenerateResult && (
