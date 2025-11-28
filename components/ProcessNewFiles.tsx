@@ -74,6 +74,12 @@ export default function ProcessNewFiles() {
   const [newEventDesc, setNewEventDesc] = useState('');
   const [creatingEvent, setCreatingEvent] = useState(false);
 
+  // New person creation
+  const [showNewPersonForm, setShowNewPersonForm] = useState(false);
+  const [newPersonName, setNewPersonName] = useState('');
+  const [newPersonRelation, setNewPersonRelation] = useState('');
+  const [creatingPerson, setCreatingPerson] = useState(false);
+
   // Face recognition
   const [faceSuggestions, setFaceSuggestions] = useState<FaceSuggestion[]>([]);
   const [recognizingFaces, setRecognizingFaces] = useState(false);
@@ -229,6 +235,58 @@ export default function ProcessNewFiles() {
       setError(err.message || 'Failed to create event');
     } finally {
       setCreatingEvent(false);
+    }
+  };
+
+  const handleCreatePerson = async () => {
+    if (!newPersonName.trim()) {
+      setError('Person name is required');
+      return;
+    }
+
+    setCreatingPerson(true);
+    setError('');
+    try {
+      const res = await fetch('/api/people', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          neName: newPersonName.trim(),
+          neRelation: newPersonRelation.trim() || null
+        })
+      });
+
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || 'Failed to create person');
+      }
+
+      const data = await res.json();
+      
+      // Add new person to the list
+      const newPerson: Person = {
+        ID: data.person?.ID,
+        neName: data.person?.neName,
+        neRelation: data.person?.neRelation || '',
+        neCount: 0
+      };
+      
+      setPeople(prev => [newPerson, ...prev].sort((a, b) => a.neName.localeCompare(b.neName)));
+      
+      // Select the newly created person
+      setSelectedPeople(prev => [...prev, newPerson.ID]);
+      
+      // Close form and reset
+      setShowNewPersonForm(false);
+      setNewPersonName('');
+      setNewPersonRelation('');
+      setPeopleDropdownOpen(false);
+      
+    } catch (err: any) {
+      console.error('Error creating person:', err);
+      setError(err.message || 'Failed to create person');
+    } finally {
+      setCreatingPerson(false);
     }
   };
 
@@ -972,9 +1030,20 @@ export default function ProcessNewFiles() {
               />
               {peopleDropdownOpen && !processing && !peopleLoading && (
                 <div className="autocomplete-dropdown">
+                  {/* Create New Person Button */}
+                  <div 
+                    className="autocomplete-item create-new"
+                    onClick={() => {
+                      setShowNewPersonForm(true);
+                      setPeopleDropdownOpen(false);
+                    }}
+                  >
+                    <strong>+ Create New Person</strong>
+                  </div>
+                  
                   {filteredPeople.length === 0 ? (
                     <div className="autocomplete-item disabled">
-                      <em>No people in database</em>
+                      <em>{peopleSearch ? 'No matching people found' : 'No people in database'}</em>
                     </div>
                   ) : (
                     filteredPeople.map(person => (
@@ -1081,6 +1150,56 @@ export default function ProcessNewFiles() {
                   setNewEventDesc('');
                 }}
                 disabled={creatingEvent}
+                className="btn btn-secondary"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* New Person Modal */}
+      {showNewPersonForm && (
+        <div className="modal-overlay" onClick={() => setShowNewPersonForm(false)}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+            <h3>Create New Person</h3>
+            <div className="form-group">
+              <label>Person Name *</label>
+              <input
+                type="text"
+                value={newPersonName}
+                onChange={(e) => setNewPersonName(e.target.value)}
+                placeholder="e.g., John Smith"
+                autoFocus
+                disabled={creatingPerson}
+              />
+            </div>
+            <div className="form-group">
+              <label>Relation (Optional)</label>
+              <input
+                type="text"
+                value={newPersonRelation}
+                onChange={(e) => setNewPersonRelation(e.target.value)}
+                placeholder="e.g., Uncle, Friend, Cousin"
+                disabled={creatingPerson}
+              />
+            </div>
+            <div className="modal-actions">
+              <button
+                onClick={handleCreatePerson}
+                disabled={creatingPerson || !newPersonName.trim()}
+                className="btn btn-primary"
+              >
+                {creatingPerson ? 'Creating...' : 'Create Person'}
+              </button>
+              <button
+                onClick={() => {
+                  setShowNewPersonForm(false);
+                  setNewPersonName('');
+                  setNewPersonRelation('');
+                }}
+                disabled={creatingPerson}
                 className="btn btn-secondary"
               >
                 Cancel
