@@ -1676,10 +1676,11 @@ export default function MediaDetailModal({
                             borderRadius: '4px',
                             padding: '0.25rem 0.5rem',
                             cursor: 'pointer',
-                            fontSize: '0.9rem'
+                            fontSize: '0.9rem',
+                            fontFamily: 'Arial, sans-serif'
                           }}
                         >
-                          ✕ Remove
+                          × Remove
                         </button>
                       )}
                     </div>
