@@ -1186,7 +1186,7 @@ export default function AdminSettings({ onRequestsChange }: AdminSettingsProps) 
         <div>
           <h3 style={{ fontSize: '1.1rem', marginBottom: '0.5rem' }}>Generate Midsize Images</h3>
           <p style={{ color: '#666', marginBottom: '1rem' }}>
-            Generate 1080px midsize versions for large images (&gt;1MB and &gt;1080px) to improve loading performance.
+            Generate 1080px midsize versions for large images (&gt;500KB and &gt;1080px) to improve loading performance.
             {midsizeStatus && (
               <span style={{ display: 'block', marginTop: '0.5rem', fontWeight: '500', color: '#856404' }}>
                 📊 {midsizeStatus.filesNeedingMidsize} images need midsize versions

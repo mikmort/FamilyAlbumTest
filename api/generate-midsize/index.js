@@ -262,9 +262,9 @@ async function processBatch(context, batchSize) {
 
                 context.log(`Downloaded ${image.PFileName} (${sizeMB.toFixed(2)} MB)`);
 
-                // Skip if <1MB
-                if (sizeMB <= 1) {
-                    context.log(`Skipping ${image.PFileName} - file size ${sizeMB.toFixed(2)}MB <= 1MB`);
+                // Skip if <500KB
+                if (sizeMB <= 0.5) {
+                    context.log(`Skipping ${image.PFileName} - file size ${sizeMB.toFixed(2)}MB <= 0.5MB`);
                     batchProgress.skipped++;
                     batchProgress.processed++;
                     continue;
