@@ -102,9 +102,11 @@ module.exports = async function (context, req) {
 
         // POST /api/events - Create new event
         if (method === 'POST') {
-            const { name, neName, relation, neRelation, eventDate } = req.body;
+            const { name, neName, relation, neRelation, details, eventDate } = req.body;
             const eventName = name || neName;
-            const eventRelation = relation || neRelation || null;
+            const eventRelation = relation || neRelation || details || null;
+
+            context.log(`📝 Creating event: name="${eventName}", relation="${eventRelation}", eventDate="${eventDate}"`);
 
             if (!eventName || !eventName.trim()) {
                 context.res = {
@@ -172,10 +174,10 @@ module.exports = async function (context, req) {
         // PUT /api/events/[id] or PUT /api/events - Update event
         if (method === 'PUT') {
             // Accept ID from URL path or request body (for compatibility)
-            const { name, neName, relation, neRelation, id: bodyId, eventDate } = req.body;
+            const { name, neName, relation, neRelation, details, id: bodyId, eventDate } = req.body;
             const eventId = id || bodyId;
             const eventName = name || neName;
-            const eventRelation = relation || neRelation;
+            const eventRelation = relation || neRelation || details;
 
             context.log(`📝 Updating event ${eventId}: name="${eventName}", relation="${eventRelation}", eventDate="${eventDate}"`);
 
