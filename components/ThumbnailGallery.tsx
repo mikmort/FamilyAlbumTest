@@ -207,6 +207,13 @@ function ThumbnailGallery({
   // Update allMedia when an item is updated externally (e.g., from modal)
   useEffect(() => {
     if (updatedMedia) {
+      // Check if this is a thumbnail rotation update (has newer PLastModifiedDate)
+      const rotationTimestamp = sessionStorage.getItem('thumbnailRotated');
+      if (rotationTimestamp) {
+        setCacheBuster(rotationTimestamp);
+        sessionStorage.removeItem('thumbnailRotated');
+      }
+      
       setAllMedia(prevMedia => {
         // Check if the updated item still matches the current filters
         let matchesFilter = true;

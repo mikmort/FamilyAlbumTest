@@ -741,9 +741,18 @@ export default function MediaDetailModal({
         const cacheBuster = Date.now();
         sessionStorage.setItem('thumbnailRotated', cacheBuster.toString());
         
-        // Wait 2 seconds for Azure to fully write and propagate the rotated blob
+        // Update the media object with cache-busted thumbnail URL
+        const updatedMedia = {
+          ...media,
+          PThumbnailUrl: data.thumbnailUrl 
+            ? `${data.thumbnailUrl}${data.thumbnailUrl.includes('?') ? '&' : '?'}v=${cacheBuster}`
+            : `${media.PThumbnailUrl}?v=${cacheBuster}`,
+          PLastModifiedDate: new Date(), // Update modified date to bust cache
+        };
+        
+        // Wait 1 second for Azure to fully write and propagate the rotated blob
         setTimeout(async () => {
-          // Use the actual thumbnail blob URL from the API response
+          // Use the actual thumbnail blob URL from the API response with cache buster
           const previewUrl = data.thumbnailUrl 
             ? `${data.thumbnailUrl}${data.thumbnailUrl.includes('?') ? '&' : '?'}nocache=${cacheBuster}`
             : `${media.PThumbnailUrl}?v=${cacheBuster}&nocache=${Math.random()}`;
@@ -751,9 +760,16 @@ export default function MediaDetailModal({
           setRotatedPreviewUrl(previewUrl);
           setShowRotationPreview(true);
           
+          // Notify parent component to update the media in the gallery
+          if (onUpdate) {
+            onUpdate(updatedMedia);
+          }
+          
           // Store cacheBuster for manual navigation
           (window as any).__cacheBuster = cacheBuster;
-        }, 2000);
+          
+          alert('✓ Thumbnail rotated successfully! The gallery will show the updated thumbnail.');
+        }, 1000);
       } else {
         throw new Error(data.error || 'Failed to rotate thumbnail');
       }
