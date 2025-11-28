@@ -160,19 +160,28 @@ async function processBatch(context, batchSize) {
         context.log(`Starting batch midsize generation (batch size: ${batchSize})...`);
 
         // Get images that need midsize versions
-        // Note: Don't filter by dimensions here since many images have NULL width/height
-        // Let the processing logic check actual image size
-        // Note: Don't filter by PBlobUrl IS NOT NULL - older images don't have this field populated
-        // The processing logic will construct the blob path from PFileDirectory + PFileName
+        // Filter for images that are likely large enough (>1080px in at least one dimension)
+        // Images without dimensions will still be checked, but prioritize known large images
         const result = await query(`
             SELECT TOP ${batchSize}
                 PFileName,
                 PFileDirectory,
-                PBlobUrl
+                PBlobUrl,
+                PWidth,
+                PHeight
             FROM Pictures
             WHERE PType = 1 
             AND PMidsizeUrl IS NULL
-            ORDER BY PDateEntered DESC
+            AND (
+                PWidth > 1080 
+                OR PHeight > 1080 
+                OR PWidth IS NULL 
+                OR PHeight IS NULL
+            )
+            ORDER BY 
+                -- Prioritize images with known large dimensions
+                CASE WHEN (PWidth > 1080 OR PHeight > 1080) THEN 0 ELSE 1 END,
+                PDateEntered DESC
         `);
 
         const images = result || [];
@@ -225,8 +234,20 @@ async function processBatch(context, batchSize) {
                 
                 if (!blobClient) {
                     context.log.warn(`❌ Blob not found in any location:`, pathsToTry);
+                    batchProgress.errors.push(`${image.PFileName}: Blob not found`);
                     batchProgress.skipped++;
                     batchProgress.processed++;
+                    continue;
+                }
+
+                // Check dimensions if available - skip small images without downloading
+                if (image.PWidth && image.PHeight && image.PWidth <= 1080 && image.PHeight <= 1080) {
+                    context.log(`Skipping ${image.PFileName} - dimensions ${image.PWidth}x${image.PHeight} <= 1080px`);
+                    batchProgress.skipped++;
+                    batchProgress.processed++;
+                    
+                    // Mark as processed (set PMidsizeUrl to empty string or NULL to indicate "checked but not needed")
+                    // Actually, don't update DB - let it stay NULL since midsize not needed
                     continue;
                 }
 
@@ -244,6 +265,21 @@ async function processBatch(context, batchSize) {
                 // Skip if <1MB
                 if (sizeMB <= 1) {
                     context.log(`Skipping ${image.PFileName} - file size ${sizeMB.toFixed(2)}MB <= 1MB`);
+                    batchProgress.skipped++;
+                    batchProgress.processed++;
+                    continue;
+                }
+
+                // Get actual dimensions
+                const metadata = await sharp(imageBuffer).metadata();
+                const actualWidth = metadata.width || 0;
+                const actualHeight = metadata.height || 0;
+                
+                context.log(`Image dimensions: ${actualWidth}x${actualHeight}`);
+                
+                // Skip if dimensions are <= 1080px
+                if (actualWidth <= 1080 && actualHeight <= 1080) {
+                    context.log(`Skipping ${image.PFileName} - dimensions ${actualWidth}x${actualHeight} <= 1080px`);
                     batchProgress.skipped++;
                     batchProgress.processed++;
                     continue;
