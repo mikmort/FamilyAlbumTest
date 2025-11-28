@@ -138,27 +138,88 @@ export default function AdminSettings({ onRequestsChange }: AdminSettingsProps) 
   const startMidsizeGeneration = async (batchSize: number = 50) => {
     try {
       setIsGeneratingMidsize(true);
-      const response = await fetch('/api/generate-midsize/batch', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ batchSize })
+      setMidsizeProgress(null); // Clear previous progress
+      
+      // Keep processing batches until no more files need processing
+      let hasMore = true;
+      let totalProcessed = 0;
+      let totalSucceeded = 0;
+      let totalFailed = 0;
+      let totalSkipped = 0;
+      
+      while (hasMore) {
+        const response = await fetch('/api/generate-midsize/batch', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ batchSize })
+        });
+        
+        const data = await response.json();
+        
+        if (!response.ok) {
+          alert(`Error: ${data.error}`);
+          break;
+        }
+        
+        // Poll for this batch to complete
+        hasMore = await waitForBatchCompletion();
+        
+        // Update totals
+        if (midsizeProgress) {
+          totalProcessed += midsizeProgress.processed;
+          totalSucceeded += midsizeProgress.succeeded;
+          totalFailed += midsizeProgress.failed;
+          totalSkipped += midsizeProgress.skipped;
+        }
+        
+        // Check if there are more files to process
+        const statusResponse = await fetch('/api/generate-midsize');
+        const statusData = await statusResponse.json();
+        
+        if (statusData.filesNeedingMidsize === 0) {
+          hasMore = false;
+        }
+      }
+      
+      // Final status update
+      setMidsizeProgress({
+        isRunning: false,
+        processed: totalProcessed,
+        succeeded: totalSucceeded,
+        failed: totalFailed,
+        skipped: totalSkipped
       });
       
-      const data = await response.json();
+      setIsGeneratingMidsize(false);
+      fetchMidsizeStatus();
+      alert(`✅ All batches complete! Processed ${totalProcessed} images.`);
       
-      if (response.ok) {
-        alert(`Batch processing started! Processing ${batchSize} images. Check progress below.`);
-        // Poll for progress
-        pollMidsizeProgress();
-      } else {
-        alert(`Error: ${data.error}`);
-        setIsGeneratingMidsize(false);
-      }
     } catch (err: any) {
       console.error('Error starting midsize generation:', err);
       alert(`Error: ${err.message}`);
       setIsGeneratingMidsize(false);
     }
+  };
+
+  const waitForBatchCompletion = async (): Promise<boolean> => {
+    return new Promise((resolve) => {
+      const pollInterval = setInterval(async () => {
+        try {
+          const response = await fetch('/api/generate-midsize/progress');
+          const data = await response.json();
+          setMidsizeProgress(data);
+          
+          if (!data.isRunning) {
+            clearInterval(pollInterval);
+            resolve(true);
+          }
+        } catch (err) {
+          console.error('Error polling progress:', err);
+          clearInterval(pollInterval);
+          resolve(false);
+        }
+      }, 2000); // Poll every 2 seconds
+    });
   };
 
   const pollMidsizeProgress = async () => {
