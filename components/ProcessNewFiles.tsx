@@ -86,6 +86,7 @@ export default function ProcessNewFiles() {
   const [faceModelsLoaded, setFaceModelsLoaded] = useState(false);
   const [autoRecognizeEnabled, setAutoRecognizeEnabled] = useState(false); // Off by default
   const imageRef = useRef<HTMLImageElement>(null);
+  const peopleSearchRef = useRef<HTMLInputElement>(null);
 
   // Load people and events for dropdowns
   useEffect(() => {
@@ -615,7 +616,10 @@ export default function ProcessNewFiles() {
       }
     });
     setPeopleSearch('');
-    setPeopleDropdownOpen(false);
+    // Keep dropdown open and refocus input for quick multi-selection
+    setTimeout(() => {
+      peopleSearchRef.current?.focus();
+    }, 0);
   };
 
   // Filter events - only show events that start with search string
@@ -1017,6 +1021,7 @@ export default function ProcessNewFiles() {
             <label>Tag People {people.length > 0 && `(${people.length} available)`}</label>
             <div className="autocomplete-wrapper">
               <input
+                ref={peopleSearchRef}
                 type="text"
                 value={peopleSearch}
                 onChange={(e) => {
