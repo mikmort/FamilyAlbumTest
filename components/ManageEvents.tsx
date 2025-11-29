@@ -1,6 +1,5 @@
 "use client"
 import React, { useEffect, useState, FormEvent } from 'react'
-import { formatDateOnly } from '../lib/utils'
 import { formatDateOnly } from '@/lib/utils'
 
 type EventItem = {
