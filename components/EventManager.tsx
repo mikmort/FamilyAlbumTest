@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { Event } from '../lib/types';
-import { formatDateOnly } from '../lib/utils';
+import { formatDateOnly } from '../lib/clientUtils';
 
 export default function EventManager() {
   const [events, setEvents] = useState<Event[]>([]);

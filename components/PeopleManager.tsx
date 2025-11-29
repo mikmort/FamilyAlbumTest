@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { Person } from '../lib/types';
-import { formatDateOnly } from '../lib/utils';
+import { formatDateOnly } from '../lib/clientUtils';
 
 export default function PeopleManager() {
   const [people, setPeople] = useState<Person[]>([]);
