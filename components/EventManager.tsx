@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { Event } from '../lib/types';
+import { formatDateOnly } from '../lib/utils';
 
 export default function EventManager() {
   const [events, setEvents] = useState<Event[]>([]);
@@ -266,11 +267,7 @@ export default function EventManager() {
                     <td className="relation-cell">
                       {event.EventDate ? (
                         <span className="event-date-badge">
-                          {new Date(event.EventDate).toLocaleDateString('en-US', { 
-                            year: 'numeric', 
-                            month: 'short', 
-                            day: 'numeric' 
-                          })}
+                          {formatDateOnly(event.EventDate)}
                         </span>
                       ) : '—'}
                       {event.neRelation && (

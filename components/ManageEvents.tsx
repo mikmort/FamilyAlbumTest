@@ -1,5 +1,7 @@
 "use client"
 import React, { useEffect, useState, FormEvent } from 'react'
+import { formatDateOnly } from '../lib/utils'
+import { formatDateOnly } from '@/lib/utils'
 
 type EventItem = {
     id: number
@@ -295,11 +297,7 @@ export default function ManageEvents() {
                                                     color: '#1976d2',
                                                     fontWeight: 500
                                                 }}>
-                                                    📅 {new Date(ev.EventDate).toLocaleDateString('en-US', { 
-                                                        year: 'numeric', 
-                                                        month: 'short', 
-                                                        day: 'numeric' 
-                                                    })}
+                                                    📅 {formatDateOnly(ev.EventDate)}
                                                 </span>
                                             )}
                                         </div>

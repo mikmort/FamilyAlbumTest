@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { Person } from '../lib/types';
+import { formatDateOnly } from '../lib/utils';
 
 export default function PeopleManager() {
   const [people, setPeople] = useState<Person[]>([]);
@@ -307,13 +308,7 @@ export default function PeopleManager() {
                     </td>
                     <td className="relation-cell">{person.neRelation || '—'}</td>
                     <td className="date-cell">
-                      {person.Birthday 
-                        ? new Date(person.Birthday).toLocaleDateString('en-US', { 
-                            year: 'numeric', 
-                            month: 'short', 
-                            day: 'numeric' 
-                          })
-                        : '—'}
+                      {formatDateOnly(person.Birthday)}
                     </td>
                     <td className="count-cell">{person.neCount || 0}</td>
                     <td className="actions-cell">
