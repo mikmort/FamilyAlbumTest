@@ -101,16 +101,8 @@ export default function EventManager() {
     }
 
     try {
-      const response = await fetch('/api/events', {
-        method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: event.ID }),
-      });
-
-      if (!response.ok) throw new Error('Failed to delete event');
-      
-      await fetchEvents();
-    } catch (err) {
+      const response = await fetch(`/api/events/${event.ID}`, {
+        method: 'DELETE'
       alert('Error deleting event: ' + (err instanceof Error ? err.message : 'Unknown error'));
     }
   };
