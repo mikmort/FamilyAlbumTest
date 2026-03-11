@@ -53,15 +53,14 @@ export function getLogoutUrl(): string {
 }
 
 /**
- * Get the URL to sign in as a different user
- * Chains: SWA logout → Microsoft SSO logout (clears cached account) → login page
- * The Microsoft SSO logout is required to clear browser-level SSO cookies so the
- * account picker doesn't just auto-select the previous account.
+ * Get the URL to sign in as a different user.
+ * Logs out of SWA then goes directly to the AAD login with prompt=login,
+ * which forces Microsoft to demand fresh credentials regardless of any cached
+ * SSO cookies — no Microsoft logout chain needed.
  */
 export function getSwitchAccountUrl(): string {
-  const loginPageUrl = `${window.location.origin}/login.html?fresh=1`;
-  const msLogoutUrl = `https://login.microsoftonline.com/common/oauth2/v2.0/logout?post_logout_redirect_uri=${encodeURIComponent(loginPageUrl)}`;
-  return `/.auth/logout?post_logout_redirect_uri=${encodeURIComponent(msLogoutUrl)}`;
+  const loginUrl = `/.auth/login/aad?post_login_redirect_uri=/&prompt=login`;
+  return `/.auth/logout?post_logout_redirect_uri=${encodeURIComponent(loginUrl)}`;
 }
 
 /**
