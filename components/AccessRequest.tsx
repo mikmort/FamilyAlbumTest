@@ -264,7 +264,7 @@ export default function AccessRequest() {
             Signed in as: <strong style={{ color: '#666' }}>{authStatus.user.email}</strong>
             <br />
             <a 
-              href="https://login.microsoftonline.com/common/oauth2/v2.0/logout?post_logout_redirect_uri=https://lively-bay-0be7b1e10.5.azurestaticapps.net/login.html"
+              href={getLogoutUrl()}
               style={{ 
                 color: '#667eea', 
                 textDecoration: 'none', 
@@ -278,6 +278,9 @@ export default function AccessRequest() {
             >
               🔄 Sign in with different account
             </a>
+            <div style={{ marginTop: '10px', fontSize: '12px', color: '#aaa' }}>
+              After clicking, close all browser windows and reopen to sign in with a different email
+            </div>
           </div>
         )}
       </div>
