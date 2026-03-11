@@ -34,6 +34,10 @@
       "allowedRoles": ["anonymous", "authenticated"]
     },
     {
+      "route": "/api/setup-admin",
+      "allowedRoles": ["anonymous", "authenticated"]
+    },
+    {
       "route": "/api/*",
       "allowedRoles": ["authenticated"]
     },
