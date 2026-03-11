@@ -8,7 +8,7 @@
     "dev:api": "cd api && npm start",
     "dev:frontend": "next dev",
     "dev:full": "npm run setup:api-env && concurrently --names \"API,WEB\" --prefix-colors \"blue,green\" \"npm:dev:api\" \"npm:dev:frontend\"",
-    "build": "next build",
+    "build": "next build && node scripts/copy-swa-config.js",
     "start": "next start",
     "lint": "next lint",
     "test": "playwright test",

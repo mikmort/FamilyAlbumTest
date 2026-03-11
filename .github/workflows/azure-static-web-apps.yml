@@ -46,6 +46,9 @@ jobs:
         env:
           NODE_ENV: production
 
+      - name: Verify SWA config in output
+        run: test -f out/staticwebapp.config.json
+
       - name: Deploy to Azure Static Web Apps
         id: deploy
         uses: Azure/static-web-apps-deploy@v1
