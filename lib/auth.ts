@@ -45,14 +45,20 @@ export function getLoginUrl(redirectUrl?: string): string {
 
 /**
  * Get the logout URL
- * Fully logs out from Microsoft/Google and redirects back to login page
+ * Logs out from SWA and redirects to login page (with ?fresh=1 to suppress auto-redirect)
  */
 export function getLogoutUrl(): string {
-  // First logout from the app, then redirect to Microsoft logout which will clear the session
-  // Microsoft logout then redirects back to our login page
-  const loginPageUrl = `${window.location.origin}/login.html`;
-  const msLogoutUrl = `https://login.microsoftonline.com/common/oauth2/v2.0/logout?post_logout_redirect_uri=${encodeURIComponent(loginPageUrl)}`;
-  return `/.auth/logout?post_logout_redirect_uri=${encodeURIComponent(msLogoutUrl)}`;
+  const loginPageUrl = `${window.location.origin}/login.html?fresh=1`;
+  return `/.auth/logout?post_logout_redirect_uri=${encodeURIComponent(loginPageUrl)}`;
+}
+
+/**
+ * Get the URL to sign in as a different user
+ * Logs out from SWA then goes directly to Microsoft account picker, bypassing login.html
+ */
+export function getSwitchAccountUrl(): string {
+  const loginUrl = `/.auth/login/aad?post_login_redirect_uri=/&prompt=select_account`;
+  return `/.auth/logout?post_logout_redirect_uri=${encodeURIComponent(loginUrl)}`;
 }
 
 /**

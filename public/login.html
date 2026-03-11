@@ -175,16 +175,20 @@
     </div>
 
     <script>
-        // Check if already authenticated
-        fetch('/.auth/me')
-            .then(response => response.json())
-            .then(data => {
-                if (data.clientPrincipal) {
-                    // Already authenticated, redirect to home
-                    window.location.href = '/';
-                }
-            })
-            .catch(err => console.log('Not authenticated'));
+        // Check if already authenticated, but skip auto-redirect if ?fresh=1
+        // (set when arriving after a logout, to allow choosing a different account)
+        const urlParams = new URLSearchParams(window.location.search);
+        if (!urlParams.has('fresh')) {
+            fetch('/.auth/me')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.clientPrincipal) {
+                        // Already authenticated, redirect to home
+                        window.location.href = '/';
+                    }
+                })
+                .catch(err => console.log('Not authenticated'));
+        }
     </script>
 </body>
 </html>

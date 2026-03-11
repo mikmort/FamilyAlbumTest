@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { getLogoutUrl } from '../lib/auth';
+import { getLogoutUrl, getSwitchAccountUrl } from '../lib/auth';
 
 interface UserClaim {
   typ: string;
@@ -125,7 +125,7 @@ export default function UserInfo() {
           zIndex: 1000,
         }}>
           <a
-            href={getLogoutUrl()}
+            href={getSwitchAccountUrl()}
             style={{
               display: 'block',
               padding: '0.75rem 1rem',
