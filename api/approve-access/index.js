@@ -115,8 +115,16 @@ module.exports = async function (context, req) {
                 return;
             }
 
-            // Get admin email if authenticated
-            const adminEmail = getUserEmail(context) || 'System';
+            // Get admin email if authenticated (token-based approval doesn't require auth)
+            let adminEmail = 'Token-based approval';
+            try {
+                const email = getUserEmail(context);
+                if (email) {
+                    adminEmail = email;
+                }
+            } catch (err) {
+                context.log.warn('Could not get user email, using default:', err.message);
+            }
 
             // Get token data with FOR UPDATE lock
             const tokenData = await query(`
