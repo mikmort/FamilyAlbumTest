@@ -63,7 +63,7 @@
           "clientSecretSettingName": "AZURE_AD_CLIENT_SECRET"
         },
         "login": {
-          "loginParameters": ["scope=openid profile email https://graph.microsoft.com/User.Read", "prompt=select_account"]
+          "loginParameters": ["scope=openid profile email https://graph.microsoft.com/User.Read"]
         },
         "userDetailsClaim": "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/name"
       },
