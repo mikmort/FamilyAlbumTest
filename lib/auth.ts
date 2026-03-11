@@ -54,13 +54,13 @@ export function getLogoutUrl(): string {
 
 /**
  * Get the URL to sign in as a different user.
- * Logs out of SWA then goes directly to the AAD login with prompt=login,
- * which forces Microsoft to demand fresh credentials regardless of any cached
- * SSO cookies — no Microsoft logout chain needed.
+ * Logs out of SWA and redirects to /switch-account.html, which then does a
+ * fresh top-level navigation to the AAD login with prompt=login. This ensures
+ * the prompt parameter is respected by Azure SWA/AAD.
  */
 export function getSwitchAccountUrl(): string {
-  const loginUrl = `/.auth/login/aad?post_login_redirect_uri=/&prompt=login`;
-  return `/.auth/logout?post_logout_redirect_uri=${encodeURIComponent(loginUrl)}`;
+  const switchPageUrl = `${window.location.origin}/switch-account.html`;
+  return `/.auth/logout?post_logout_redirect_uri=${encodeURIComponent(switchPageUrl)}`;
 }
 
 /**

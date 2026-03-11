@@ -5,6 +5,10 @@
       "allowedRoles": ["anonymous"]
     },
     {
+      "route": "/switch-account.html",
+      "allowedRoles": ["anonymous"]
+    },
+    {
       "route": "/setup-admin.html",
       "allowedRoles": ["anonymous", "authenticated"]
     },
