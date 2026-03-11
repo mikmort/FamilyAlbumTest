@@ -263,23 +263,31 @@ export default function AccessRequest() {
           }}>
             Signed in as: <strong style={{ color: '#666' }}>{authStatus.user.email}</strong>
             <br />
-            <a 
-              href={getLogoutUrl()}
+            <button
+              onClick={() => {
+                // Clear any client-side session data
+                sessionStorage.clear();
+                localStorage.clear();
+                // Redirect to app logout, which chains to Microsoft logout, then back to login
+                window.location.href = getLogoutUrl();
+              }}
               style={{ 
-                color: '#667eea', 
+                color: '#667eea',
+                backgroundColor: 'white',
                 textDecoration: 'none', 
                 marginTop: '10px', 
                 display: 'inline-block',
                 padding: '8px 16px',
                 border: '1px solid #667eea',
                 borderRadius: '4px',
-                fontWeight: '500'
+                fontWeight: '500',
+                cursor: 'pointer'
               }}
             >
               🔄 Sign in with different account
-            </a>
-            <div style={{ marginTop: '10px', fontSize: '12px', color: '#aaa' }}>
-              After clicking, close all browser windows and reopen to sign in with a different email
+            </button>
+            <div style={{ marginTop: '15px', fontSize: '12px', color: '#aaa' }}>
+              Or use <a href="/.auth/login/google?post_login_redirect_uri=/" style={{ color: '#667eea' }}>Google sign-in</a> with your other email
             </div>
           </div>
         )}
