@@ -38,6 +38,10 @@
       "allowedRoles": ["anonymous", "authenticated"]
     },
     {
+      "route": "/api/get-roles",
+      "allowedRoles": ["anonymous", "authenticated"]
+    },
+    {
       "route": "/api/setup-admin",
       "allowedRoles": ["anonymous", "authenticated"]
     },
@@ -73,7 +77,7 @@
         }
       }
     },
-    "rolesSource": "/api/auth-status",
+    "rolesSource": "/api/get-roles",
     "cookieSessionLifetimeInMinutes": 10080
   },
   "navigationFallback": {
