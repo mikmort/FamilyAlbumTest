@@ -264,10 +264,19 @@ export default function AccessRequest() {
             Signed in as: <strong style={{ color: '#666' }}>{authStatus.user.email}</strong>
             <br />
             <a 
-              href={getLogoutUrl()}
-              style={{ color: '#667eea', textDecoration: 'none', marginTop: '10px', display: 'inline-block' }}
+              href="https://login.microsoftonline.com/common/oauth2/v2.0/logout?post_logout_redirect_uri=https://lively-bay-0be7b1e10.5.azurestaticapps.net/login.html"
+              style={{ 
+                color: '#667eea', 
+                textDecoration: 'none', 
+                marginTop: '10px', 
+                display: 'inline-block',
+                padding: '8px 16px',
+                border: '1px solid #667eea',
+                borderRadius: '4px',
+                fontWeight: '500'
+              }}
             >
-              Sign out
+              🔄 Sign in with different account
             </a>
           </div>
         )}
