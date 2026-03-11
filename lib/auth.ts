@@ -45,12 +45,14 @@ export function getLoginUrl(redirectUrl?: string): string {
 
 /**
  * Get the logout URL
- * Redirects back to login page after logout
+ * Fully logs out from Microsoft/Google and redirects back to login page
  */
 export function getLogoutUrl(): string {
-  // Redirect back to the login page after logout
-  // This allows users to sign in with a different account
-  return `/.auth/logout?post_logout_redirect_uri=${encodeURIComponent('/login.html')}`;
+  // First logout from the app, then redirect to Microsoft logout which will clear the session
+  // Microsoft logout then redirects back to our login page
+  const loginPageUrl = `${window.location.origin}/login.html`;
+  const msLogoutUrl = `https://login.microsoftonline.com/common/oauth2/v2.0/logout?post_logout_redirect_uri=${encodeURIComponent(loginPageUrl)}`;
+  return `/.auth/logout?post_logout_redirect_uri=${encodeURIComponent(msLogoutUrl)}`;
 }
 
 /**
