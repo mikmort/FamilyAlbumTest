@@ -54,11 +54,14 @@ export function getLogoutUrl(): string {
 
 /**
  * Get the URL to sign in as a different user
- * Logs out from SWA then goes directly to Microsoft account picker, bypassing login.html
+ * Chains: SWA logout → Microsoft SSO logout (clears cached account) → login page
+ * The Microsoft SSO logout is required to clear browser-level SSO cookies so the
+ * account picker doesn't just auto-select the previous account.
  */
 export function getSwitchAccountUrl(): string {
-  const loginUrl = `/.auth/login/aad?post_login_redirect_uri=/&prompt=select_account`;
-  return `/.auth/logout?post_logout_redirect_uri=${encodeURIComponent(loginUrl)}`;
+  const loginPageUrl = `${window.location.origin}/login.html?fresh=1`;
+  const msLogoutUrl = `https://login.microsoftonline.com/common/oauth2/v2.0/logout?post_logout_redirect_uri=${encodeURIComponent(loginPageUrl)}`;
+  return `/.auth/logout?post_logout_redirect_uri=${encodeURIComponent(msLogoutUrl)}`;
 }
 
 /**
