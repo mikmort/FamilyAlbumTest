@@ -7,18 +7,6 @@ module.exports = async function (context, req) {
   context.log('Setup admin called');
 
   try {
-    // Check if any Active Admin users exist
-    const adminUsers = await query(
-      `SELECT COUNT(*) as count FROM Users WHERE Role = 'Admin' AND Status = 'Active'`
-    );
-
-    if (adminUsers && adminUsers.length > 0 && adminUsers[0].count > 0) {
-      return {
-        status: 403,
-        body: { error: 'Admin users already exist' }
-      };
-    }
-
     // Activate the specified admin accounts
     const emails = ['jb_morton@live.com', 'jbm@mikmort.hotwire.microsoft.com'];
     
