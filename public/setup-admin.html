@@ -86,19 +86,27 @@
                     return;
                 }
 
-                status.textContent = 'Signed in as ' + meData.clientPrincipal.userDetails + '. Running setup...';
+                status.textContent = 'Signed in as ' + meData.clientPrincipal.userDetails + '. Running setup...\n';
 
-                const setupResponse = await fetch('/api/setup-admin');
-                const setupData = await setupResponse.json();
+                const setupResponse = await fetch('/api/setup-admin', { method: 'GET' });
+                const setupText = await setupResponse.text();
+                
+                let setupData;
+                try {
+                  setupData = JSON.parse(setupText);
+                } catch (e) {
+                  status.textContent = 'Setup returned invalid response:\n' + setupText + '\n\nRaw status: ' + setupResponse.status;
+                  return;
+                }
 
                 if (!setupResponse.ok) {
-                    status.textContent = 'Setup failed:\n' + JSON.stringify(setupData, null, 2);
+                    status.textContent = 'Setup error (status ' + setupResponse.status + '):\n' + JSON.stringify(setupData, null, 2);
                     return;
                 }
 
-                status.textContent = 'Setup complete.\n\n' + JSON.stringify(setupData, null, 2) + '\n\nNow go back to / and sign in normally.';
+                status.textContent = 'Setup complete!\n\n' + JSON.stringify(setupData, null, 2) + '\n\nNow go back to / and sign in normally with jb_morton@live.com.';
             } catch (error) {
-                status.textContent = 'Unexpected error: ' + error.message;
+                status.textContent = 'Unexpected error: ' + error.message + '\n' + error.stack;
             }
         }
 
