@@ -12,15 +12,11 @@ module.exports = async function (context, req) {
       `SELECT COUNT(*) as count FROM Users WHERE Role = 'Admin' AND Status = 'Active'`
     );
 
-    context.log('Admin check result:', adminUsers);
-
-    if (adminUsers.length > 0 && adminUsers[0].count > 0) {
-      context.res = { 
-        status: 403, 
-        headers: { 'Content-Type': 'application/json' },
-        body: { error: 'Admin users already exist' } 
+    if (adminUsers && adminUsers.length > 0 && adminUsers[0].count > 0) {
+      return {
+        status: 403,
+        body: { error: 'Admin users already exist' }
       };
-      return;
     }
 
     // Activate the specified admin accounts
@@ -39,23 +35,21 @@ module.exports = async function (context, req) {
       `SELECT Email, Role, Status FROM Users WHERE Email IN ('jb_morton@live.com', 'jbm@mikmort.hotwire.microsoft.com')`
     );
 
-    context.log('Final result:', result);
+    context.log('Setup complete, result:', result);
 
-    context.res = { 
+    return {
       status: 200,
-      headers: { 'Content-Type': 'application/json' },
       body: { 
         success: true, 
         message: 'Admin accounts activated',
         accounts: result
-      } 
+      }
     };
 
   } catch (error) {
     context.log.error('Setup error:', error);
-    context.res = {
+    return {
       status: 500,
-      headers: { 'Content-Type': 'application/json' },
       body: { error: error.message }
     };
   }
