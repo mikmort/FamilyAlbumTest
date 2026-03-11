@@ -7,10 +7,6 @@ const { query } = require('../shared/db');
 module.exports = async function (context, req) {
   context.log('Setup admin called with method:', req.method);
 
-  // Set response headers for JSON
-  context.res.headers = context.res.headers || {};
-  context.res.headers['Content-Type'] = 'application/json';
-
   try {
     // Check if any Active Admin users exist
     const adminUsers = await query(
@@ -20,7 +16,6 @@ module.exports = async function (context, req) {
     if (adminUsers.length > 0 && adminUsers[0].count > 0) {
       context.res = {
         status: 403,
-        headers: { 'Content-Type': 'application/json' },
         body: {
           error: 'Admin users already exist. This endpoint can only be used for initial setup.'
         }
@@ -47,7 +42,6 @@ module.exports = async function (context, req) {
 
     context.res = {
       status: 200,
-      headers: { 'Content-Type': 'application/json' },
       body: {
         success: true,
         message: 'Admin accounts activated',
@@ -59,7 +53,6 @@ module.exports = async function (context, req) {
     context.log.error('Setup error:', error);
     context.res = {
       status: 500,
-      headers: { 'Content-Type': 'application/json' },
       body: {
         error: error.message || 'Setup failed',
         details: error.toString()
