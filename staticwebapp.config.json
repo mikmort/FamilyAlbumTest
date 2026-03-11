@@ -5,6 +5,11 @@
       "allowedRoles": ["anonymous"]
     },
     {
+      "route": "/.auth/login/azureStaticWebApps",
+      "redirect": "/.auth/login/aad",
+      "statusCode": 302
+    },
+    {
       "route": "/.auth/login/aad",
       "allowedRoles": ["anonymous"]
     },
