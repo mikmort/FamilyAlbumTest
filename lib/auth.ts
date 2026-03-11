@@ -45,13 +45,12 @@ export function getLoginUrl(redirectUrl?: string): string {
 
 /**
  * Get the logout URL
- * Includes redirect to Azure AD logout to fully clear the session
+ * Redirects back to login page after logout
  */
 export function getLogoutUrl(): string {
-  // Use Azure AD common logout endpoint to clear the Microsoft account session
-  // This prevents automatic re-authentication when user signs out
-  const azureLogout = encodeURIComponent('https://login.microsoftonline.com/common/oauth2/v2.0/logout');
-  return `/.auth/logout?post_logout_redirect_uri=${azureLogout}`;
+  // Redirect back to the login page after logout
+  // This allows users to sign in with a different account
+  return `/.auth/logout?post_logout_redirect_uri=${encodeURIComponent('/login.html')}`;
 }
 
 /**
