@@ -28,13 +28,36 @@
 <body>
     <div class="message">
         <h2>📸 Family Album</h2>
-        <p>Redirecting to sign in&hellip;</p>
+        <p id="status">Signing out&hellip;</p>
     </div>
     <script>
-        // Navigate to AAD login with prompt=login as a fresh top-level navigation.
-        // This ensures the parameter is respected by Azure SWA/AAD — unlike when
-        // it is embedded inside a post_logout_redirect_uri chain.
-        window.location.replace('/.auth/login/aad?post_login_redirect_uri=/&prompt=login');
+        // Wait until /.auth/logout has fully cleared the SWA session before
+        // redirecting. This prevents SWA from silently re-issuing the old session
+        // because the logout hadn't propagated yet.
+        async function waitForLogout() {
+            for (let i = 0; i < 20; i++) {
+                try {
+                    const res = await fetch('/.auth/me', { cache: 'no-store' });
+                    const data = await res.json();
+                    if (!data.clientPrincipal) {
+                        // Confirmed signed out — go to login page
+                        // Using login.html (user must click) so the browser
+                        // cannot silently complete the OAuth flow.
+                        window.location.replace('/login.html?fresh=1');
+                        return;
+                    }
+                } catch (e) { /* ignore */ }
+                document.getElementById('status').textContent =
+                    'Completing sign out\u2026 (' + (i + 1) + ')';
+                await new Promise(r => setTimeout(r, 500));
+            }
+            // Still signed in after 10 s — force another logout
+            window.location.replace(
+                '/.auth/logout?post_logout_redirect_uri=' +
+                encodeURIComponent(window.location.href)
+            );
+        }
+        waitForLogout();
     </script>
 </body>
 </html>

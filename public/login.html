@@ -146,6 +146,11 @@
             <p>Sign in to access your photos and memories</p>
         </div>
 
+        <div id="switch-banner" style="display:none;background:#fff3cd;border:1px solid #ffc107;border-radius:8px;padding:12px 16px;margin-bottom:20px;font-size:14px;color:#856404;text-align:center;">
+            <strong>Switching accounts?</strong> Click the button below and select
+            <em>"Use another account"</em> to sign in with a different account.
+        </div>
+
         <div class="login-buttons">
             <a href="/.auth/login/aad?post_login_redirect_uri=/&prompt=select_account" class="login-btn microsoft-btn">
                 <svg viewBox="0 0 23 23" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -175,15 +180,16 @@
     </div>
 
     <script>
-        // Check if already authenticated, but skip auto-redirect if ?fresh=1
-        // (set when arriving after a logout, to allow choosing a different account)
         const urlParams = new URLSearchParams(window.location.search);
-        if (!urlParams.has('fresh')) {
-            fetch('/.auth/me')
+        if (urlParams.has('fresh')) {
+            // Arrived after a logout — show the "switch account" reminder banner
+            document.getElementById('switch-banner').style.display = 'block';
+        } else {
+            // Normal visit — auto-redirect if already authenticated
+            fetch('/.auth/me', { cache: 'no-store' })
                 .then(response => response.json())
                 .then(data => {
                     if (data.clientPrincipal) {
-                        // Already authenticated, redirect to home
                         window.location.href = '/';
                     }
                 })
