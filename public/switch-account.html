@@ -42,8 +42,12 @@
                 ? '/login.html?fresh=1&loggedOut=1'
                 : '/login.html?fresh=1&switch=1';
 
+            // Chain through both Azure AD and Microsoft Live logout endpoints
+            // so existing browser-level sessions are fully cleared.
+            const appReturnUrl = window.location.origin + destination;
+            const liveLogoutUrl = 'https://login.live.com/logout.srf?ru=' + encodeURIComponent(appReturnUrl);
             return 'https://login.microsoftonline.com/common/oauth2/v2.0/logout?post_logout_redirect_uri=' +
-                encodeURIComponent(window.location.origin + destination);
+                encodeURIComponent(liveLogoutUrl);
         }
 
         // Wait until /.auth/logout has fully cleared the SWA session before
