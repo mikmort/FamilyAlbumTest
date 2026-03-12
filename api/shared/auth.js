@@ -12,6 +12,19 @@ const ROLE_HIERARCHY = {
   'None': 0
 };
 
+function isDevModeEnabled() {
+  const devMode = (process.env.DEV_MODE || '').toLowerCase() === 'true';
+  if (!devMode) return false;
+
+  // Never allow dev-mode auth bypass in Azure-hosted or production environments.
+  const isProduction =
+    (process.env.NODE_ENV || '').toLowerCase() === 'production' ||
+    (process.env.AZURE_FUNCTIONS_ENVIRONMENT || '').toLowerCase() === 'production' ||
+    Boolean(process.env.WEBSITE_SITE_NAME);
+
+  return !isProduction;
+}
+
 /**
  * Get user from database by email
  * @throws {DatabaseWarmupError} if database is warming up
@@ -106,7 +119,7 @@ function hasPermission(userRole, requiredRole) {
  */
 function getUserEmail(context) {
   // Dev mode bypass
-  if (process.env.DEV_MODE === 'true') {
+  if (isDevModeEnabled()) {
     return process.env.DEV_USER_EMAIL || 'dev@example.com';
   }
   
@@ -144,7 +157,7 @@ function getUserEmail(context) {
  */
 function getUserName(context) {
   // Dev mode bypass
-  if (process.env.DEV_MODE === 'true') {
+  if (isDevModeEnabled()) {
     return 'Dev User';
   }
   
@@ -180,7 +193,7 @@ function getUserName(context) {
  */
 async function checkAuthorization(context, requiredRole = 'Read') {
   // Dev mode bypass for testing (only in development)
-  if (process.env.DEV_MODE === 'true') {
+  if (isDevModeEnabled()) {
     const devEmail = process.env.DEV_USER_EMAIL || 'dev@example.com';
     const devRole = process.env.DEV_USER_ROLE || 'Admin';
     

@@ -1,5 +1,17 @@
 const { query } = require('../shared/db');
 
+function isDevModeEnabled() {
+  const devMode = (process.env.DEV_MODE || '').toLowerCase() === 'true';
+  if (!devMode) return false;
+
+  const isProduction =
+    (process.env.NODE_ENV || '').toLowerCase() === 'production' ||
+    (process.env.AZURE_FUNCTIONS_ENVIRONMENT || '').toLowerCase() === 'production' ||
+    Boolean(process.env.WEBSITE_SITE_NAME);
+
+  return !isProduction;
+}
+
 /**
  * rolesSource endpoint for Azure Static Web Apps.
  * SWA calls this (POST) after sign-in to determine the user's custom roles.
@@ -10,7 +22,7 @@ module.exports = async function (context, req) {
 
   try {
     // Dev mode bypass
-    if (process.env.DEV_MODE === 'true') {
+    if (isDevModeEnabled()) {
       const devRole = process.env.DEV_USER_ROLE || 'Admin';
       return { status: 200, body: { roles: ['authenticated', devRole] } };
     }
