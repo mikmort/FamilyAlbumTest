@@ -152,6 +152,10 @@
             If the account picker does not show that option, use Google sign-in for non-Microsoft emails.
         </div>
 
+        <div id="manual-ms-box" style="display:none;background:#e8f0fe;border:1px solid #9ec5fe;border-radius:8px;padding:12px 16px;margin-bottom:20px;font-size:14px;color:#0b3b8c;text-align:center;">
+            No add-account option? <a id="manual-ms-link" href="/.auth/login/aad?post_login_redirect_uri=/&prompt=login" style="color:#0b3b8c;font-weight:600;">Enter a different Microsoft email manually</a>
+        </div>
+
         <div class="login-buttons">
             <a href="/.auth/login/aad?post_login_redirect_uri=/&prompt=select_account" class="login-btn microsoft-btn">
                 <svg viewBox="0 0 23 23" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -185,6 +189,8 @@
         if (urlParams.has('fresh')) {
             // Arrived after a logout — show the "switch account" reminder banner
             document.getElementById('switch-banner').style.display = 'block';
+            document.getElementById('manual-ms-box').style.display = 'block';
+            document.getElementById('manual-ms-link').href = '/.auth/login/aad?post_login_redirect_uri=/&prompt=login';
         } else {
             // Normal visit — auto-redirect if already authenticated
             fetch('/.auth/me', { cache: 'no-store' })
