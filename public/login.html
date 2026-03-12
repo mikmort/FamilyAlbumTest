@@ -151,10 +151,6 @@
             <em>"Use another account"</em> to sign in with a different account.
         </div>
 
-        <div id="clear-ms-box" style="display:none;background:#e8f0fe;border:1px solid #9ec5fe;border-radius:8px;padding:12px 16px;margin-bottom:20px;font-size:14px;color:#0b3b8c;text-align:center;">
-            Still seeing the old account? <a id="clear-ms-link" href="#" style="color:#0b3b8c;font-weight:600;">Clear Microsoft session</a>
-        </div>
-
         <div class="login-buttons">
             <a href="/.auth/login/aad?post_login_redirect_uri=/" class="login-btn microsoft-btn">
                 <svg viewBox="0 0 23 23" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -188,10 +184,6 @@
         if (urlParams.has('fresh')) {
             // Arrived after a logout — show the "switch account" reminder banner
             document.getElementById('switch-banner').style.display = 'block';
-            document.getElementById('clear-ms-box').style.display = 'block';
-            document.getElementById('clear-ms-link').href =
-                'https://login.microsoftonline.com/common/oauth2/v2.0/logout?post_logout_redirect_uri=' +
-                encodeURIComponent(window.location.origin + '/login.html?fresh=1&msCleared=1');
         } else {
             // Normal visit — auto-redirect if already authenticated
             fetch('/.auth/me', { cache: 'no-store' })

@@ -45,7 +45,8 @@ export function getLoginUrl(redirectUrl?: string): string {
 
 /**
  * Get the logout URL
- * Logs out from SWA and redirects to login page (with ?fresh=1 to suppress auto-redirect)
+ * Logs out from SWA and redirects through switch-account intermediary flow
+ * to ensure provider session is also cleared.
  */
 export function getLogoutUrl(): string {
   const switchPagePath = `/switch-account.html?mode=logout&t=${Date.now()}`;
@@ -54,9 +55,8 @@ export function getLogoutUrl(): string {
 
 /**
  * Get the URL to sign in as a different user.
- * Logs out of SWA and redirects to /switch-account.html, which then does a
- * fresh top-level navigation to the AAD login with prompt=login. This ensures
- * the prompt parameter is respected by Azure SWA/AAD.
+ * Logs out of SWA and redirects through /switch-account.html to clear
+ * provider session before returning to login.
  */
 export function getSwitchAccountUrl(): string {
   const switchPagePath = `/switch-account.html?mode=switch&t=${Date.now()}`;
