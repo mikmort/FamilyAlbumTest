@@ -48,8 +48,8 @@ export function getLoginUrl(redirectUrl?: string): string {
  * Logs out from SWA and redirects to login page (with ?fresh=1 to suppress auto-redirect)
  */
 export function getLogoutUrl(): string {
-  const loginPageUrl = `${window.location.origin}/login.html?fresh=1`;
-  return `/.auth/logout?post_logout_redirect_uri=${encodeURIComponent(loginPageUrl)}`;
+  const loginPagePath = `/login.html?fresh=1&t=${Date.now()}`;
+  return `/.auth/logout?post_logout_redirect_uri=${encodeURIComponent(loginPagePath)}`;
 }
 
 /**
@@ -59,8 +59,8 @@ export function getLogoutUrl(): string {
  * the prompt parameter is respected by Azure SWA/AAD.
  */
 export function getSwitchAccountUrl(): string {
-  const switchPageUrl = `${window.location.origin}/switch-account.html`;
-  return `/.auth/logout?post_logout_redirect_uri=${encodeURIComponent(switchPageUrl)}`;
+  const switchPagePath = `/switch-account.html?t=${Date.now()}`;
+  return `/.auth/logout?post_logout_redirect_uri=${encodeURIComponent(switchPagePath)}`;
 }
 
 /**
