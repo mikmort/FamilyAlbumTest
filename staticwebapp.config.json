@@ -5,6 +5,10 @@
       "allowedRoles": ["anonymous"]
     },
     {
+      "route": "/logout-cleanup.html",
+      "allowedRoles": ["anonymous", "authenticated"]
+    },
+    {
       "route": "/switch-account.html",
       "allowedRoles": ["anonymous"]
     },

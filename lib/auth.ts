@@ -44,27 +44,46 @@ export function getLoginUrl(redirectUrl?: string): string {
 }
 
 /**
+ * Clear all session storage and browser cache for auth session
+ * This ensures old user data doesn't persist across logins
+ */
+function clearSessionData(): void {
+  // Clear browser storage
+  try {
+    sessionStorage.clear();
+    localStorage.removeItem('familyAlbumUser');
+    localStorage.removeItem('familyAlbumAuthToken');
+    // Note: Keep familyAlbumLastManualMicrosoftEmail as user may want to retry
+  } catch (e) {
+    console.warn('Could not clear session storage:', e);
+  }
+}
+
+/**
  * Get the logout URL
- * Logs out from SWA and returns to login page.
+ * Logs out from SWA and returns to cleanup page for final session clearing
  */
 export function getLogoutUrl(): string {
-  const loginPath = `/login.html?fresh=1&loggedOut=1&t=${Date.now()}`;
-  return `/.auth/logout?post_logout_redirect_uri=${encodeURIComponent(loginPath)}`;
+  // Redirect to logout cleanup page which will clear all storage before redirecting to login
+  const cleanupPath = `/logout-cleanup.html?redirect=${encodeURIComponent('/login.html?fresh=1&loggedOut=1&t=' + Date.now())}`;
+  return `/.auth/logout?post_logout_redirect_uri=${encodeURIComponent(cleanupPath)}`;
 }
 
 /**
  * Get the URL to sign in as a different user.
- * Logs out of SWA and returns to login page with switch hint.
+ * Logs out of SWA and returns to cleanup page for final session clearing
  */
 export function getSwitchAccountUrl(): string {
-  const loginPath = `/login.html?fresh=1&switch=1&t=${Date.now()}`;
-  return `/.auth/logout?post_logout_redirect_uri=${encodeURIComponent(loginPath)}`;
+  // Redirect to logout cleanup page which will clear all storage before redirecting to login
+  const cleanupPath = `/logout-cleanup.html?redirect=${encodeURIComponent('/login.html?fresh=1&switch=1&t=' + Date.now())}`;
+  return `/.auth/logout?post_logout_redirect_uri=${encodeURIComponent(cleanupPath)}`;
 }
 
 /**
  * Redirect to login page
  */
 export function redirectToLogin(redirectUrl?: string): void {
+  clearSessionData();
   window.location.href = getLoginUrl(redirectUrl);
 }
 
@@ -72,6 +91,7 @@ export function redirectToLogin(redirectUrl?: string): void {
  * Redirect to logout
  */
 export function logout(): void {
+  clearSessionData();
   window.location.href = getLogoutUrl();
 }
 

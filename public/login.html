@@ -299,17 +299,26 @@
             document.getElementById('switch-banner').style.display = 'block';
             manualMsLink.href = buildMsLoginUrl('login');
             msLoginLink.href = buildMsLoginUrl('login');
-            googleLoginLink.href = '/.auth/login/google?post_login_redirect_uri=' + encodeURIComponent(redirectTarget) + '&prompt=select_account';
+            googleLoginLink.href = '/.auth/login/google?post_login_redirect_uri=' + encodeURIComponent(redirectTarget) + '&prompt=login';
         } else {
             // Normal login keeps account picker behavior.
             manualMsLink.href = buildMsLoginUrl('login');
             msLoginLink.href = buildMsLoginUrl('select_account');
             googleLoginLink.href = '/.auth/login/google?post_login_redirect_uri=' + encodeURIComponent(redirectTarget) + '&prompt=select_account';
+            
             // Normal visit — auto-redirect if already authenticated
-            fetch('/.auth/me', { cache: 'no-store' })
+            // Use cache prevention headers to ensure we get fresh auth state
+            fetch('/.auth/me', { 
+              cache: 'no-store',
+              headers: {
+                'Cache-Control': 'no-cache, no-store, must-revalidate',
+                'Pragma': 'no-cache',
+                'Expires': '0'
+              }
+            })
                 .then(response => response.json())
                 .then(data => {
-                    if (data.clientPrincipal) {
+                    if (data.clientPrincipal && data.clientPrincipal.userRoles && data.clientPrincipal.userRoles.includes('authenticated')) {
                         window.location.href = redirectTarget;
                     }
                 })

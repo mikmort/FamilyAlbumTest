@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { getLogoutUrl, getSwitchAccountUrl } from '../lib/auth';
+import { getLogoutUrl, getSwitchAccountUrl, logout } from '../lib/auth';
 
 interface UserClaim {
   typ: string;
@@ -60,6 +60,18 @@ export default function UserInfo() {
       return () => document.removeEventListener('mousedown', handleClickOutside);
     }
   }, [dropdownOpen]);
+
+  const handleSwitchAccount = (e: React.MouseEvent<HTMLAnchorElement>) => {
+    // Clear session data before switching accounts
+    sessionStorage.clear();
+    window.location.href = getSwitchAccountUrl();
+  };
+
+  const handleLogout = (e: React.MouseEvent<HTMLAnchorElement>) => {
+    // Clear session data before logging out
+    sessionStorage.clear();
+    window.location.href = getLogoutUrl();
+  };
 
   if (loading) return null;
   if (!user) return null;
@@ -125,7 +137,8 @@ export default function UserInfo() {
           zIndex: 1000,
         }}>
           <a
-            href={getSwitchAccountUrl()}
+            href="#"
+            onClick={handleSwitchAccount}
             style={{
               display: 'block',
               padding: '0.75rem 1rem',
@@ -140,7 +153,8 @@ export default function UserInfo() {
             🔄 Sign in as Different User
           </a>
           <a
-            href={getLogoutUrl()}
+            href="#"
+            onClick={handleLogout}
             style={{
               display: 'block',
               padding: '0.75rem 1rem',
