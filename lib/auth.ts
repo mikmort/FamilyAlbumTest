@@ -40,7 +40,7 @@ export async function isAuthenticated(): Promise<boolean> {
  */
 export function getLoginUrl(redirectUrl?: string): string {
   const redirect = redirectUrl || window.location.pathname;
-  return `/.auth/login/aad?post_login_redirect_uri=${encodeURIComponent(redirect)}`;
+  return `/login.html?redirect=${encodeURIComponent(redirect)}`;
 }
 
 /**

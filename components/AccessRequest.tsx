@@ -287,7 +287,7 @@ export default function AccessRequest() {
               🔄 Sign in with different account
             </button>
             <div style={{ marginTop: '15px', fontSize: '12px', color: '#aaa' }}>
-              Or use <a href="/.auth/login/google?post_login_redirect_uri=/" style={{ color: '#667eea' }}>Google sign-in</a> with your other email
+              Or use <a href="/.auth/login/google?post_login_redirect_uri=/&prompt=select_account" style={{ color: '#667eea' }}>Google sign-in</a> with your other email
             </div>
           </div>
         )}

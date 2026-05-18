@@ -157,7 +157,7 @@
         </div>
 
         <div class="login-buttons">
-            <a href="/.auth/login/aad?post_login_redirect_uri=/&prompt=select_account" class="login-btn microsoft-btn">
+            <a id="ms-login-link" href="/.auth/login/aad?post_login_redirect_uri=/&prompt=login" class="login-btn microsoft-btn">
                 <svg viewBox="0 0 23 23" fill="none" xmlns="http://www.w3.org/2000/svg">
                     <path d="M0 0h10.93v10.93H0z" fill="#f25022"/>
                     <path d="M12.07 0H23v10.93H12.07z" fill="#00a4ef"/>
@@ -167,7 +167,7 @@
                 Sign in with Microsoft
             </a>
 
-            <a href="/.auth/login/google?post_login_redirect_uri=/" class="login-btn google-btn">
+            <a id="google-login-link" href="/.auth/login/google?post_login_redirect_uri=/&prompt=select_account" class="login-btn google-btn">
                 <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                     <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
                     <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
@@ -186,18 +186,29 @@
 
     <script>
         const urlParams = new URLSearchParams(window.location.search);
+        const redirectTarget = urlParams.get('redirect') || '/';
+        const msLoginLink = document.getElementById('ms-login-link');
+        const googleLoginLink = document.getElementById('google-login-link');
+        const manualMsLink = document.getElementById('manual-ms-link');
+
         if (urlParams.has('fresh')) {
             // Arrived after a logout — show the "switch account" reminder banner
             document.getElementById('switch-banner').style.display = 'block';
             document.getElementById('manual-ms-box').style.display = 'block';
-            document.getElementById('manual-ms-link').href = '/.auth/login/aad?post_login_redirect_uri=/&prompt=login';
+            manualMsLink.href = '/.auth/login/aad?post_login_redirect_uri=' + encodeURIComponent(redirectTarget) + '&prompt=login';
+            msLoginLink.href = '/.auth/login/aad?post_login_redirect_uri=' + encodeURIComponent(redirectTarget) + '&prompt=login';
+            googleLoginLink.href = '/.auth/login/google?post_login_redirect_uri=' + encodeURIComponent(redirectTarget) + '&prompt=select_account';
         } else {
+            // Normal login keeps account picker behavior.
+            manualMsLink.href = '/.auth/login/aad?post_login_redirect_uri=' + encodeURIComponent(redirectTarget) + '&prompt=login';
+            msLoginLink.href = '/.auth/login/aad?post_login_redirect_uri=' + encodeURIComponent(redirectTarget) + '&prompt=select_account';
+            googleLoginLink.href = '/.auth/login/google?post_login_redirect_uri=' + encodeURIComponent(redirectTarget) + '&prompt=select_account';
             // Normal visit — auto-redirect if already authenticated
             fetch('/.auth/me', { cache: 'no-store' })
                 .then(response => response.json())
                 .then(data => {
                     if (data.clientPrincipal) {
-                        window.location.href = '/';
+                        window.location.href = redirectTarget;
                     }
                 })
                 .catch(err => console.log('Not authenticated'));
