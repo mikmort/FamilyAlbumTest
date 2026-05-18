@@ -73,7 +73,15 @@
                     const data = await res.json();
                     if (!data.clientPrincipal) {
                         // Confirmed signed out in SWA.
-                        // Next clear Microsoft identity session to avoid reusing old account.
+                        // For force-login flows, skip provider logout page and go
+                        // directly to AAD login with prompt/login_hint.
+                        if (forceMsLogin) {
+                            document.getElementById('status').textContent = 'Opening Microsoft sign-in…';
+                            window.location.replace(buildMsLoginUrl());
+                            return;
+                        }
+
+                        // Standard switch/logout flow clears provider session.
                         document.getElementById('status').textContent = 'Clearing Microsoft session…';
                         window.location.replace(msLogoutUrl());
                         return;
