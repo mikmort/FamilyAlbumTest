@@ -36,11 +36,24 @@
     <script>
         const urlParams = new URLSearchParams(window.location.search);
         const mode = urlParams.get('mode') || 'switch';
+        const redirectTarget = urlParams.get('redirect') || '/';
+        const loginHint = urlParams.get('loginHint') || '';
+        const forceMsLogin = urlParams.get('forceMsLogin') === '1';
+
+        function buildMsLoginUrl() {
+            let url = '/.auth/login/aad?post_login_redirect_uri=' + encodeURIComponent(redirectTarget) + '&prompt=login';
+            if (loginHint && loginHint.trim()) {
+                url += '&login_hint=' + encodeURIComponent(loginHint.trim());
+            }
+            return url;
+        }
 
         function msLogoutUrl() {
-            const destination = mode === 'logout'
-                ? '/login.html?fresh=1&loggedOut=1'
-                : '/login.html?fresh=1&switch=1';
+            const destination = forceMsLogin
+                ? buildMsLoginUrl()
+                : (mode === 'logout'
+                    ? '/login.html?fresh=1&loggedOut=1'
+                    : '/login.html?fresh=1&switch=1');
 
             // Chain through both Azure AD and Microsoft Live logout endpoints
             // so existing browser-level sessions are fully cleared.
@@ -77,7 +90,9 @@
             );
         }
 
-        document.getElementById('fallback-link').href = msLogoutUrl();
+        document.getElementById('fallback-link').href = forceMsLogin
+            ? buildMsLoginUrl()
+            : msLogoutUrl();
         waitForLogout();
     </script>
 </body>
