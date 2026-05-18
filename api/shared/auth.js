@@ -52,6 +52,61 @@ async function getUserByEmail(email) {
 }
 
 /**
+ * Extract all candidate email addresses from the SWA client principal.
+ * Microsoft accounts often have multiple aliases (e.g. jb_morton@live.com
+ * and jbm@mikmorthotmail.onmicrosoft.com for the same account).
+ * Returns an array in priority order: real email addresses first, then aliases.
+ */
+function getCandidateEmails(context) {
+  if (isDevModeEnabled()) {
+    return [process.env.DEV_USER_EMAIL || 'dev@example.com'];
+  }
+
+  const principal = context.req.headers['x-ms-client-principal'];
+  if (!principal) return [];
+
+  try {
+    const decoded = Buffer.from(principal, 'base64').toString('ascii');
+    const user = JSON.parse(decoded);
+    const isEmailLike = (v) => typeof v === 'string' && v.includes('@');
+    const emails = [];
+
+    if (user.claims) {
+      // Real email claim types come first so we prefer live.com over onmicrosoft.com
+      const priorityTypes = [
+        'http://schemas.xmlsoap.org/ws/2005/05/identity/claims/emailaddress',
+        'email',
+        'emails',
+        'preferred_username',
+        'upn',
+        'http://schemas.xmlsoap.org/ws/2005/05/identity/claims/upn',
+      ];
+      for (const typ of priorityTypes) {
+        const claim = user.claims.find(c => c.typ === typ);
+        if (claim && isEmailLike(claim.val)) {
+          const val = claim.val.toLowerCase();
+          if (!emails.includes(val)) emails.push(val);
+        }
+      }
+      // Catch any other email-like claims
+      for (const claim of user.claims) {
+        if (isEmailLike(claim.val)) {
+          const val = claim.val.toLowerCase();
+          if (!emails.includes(val)) emails.push(val);
+        }
+      }
+    }
+    if (isEmailLike(user.userDetails)) {
+      const val = user.userDetails.toLowerCase();
+      if (!emails.includes(val)) emails.push(val);
+    }
+    return emails;
+  } catch (err) {
+    return [];
+  }
+}
+
+/**
  * Get or create user record
  * If user doesn't exist, creates with Pending status
  * @throws {DatabaseWarmupError} if database is warming up
@@ -118,44 +173,10 @@ function hasPermission(userRole, requiredRole) {
  * Extract user email from Azure Static Web Apps auth
  */
 function getUserEmail(context) {
-  // Dev mode bypass
-  if (isDevModeEnabled()) {
-    return process.env.DEV_USER_EMAIL || 'dev@example.com';
-  }
-  
-  const principal = context.req.headers['x-ms-client-principal'];
-  if (!principal) return null;
-  
-  try {
-    const decoded = Buffer.from(principal, 'base64').toString('ascii');
-    const user = JSON.parse(decoded);
-
-    const isEmailLike = (value) => typeof value === 'string' && value.includes('@');
-    
-    // Try to get email from claims
-    if (user.claims) {
-      const emailClaim = user.claims.find(c => 
-        c.typ === 'http://schemas.xmlsoap.org/ws/2005/05/identity/claims/emailaddress' ||
-        c.typ === 'preferred_username' ||
-        c.typ === 'upn' ||
-        c.typ === 'emails' ||
-        c.typ === 'email'
-      );
-      if (emailClaim && isEmailLike(emailClaim.val)) {
-        return emailClaim.val.toLowerCase();
-      }
-    }
-    
-    // Fallback to userDetails only when it looks like an email.
-    if (isEmailLike(user.userDetails)) {
-      return user.userDetails.toLowerCase();
-    }
-    
-    return null;
-  } catch (err) {
-    context.log.error('Error parsing user principal:', err);
-    return null;
-  }
+  // Returns the first (highest-priority) candidate email.
+  // Use getCandidateEmails for multi-alias lookup.
+  const emails = getCandidateEmails(context);
+  return emails.length > 0 ? emails[0] : null;
 }
 
 /**
@@ -219,21 +240,34 @@ async function checkAuthorization(context, requiredRole = 'Read') {
     };
   }
   
-  const email = getUserEmail(context);
-  
-  if (!email) {
+  const candidateEmails = getCandidateEmails(context);
+
+  if (candidateEmails.length === 0) {
     return {
       authorized: false,
       user: null,
       error: 'No authenticated user found'
     };
   }
-  
+
   try {
-    // Get or create user (can throw DatabaseWarmupError)
+    // Try each candidate email in priority order.
+    // This handles Microsoft accounts that have an onmicrosoft.com alias
+    // but are registered in the DB with their live.com or personal email.
     const name = getUserName(context);
-    const user = await getOrCreateUser(email, name);
-    
+    let user = null;
+    let matchedEmail = null;
+    for (const email of candidateEmails) {
+      user = await getUserByEmail(email);
+      if (user) { matchedEmail = email; break; }
+    }
+    // No existing record — create a Pending entry using the primary (first) email
+    if (!user) {
+      matchedEmail = candidateEmails[0];
+      user = await getOrCreateUser(matchedEmail, name);
+    }
+    const email = matchedEmail;
+
     // Update last login (can throw DatabaseWarmupError)
     await updateLastLogin(email);
     

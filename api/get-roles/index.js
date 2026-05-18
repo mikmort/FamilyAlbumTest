@@ -43,45 +43,70 @@ module.exports = async function (context, req) {
       return { status: 200, body: { roles: [] } };
     }
 
-    // Extract email from claims
-    let email = null;
+    // Extract all candidate emails from claims - Microsoft accounts can have multiple
+    // aliases (e.g. jb_morton@live.com and jbm@mikmorthotmail.onmicrosoft.com are the same account).
+    // We collect ALL email-like claims and try each one against the database.
     const isEmailLike = (value) => typeof value === 'string' && value.includes('@');
+    const candidateEmails = [];
+
     if (user.claims) {
-      const emailClaim = user.claims.find(c =>
-        c.typ === 'http://schemas.xmlsoap.org/ws/2005/05/identity/claims/emailaddress' ||
-        c.typ === 'preferred_username' ||
-        c.typ === 'upn' ||
-        c.typ === 'emails' ||
-        c.typ === 'email'
-      );
-      if (emailClaim && isEmailLike(emailClaim.val)) {
-        email = emailClaim.val.toLowerCase();
+      // Priority order: real email addresses first, then UPN/preferred_username aliases
+      const claimPriority = [
+        'http://schemas.xmlsoap.org/ws/2005/05/identity/claims/emailaddress',
+        'email',
+        'emails',
+        'preferred_username',
+        'upn',
+        'http://schemas.xmlsoap.org/ws/2005/05/identity/claims/upn',
+      ];
+      for (const typ of claimPriority) {
+        const claim = user.claims.find(c => c.typ === typ);
+        if (claim && isEmailLike(claim.val)) {
+          const val = claim.val.toLowerCase();
+          if (!candidateEmails.includes(val)) candidateEmails.push(val);
+        }
+      }
+      // Also pick up any other email-like claims not in the list above
+      for (const claim of user.claims) {
+        if (isEmailLike(claim.val)) {
+          const val = claim.val.toLowerCase();
+          if (!candidateEmails.includes(val)) candidateEmails.push(val);
+        }
       }
     }
-    if (!email && isEmailLike(user.userDetails)) {
-      email = user.userDetails.toLowerCase();
+    if (isEmailLike(user.userDetails)) {
+      const val = user.userDetails.toLowerCase();
+      if (!candidateEmails.includes(val)) candidateEmails.push(val);
     }
 
-    context.log('Checking roles for:', email);
+    context.log('Candidate emails for role lookup:', candidateEmails);
 
-    if (!email) {
+    if (candidateEmails.length === 0) {
       return { status: 200, body: { roles: ['authenticated'] } };
     }
 
-    // Look up user in database
-    const result = await query(
-      `SELECT Role, Status FROM Users WHERE Email = @email`,
-      { email }
-    );
+    // Try each candidate email against the database until we find a match.
+    // This handles the case where Microsoft returns an onmicrosoft.com alias
+    // but the user is registered with their live.com or other personal email.
+    let dbUser = null;
+    for (const email of candidateEmails) {
+      context.log('Checking roles for:', email);
+      const result = await query(
+        `SELECT Role, Status, Email FROM Users WHERE Email = @email`,
+        { email }
+      );
+      if (result && result.length > 0) {
+        dbUser = result[0];
+        context.log('User found via email:', email, dbUser.Role, dbUser.Status);
+        break;
+      }
+    }
 
-    if (!result || result.length === 0) {
+    if (!dbUser) {
       // Unknown user - still authenticated, app will handle pending state
-      context.log('User not found, returning authenticated only');
+      context.log('User not found for any candidate email:', candidateEmails);
       return { status: 200, body: { roles: ['authenticated'] } };
     }
-
-    const dbUser = result[0];
-    context.log('User found:', dbUser.Role, dbUser.Status);
 
     if (dbUser.Status !== 'Active') {
       // Pending/denied users get authenticated so the app can show the status page

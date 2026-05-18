@@ -104,15 +104,15 @@
         // Force browser cache invalidation
         window.location.hash = Math.random();
         
-        // Redirect to login after a delay to ensure clearing is complete
+        // After clearing local data, also log out of Microsoft's identity platform.
+        // This clears the Microsoft SSO browser session so it doesn't auto-sign back in.
+        // Without this step, Microsoft silently re-authenticates with the cached account
+        // even after SWA's session is cleared.
         setTimeout(() => {
-            // Add cache busting parameters
-            const redirectUrl = redirect.includes('?') 
-                ? redirect + '&nocache=' + Date.now()
-                : redirect + '?nocache=' + Date.now();
-            
-            // Use replace to not add to browser history
-            window.location.replace(redirectUrl);
+            const finalLoginUrl = window.location.origin + redirect + (redirect.includes('?') ? '&nocache=' : '?nocache=') + Date.now();
+            const msLogoutUrl = 'https://login.microsoftonline.com/common/oauth2/v2.0/logout'
+                + '?post_logout_redirect_uri=' + encodeURIComponent(finalLoginUrl);
+            window.location.replace(msLogoutUrl);
         }, 800);
     </script>
 </body>
