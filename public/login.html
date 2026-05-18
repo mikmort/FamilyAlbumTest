@@ -295,13 +295,17 @@
         openLoginFreshLink.href = '/login.html?fresh=1&redirect=' + encodeURIComponent(redirectTarget);
 
         if (urlParams.has('fresh')) {
-            // Arrived after a logout — show the "switch account" reminder banner
+            // After logout - show the "switch account" reminder banner
             document.getElementById('switch-banner').style.display = 'block';
             manualMsLink.href = buildMsLoginUrl('login');
             msLoginLink.href = buildMsLoginUrl('login');
             googleLoginLink.href = '/.auth/login/google?post_login_redirect_uri=' + encodeURIComponent(redirectTarget) + '&prompt=login';
+            
+            // IMPORTANT: Do NOT auto-redirect on fresh logout, even if auth status shows authenticated
+            // This ensures old sessions don't get reused
+            console.log('Fresh logout detected - skipping auto-redirect');
         } else {
-            // Normal login keeps account picker behavior.
+            // Normal login keeps account picker behavior
             manualMsLink.href = buildMsLoginUrl('login');
             msLoginLink.href = buildMsLoginUrl('select_account');
             googleLoginLink.href = '/.auth/login/google?post_login_redirect_uri=' + encodeURIComponent(redirectTarget) + '&prompt=select_account';

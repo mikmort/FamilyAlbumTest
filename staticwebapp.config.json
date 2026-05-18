@@ -93,7 +93,7 @@
       }
     },
     "rolesSource": "/api/get-roles",
-    "cookieSessionLifetimeInMinutes": 10080
+    "cookieSessionLifetimeInMinutes": 60
   },
   "navigationFallback": {
     "rewrite": "/index.html",
