@@ -45,22 +45,20 @@ export function getLoginUrl(redirectUrl?: string): string {
 
 /**
  * Get the logout URL
- * Logs out from SWA and redirects through switch-account intermediary flow
- * to ensure provider session is also cleared.
+ * Logs out from SWA and returns to login page.
  */
 export function getLogoutUrl(): string {
-  const switchPagePath = `/switch-account.html?mode=logout&t=${Date.now()}`;
-  return `/.auth/logout?post_logout_redirect_uri=${encodeURIComponent(switchPagePath)}`;
+  const loginPath = `/login.html?fresh=1&loggedOut=1&t=${Date.now()}`;
+  return `/.auth/logout?post_logout_redirect_uri=${encodeURIComponent(loginPath)}`;
 }
 
 /**
  * Get the URL to sign in as a different user.
- * Logs out of SWA and redirects through /switch-account.html to clear
- * provider session before returning to login.
+ * Logs out of SWA and returns to login page with switch hint.
  */
 export function getSwitchAccountUrl(): string {
-  const switchPagePath = `/switch-account.html?mode=switch&t=${Date.now()}`;
-  return `/.auth/logout?post_logout_redirect_uri=${encodeURIComponent(switchPagePath)}`;
+  const loginPath = `/login.html?fresh=1&switch=1&t=${Date.now()}`;
+  return `/.auth/logout?post_logout_redirect_uri=${encodeURIComponent(loginPath)}`;
 }
 
 /**

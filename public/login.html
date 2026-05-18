@@ -255,14 +255,6 @@
         const reuseEmailButton = document.getElementById('reuse-email');
         const openLoginFreshLink = document.getElementById('open-login-fresh');
 
-        function buildHardMsSwitchUrl(loginHint) {
-            let url = '/switch-account.html?mode=switch&forceMsLogin=1&redirect=' + encodeURIComponent(redirectTarget) + '&t=' + Date.now();
-            if (loginHint && loginHint.trim()) {
-                url += '&loginHint=' + encodeURIComponent(loginHint.trim());
-            }
-            return url;
-        }
-
         function buildMsLoginUrl(promptValue, loginHint) {
             let url = '/.auth/login/aad?post_login_redirect_uri=' + encodeURIComponent(redirectTarget) + '&prompt=' + encodeURIComponent(promptValue);
             if (loginHint && loginHint.trim()) {
@@ -276,7 +268,7 @@
             if (emailValue.trim()) {
                 localStorage.setItem('familyAlbumLastManualMicrosoftEmail', emailValue.trim());
             }
-            window.location.href = buildHardMsSwitchUrl(emailValue);
+            window.location.href = buildMsLoginUrl('login', emailValue);
         }
 
         manualMsSubmit.addEventListener('click', submitManualMsLogin);
@@ -305,12 +297,12 @@
         if (urlParams.has('fresh')) {
             // Arrived after a logout — show the "switch account" reminder banner
             document.getElementById('switch-banner').style.display = 'block';
-            manualMsLink.href = buildHardMsSwitchUrl();
+            manualMsLink.href = buildMsLoginUrl('login');
             msLoginLink.href = buildMsLoginUrl('login');
             googleLoginLink.href = '/.auth/login/google?post_login_redirect_uri=' + encodeURIComponent(redirectTarget) + '&prompt=select_account';
         } else {
             // Normal login keeps account picker behavior.
-            manualMsLink.href = buildHardMsSwitchUrl();
+            manualMsLink.href = buildMsLoginUrl('login');
             msLoginLink.href = buildMsLoginUrl('select_account');
             googleLoginLink.href = '/.auth/login/google?post_login_redirect_uri=' + encodeURIComponent(redirectTarget) + '&prompt=select_account';
             // Normal visit — auto-redirect if already authenticated
