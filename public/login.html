@@ -152,8 +152,15 @@
             If the account picker does not show that option, use Google sign-in for non-Microsoft emails.
         </div>
 
-        <div id="manual-ms-box" style="display:none;background:#e8f0fe;border:1px solid #9ec5fe;border-radius:8px;padding:12px 16px;margin-bottom:20px;font-size:14px;color:#0b3b8c;text-align:center;">
-            No add-account option? <a id="manual-ms-link" href="/.auth/login/aad?post_login_redirect_uri=/&prompt=login" style="color:#0b3b8c;font-weight:600;">Enter a different Microsoft email manually</a>
+        <div id="manual-ms-box" style="background:#e8f0fe;border:1px solid #9ec5fe;border-radius:8px;padding:12px 16px;margin-bottom:20px;font-size:14px;color:#0b3b8c;text-align:center;">
+            <div style="margin-bottom:8px;">Microsoft only shows one account? Enter the other email and continue.</div>
+            <div style="display:flex;gap:8px;justify-content:center;align-items:center;flex-wrap:wrap;">
+                <input id="manual-ms-email" type="email" placeholder="other-email@domain.com" style="padding:8px 10px;border:1px solid #9ec5fe;border-radius:6px;min-width:230px;" />
+                <button id="manual-ms-submit" type="button" style="padding:8px 12px;border:1px solid #0b3b8c;border-radius:6px;background:#0b3b8c;color:white;cursor:pointer;font-weight:600;">Use this Microsoft email</button>
+            </div>
+            <div style="margin-top:8px; font-size:12px;">
+                <a id="manual-ms-link" href="/.auth/login/aad?post_login_redirect_uri=/&prompt=login" style="color:#0b3b8c;font-weight:600;">Continue without email hint</a>
+            </div>
         </div>
 
         <div class="login-buttons">
@@ -190,18 +197,40 @@
         const msLoginLink = document.getElementById('ms-login-link');
         const googleLoginLink = document.getElementById('google-login-link');
         const manualMsLink = document.getElementById('manual-ms-link');
+        const manualMsEmailInput = document.getElementById('manual-ms-email');
+        const manualMsSubmit = document.getElementById('manual-ms-submit');
+
+        function buildMsLoginUrl(promptValue, loginHint) {
+            let url = '/.auth/login/aad?post_login_redirect_uri=' + encodeURIComponent(redirectTarget) + '&prompt=' + encodeURIComponent(promptValue);
+            if (loginHint && loginHint.trim()) {
+                url += '&login_hint=' + encodeURIComponent(loginHint.trim());
+            }
+            return url;
+        }
+
+        function submitManualMsLogin() {
+            const emailValue = manualMsEmailInput.value || '';
+            window.location.href = buildMsLoginUrl('login', emailValue);
+        }
+
+        manualMsSubmit.addEventListener('click', submitManualMsLogin);
+        manualMsEmailInput.addEventListener('keydown', function (e) {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                submitManualMsLogin();
+            }
+        });
 
         if (urlParams.has('fresh')) {
             // Arrived after a logout — show the "switch account" reminder banner
             document.getElementById('switch-banner').style.display = 'block';
-            document.getElementById('manual-ms-box').style.display = 'block';
-            manualMsLink.href = '/.auth/login/aad?post_login_redirect_uri=' + encodeURIComponent(redirectTarget) + '&prompt=login';
-            msLoginLink.href = '/.auth/login/aad?post_login_redirect_uri=' + encodeURIComponent(redirectTarget) + '&prompt=login';
+            manualMsLink.href = buildMsLoginUrl('login');
+            msLoginLink.href = buildMsLoginUrl('login');
             googleLoginLink.href = '/.auth/login/google?post_login_redirect_uri=' + encodeURIComponent(redirectTarget) + '&prompt=select_account';
         } else {
             // Normal login keeps account picker behavior.
-            manualMsLink.href = '/.auth/login/aad?post_login_redirect_uri=' + encodeURIComponent(redirectTarget) + '&prompt=login';
-            msLoginLink.href = '/.auth/login/aad?post_login_redirect_uri=' + encodeURIComponent(redirectTarget) + '&prompt=select_account';
+            manualMsLink.href = buildMsLoginUrl('login');
+            msLoginLink.href = buildMsLoginUrl('select_account');
             googleLoginLink.href = '/.auth/login/google?post_login_redirect_uri=' + encodeURIComponent(redirectTarget) + '&prompt=select_account';
             // Normal visit — auto-redirect if already authenticated
             fetch('/.auth/me', { cache: 'no-store' })
