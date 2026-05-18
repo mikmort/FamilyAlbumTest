@@ -137,6 +137,46 @@
         .info strong {
             color: #333;
         }
+
+        .helper-panel {
+            margin-top: 16px;
+            padding: 12px 14px;
+            background: #f7f8ff;
+            border: 1px solid #dfe3ff;
+            border-radius: 8px;
+            font-size: 13px;
+            color: #30406b;
+            text-align: left;
+        }
+
+        .helper-panel h3 {
+            font-size: 14px;
+            margin-bottom: 8px;
+            color: #22335f;
+        }
+
+        .helper-panel ol {
+            margin-left: 18px;
+            line-height: 1.45;
+        }
+
+        .helper-actions {
+            margin-top: 10px;
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .helper-btn {
+            border: 1px solid #b8c2f9;
+            background: white;
+            color: #33488a;
+            border-radius: 6px;
+            padding: 6px 10px;
+            cursor: pointer;
+            font-size: 12px;
+            text-decoration: none;
+        }
     </style>
 </head>
 <body>
@@ -160,6 +200,19 @@
             </div>
             <div style="margin-top:8px; font-size:12px;">
                 <a id="manual-ms-link" href="/.auth/login/aad?post_login_redirect_uri=/&prompt=login" style="color:#0b3b8c;font-weight:600;">Continue without email hint</a>
+            </div>
+        </div>
+
+        <div class="helper-panel">
+            <h3>Having trouble switching Microsoft accounts?</h3>
+            <ol>
+                <li>Enter your other Microsoft email above and click "Use this Microsoft email".</li>
+                <li>If Microsoft still reuses the wrong account, open this login page in an InPrivate window and sign in there.</li>
+                <li>For day-to-day use, keep each account in a separate Edge profile.</li>
+            </ol>
+            <div class="helper-actions">
+                <button id="reuse-email" class="helper-btn" type="button">Reuse last typed email</button>
+                <a id="open-login-fresh" class="helper-btn" href="/login.html?fresh=1">Reload sign-in page</a>
             </div>
         </div>
 
@@ -199,6 +252,8 @@
         const manualMsLink = document.getElementById('manual-ms-link');
         const manualMsEmailInput = document.getElementById('manual-ms-email');
         const manualMsSubmit = document.getElementById('manual-ms-submit');
+        const reuseEmailButton = document.getElementById('reuse-email');
+        const openLoginFreshLink = document.getElementById('open-login-fresh');
 
         function buildHardMsSwitchUrl(loginHint) {
             let url = '/switch-account.html?mode=switch&forceMsLogin=1&redirect=' + encodeURIComponent(redirectTarget) + '&t=' + Date.now();
@@ -218,6 +273,9 @@
 
         function submitManualMsLogin() {
             const emailValue = manualMsEmailInput.value || '';
+            if (emailValue.trim()) {
+                localStorage.setItem('familyAlbumLastManualMicrosoftEmail', emailValue.trim());
+            }
             window.location.href = buildHardMsSwitchUrl(emailValue);
         }
 
@@ -228,6 +286,21 @@
                 submitManualMsLogin();
             }
         });
+
+        reuseEmailButton.addEventListener('click', function () {
+            const rememberedEmail = localStorage.getItem('familyAlbumLastManualMicrosoftEmail') || '';
+            if (rememberedEmail) {
+                manualMsEmailInput.value = rememberedEmail;
+                manualMsEmailInput.focus();
+            }
+        });
+
+        const rememberedEmail = localStorage.getItem('familyAlbumLastManualMicrosoftEmail') || '';
+        if (rememberedEmail && !manualMsEmailInput.value) {
+            manualMsEmailInput.value = rememberedEmail;
+        }
+
+        openLoginFreshLink.href = '/login.html?fresh=1&redirect=' + encodeURIComponent(redirectTarget);
 
         if (urlParams.has('fresh')) {
             // Arrived after a logout — show the "switch account" reminder banner
