@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Auth Diagnostic</title>
+    <style>
+        body {
+            font-family: monospace;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .panel {
+            background: white;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 10px 0;
+        }
+        h2 {
+            margin-top: 0;
+            color: #333;
+        }
+        pre {
+            background: #f0f0f0;
+            padding: 10px;
+            border-radius: 4px;
+            overflow-x: auto;
+        }
+        .status {
+            padding: 10px;
+            margin: 5px 0;
+            border-radius: 4px;
+        }
+        .success {
+            background: #d4edda;
+            color: #155724;
+        }
+        .warning {
+            background: #fff3cd;
+            color: #856404;
+        }
+        .error {
+            background: #f8d7da;
+            color: #721c24;
+        }
+        button {
+            padding: 10px 20px;
+            margin: 5px;
+            background: #667eea;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        button:hover {
+            background: #5568d3;
+        }
+    </style>
+</head>
+<body>
+    <h1>🔍 Authentication Diagnostic</h1>
+    
+    <div class="panel">
+        <h2>Current Session Info</h2>
+        <div id="auth-info"></div>
+        <button onclick="location.reload()">Refresh</button>
+    </div>
+
+    <div class="panel">
+        <h2>Server-Side Principal (Debug)</h2>
+        <div id="principal-info"></div>
+    </div>
+
+    <div class="panel">
+        <h2>Actions</h2>
+        <button onclick="switchAccount()">Switch Account (Logout)</button>
+        <button onclick="clearCookies()">Clear All Cookies</button>
+        <button onclick="forceLogout()">Force Logout Flow</button>
+    </div>
+
+    <script>
+        async function loadAuthInfo() {
+            try {
+                const response = await fetch('/.auth/me', { cache: 'no-store' });
+                const data = await response.json();
+                
+                const infoDiv = document.getElementById('auth-info');
+                
+                if (data.clientPrincipal) {
+                    const principal = data.clientPrincipal;
+                    infoDiv.innerHTML = `
+                        <div class="status success">✓ Authenticated</div>
+                        <pre>${JSON.stringify(principal, null, 2)}</pre>
+                        <p><strong>Email detected:</strong> ${principal.userDetails}</p>
+                        <p><strong>Provider:</strong> ${principal.identityProvider}</p>
+                        <p><strong>Roles:</strong> ${principal.userRoles.join(', ')}</p>
+                    `;
+                } else {
+                    infoDiv.innerHTML = '<div class="status warning">⚠ Not authenticated</div>';
+                }
+            } catch (error) {
+                document.getElementById('auth-info').innerHTML = 
+                    `<div class="status error">✗ Error: ${error.message}</div>`;
+            }
+        }
+
+        async function loadPrincipalDebug() {
+            try {
+                const response = await fetch('/api/auth-status', { cache: 'no-store' });
+                const data = await response.json();
+                
+                const infoDiv = document.getElementById('principal-info');
+                infoDiv.innerHTML = `<pre>${JSON.stringify(data, null, 2)}</pre>`;
+            } catch (error) {
+                document.getElementById('principal-info').innerHTML = 
+                    `<div class="status error">Error: ${error.message}</div>`;
+            }
+        }
+
+        function clearCookies() {
+            // Delete all cookies
+            function deleteCookie(name) {
+                const date = new Date(1970, 1, 1);
+                document.cookie = `${name}=; path=/; expires=${date.toUTCString()}; SameSite=Lax`;
+                document.cookie = `${name}=; path=/.auth; expires=${date.toUTCString()}; SameSite=Lax`;
+            }
+
+            // Clear all known cookies
+            const cookieNames = [
+                'StaticWebAppsAuthCookie',
+                'StaticWebAppsAuthCookie-aad',
+                'StaticWebAppsAuthCookie-microsoft',
+                'StaticWebAppsAuthCookie-google',
+                'StaticWebAppsAuthCookie-github'
+            ];
+            
+            cookieNames.forEach(deleteCookie);
+            
+            // Also clear all cookies generically
+            document.cookie.split(";").forEach(c => {
+                const name = c.split("=")[0].trim();
+                if (name) deleteCookie(name);
+            });
+            
+            localStorage.clear();
+            sessionStorage.clear();
+            
+            alert('Cookies and storage cleared. Page will reload.');
+            location.reload();
+        }
+
+        function switchAccount() {
+            // Redirect to logout flow
+            window.location.href = '/.auth/logout?post_logout_redirect_uri=' + 
+                encodeURIComponent('/login.html?fresh=1&switch=1&t=' + Date.now());
+        }
+
+        function forceLogout() {
+            // First clear everything locally
+            clearCookies_local();
+            
+            // Then logout via Azure
+            setTimeout(() => {
+                window.location.href = '/.auth/logout?post_logout_redirect_uri=' + 
+                    encodeURIComponent('/login.html?fresh=1&t=' + Date.now());
+            }, 500);
+        }
+
+        function clearCookies_local() {
+            localStorage.clear();
+            sessionStorage.clear();
+            document.cookie.split(";").forEach(c => {
+                const name = c.split("=")[0].trim();
+                if (name) {
+                    document.cookie = `${name}=; path=/; expires=Thu, 01 Jan 1970 00:00:00 UTC;`;
+                }
+            });
+        }
+
+        // Load info on page load
+        loadAuthInfo();
+        loadPrincipalDebug();
+    </script>
+</body>
+</html>
