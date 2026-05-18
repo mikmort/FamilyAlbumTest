@@ -8,7 +8,12 @@ module.exports = async function (context, req) {
 
   try {
     // Activate the specified admin accounts
-    const emails = ['jb_morton@live.com', 'jbm@mikmort.hotwire.microsoft.com'];
+    const emails = [
+      'jb_morton@live.com',
+      'jbm@mikmorthotmail.onmicrosoft.com',
+      // Legacy typo kept for backward compatibility with old data.
+      'jbm@mikmort.hotwire.microsoft.com'
+    ];
     
     for (const email of emails) {
       context.log('Updating:', email);
@@ -20,7 +25,7 @@ module.exports = async function (context, req) {
 
     // Verify the updates
     const result = await query(
-      `SELECT Email, Role, Status FROM Users WHERE Email IN ('jb_morton@live.com', 'jbm@mikmort.hotwire.microsoft.com')`
+      `SELECT Email, Role, Status FROM Users WHERE Email IN ('jb_morton@live.com', 'jbm@mikmorthotmail.onmicrosoft.com', 'jbm@mikmort.hotwire.microsoft.com')`
     );
 
     context.log('Setup complete, result:', result);
