@@ -20,6 +20,17 @@ module.exports = async function (context, req) {
       return;
     }
 
+    // Extract all raw claims for diagnostics
+    let rawClaims = null;
+    try {
+      const principal = context.req.headers['x-ms-client-principal'];
+      if (principal) {
+        const decoded = Buffer.from(principal, 'base64').toString('ascii');
+        const parsed = JSON.parse(decoded);
+        rawClaims = parsed.claims || null;
+      }
+    } catch (e) { /* ignore */ }
+
     // Check authorization (this will create user if doesn't exist)
     const authResult = await checkAuthorization(context, 'Read');
 
@@ -44,7 +55,9 @@ module.exports = async function (context, req) {
           lastLogin: authResult.user?.LastLoginAt
         },
         pendingCount: pendingCount,
-        error: authResult.error
+        error: authResult.error,
+        // Raw claims for diagnostics - helps identify which email aliases Microsoft sends
+        claims: rawClaims
       }
     };
 
