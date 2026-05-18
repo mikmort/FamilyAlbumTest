@@ -76,7 +76,7 @@
             "prompt=select_account"
           ]
         },
-        "userDetailsClaim": "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/name"
+        "userDetailsClaim": "preferred_username"
       },
       "google": {
         "registration": {

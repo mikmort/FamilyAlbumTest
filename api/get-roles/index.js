@@ -45,15 +45,20 @@ module.exports = async function (context, req) {
 
     // Extract email from claims
     let email = null;
+    const isEmailLike = (value) => typeof value === 'string' && value.includes('@');
     if (user.claims) {
       const emailClaim = user.claims.find(c =>
         c.typ === 'http://schemas.xmlsoap.org/ws/2005/05/identity/claims/emailaddress' ||
+        c.typ === 'preferred_username' ||
+        c.typ === 'upn' ||
         c.typ === 'emails' ||
         c.typ === 'email'
       );
-      if (emailClaim) email = emailClaim.val.toLowerCase();
+      if (emailClaim && isEmailLike(emailClaim.val)) {
+        email = emailClaim.val.toLowerCase();
+      }
     }
-    if (!email && user.userDetails) {
+    if (!email && isEmailLike(user.userDetails)) {
       email = user.userDetails.toLowerCase();
     }
 

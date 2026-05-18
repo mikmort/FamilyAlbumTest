@@ -129,19 +129,25 @@ function getUserEmail(context) {
   try {
     const decoded = Buffer.from(principal, 'base64').toString('ascii');
     const user = JSON.parse(decoded);
+
+    const isEmailLike = (value) => typeof value === 'string' && value.includes('@');
     
     // Try to get email from claims
     if (user.claims) {
       const emailClaim = user.claims.find(c => 
         c.typ === 'http://schemas.xmlsoap.org/ws/2005/05/identity/claims/emailaddress' ||
+        c.typ === 'preferred_username' ||
+        c.typ === 'upn' ||
         c.typ === 'emails' ||
         c.typ === 'email'
       );
-      if (emailClaim) return emailClaim.val.toLowerCase();
+      if (emailClaim && isEmailLike(emailClaim.val)) {
+        return emailClaim.val.toLowerCase();
+      }
     }
     
-    // Fallback to userDetails
-    if (user.userDetails) {
+    // Fallback to userDetails only when it looks like an email.
+    if (isEmailLike(user.userDetails)) {
       return user.userDetails.toLowerCase();
     }
     
