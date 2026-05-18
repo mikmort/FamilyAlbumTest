@@ -72,7 +72,8 @@
         },
         "login": {
           "loginParameters": [
-            "scope=openid profile email https://graph.microsoft.com/User.Read"
+            "scope=openid profile email https://graph.microsoft.com/User.Read",
+            "prompt=select_account"
           ]
         },
         "userDetailsClaim": "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/name"
