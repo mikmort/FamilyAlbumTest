@@ -7,25 +7,29 @@ module.exports = async function (context, req) {
   context.log('Setup admin called');
 
   try {
-    // Activate the specified admin accounts
+    // Upsert the primary admin account - inserts if deleted, updates if exists
     const emails = [
       'jb_morton@live.com',
       'jbm@mikmorthotmail.onmicrosoft.com',
-      // Legacy typo kept for backward compatibility with old data.
-      'jbm@mikmort.hotwire.microsoft.com'
     ];
-    
+
     for (const email of emails) {
-      context.log('Updating:', email);
+      context.log('Upserting:', email);
       await query(
-        `UPDATE Users SET Role = 'Admin', Status = 'Active', ApprovedAt = GETDATE() WHERE Email = @email`,
+        `MERGE Users AS target
+         USING (SELECT @email AS Email) AS source ON target.Email = source.Email
+         WHEN MATCHED THEN
+           UPDATE SET Role = 'Admin', Status = 'Active', ApprovedAt = GETDATE(), UpdatedAt = GETDATE()
+         WHEN NOT MATCHED THEN
+           INSERT (Email, Role, Status, ApprovedAt, CreatedAt, UpdatedAt)
+           VALUES (@email, 'Admin', 'Active', GETDATE(), GETDATE(), GETDATE());`,
         { email: email.toLowerCase() }
       );
     }
 
     // Verify the updates
     const result = await query(
-      `SELECT Email, Role, Status FROM Users WHERE Email IN ('jb_morton@live.com', 'jbm@mikmorthotmail.onmicrosoft.com', 'jbm@mikmort.hotwire.microsoft.com')`
+      `SELECT Email, Role, Status FROM Users WHERE Email IN ('jb_morton@live.com', 'jbm@mikmorthotmail.onmicrosoft.com')`
     );
 
     context.log('Setup complete, result:', result);
