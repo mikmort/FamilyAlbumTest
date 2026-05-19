@@ -100,6 +100,12 @@ function getCandidateEmails(context) {
       const val = user.userDetails.toLowerCase();
       if (!emails.includes(val)) emails.push(val);
     }
+    // Always try real personal emails before onmicrosoft.com aliases
+    emails.sort((a, b) => {
+      const aAlias = a.endsWith('.onmicrosoft.com') ? 1 : 0;
+      const bAlias = b.endsWith('.onmicrosoft.com') ? 1 : 0;
+      return aAlias - bAlias;
+    });
     return emails;
   } catch (err) {
     return [];

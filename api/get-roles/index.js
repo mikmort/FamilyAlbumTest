@@ -79,6 +79,13 @@ module.exports = async function (context, req) {
       if (!candidateEmails.includes(val)) candidateEmails.push(val);
     }
 
+    // Always try real personal emails before onmicrosoft.com aliases
+    candidateEmails.sort((a, b) => {
+      const aAlias = a.endsWith('.onmicrosoft.com') ? 1 : 0;
+      const bAlias = b.endsWith('.onmicrosoft.com') ? 1 : 0;
+      return aAlias - bAlias;
+    });
+
     context.log('Candidate emails for role lookup:', candidateEmails);
 
     if (candidateEmails.length === 0) {
