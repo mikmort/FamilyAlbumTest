@@ -24,7 +24,7 @@ function getBaseUrl(context) {
 }
 
 // Generate HTML email content
-function generateEmailHtml(userEmail, userName, message, fullAccessUrl, readOnlyUrl, denyUrl, expiresAt) {
+function generateEmailHtml(userEmail, userName, relationship, message, fullAccessUrl, readOnlyUrl, denyUrl, expiresAt) {
     return `
 <!DOCTYPE html>
 <html>
@@ -45,7 +45,7 @@ function generateEmailHtml(userEmail, userName, message, fullAccessUrl, readOnly
         <div style="background: #f8f9fa; border-left: 4px solid #667eea; padding: 15px; margin: 20px 0; border-radius: 4px;">
             <p style="margin: 5px 0;"><strong>Name:</strong> ${userName || 'Not provided'}</p>
             <p style="margin: 5px 0;"><strong>Email:</strong> ${userEmail}</p>
-            <p style="margin: 5px 0;"><strong>Message:</strong> ${message || 'No message provided'}</p>
+            <p style="margin: 5px 0;"><strong>Relationship to family:</strong> ${relationship || 'Not provided'}</p>
             <p style="margin: 5px 0;"><strong>Time:</strong> ${new Date().toLocaleString()}</p>
         </div>
         
@@ -93,7 +93,7 @@ function generateEmailHtml(userEmail, userName, message, fullAccessUrl, readOnly
 }
 
 // Generate plain text version of email
-function generateEmailPlainText(userEmail, userName, message, fullAccessUrl, readOnlyUrl, denyUrl, expiresAt) {
+function generateEmailPlainText(userEmail, userName, relationship, message, fullAccessUrl, readOnlyUrl, denyUrl, expiresAt) {
     return `
 NEW ACCESS REQUEST - FAMILY ALBUM
 
@@ -101,7 +101,7 @@ A new user is requesting access to the Family Album:
 
 Name: ${userName || 'Not provided'}
 Email: ${userEmail}
-Message: ${message || 'No message provided'}
+Relationship to family: ${relationship || 'Not provided'}
 Time: ${new Date().toLocaleString()}
 
 ACTION REQUIRED
@@ -126,7 +126,7 @@ If you did not expect this email, please ignore it.
 }
 
 // Send email using configured service
-async function sendEmail(context, adminEmails, userEmail, userName, message, fullAccessUrl, readOnlyUrl, denyUrl, expiresAt) {
+async function sendEmail(context, adminEmails, userEmail, userName, relationship, message, fullAccessUrl, readOnlyUrl, denyUrl, expiresAt) {
     const fromAddress = process.env.EMAIL_FROM_ADDRESS;
     const senderName = process.env.EMAIL_SENDER_NAME || 'Family Album';
     
@@ -135,8 +135,8 @@ async function sendEmail(context, adminEmails, userEmail, userName, message, ful
         ? `${userName} wants to join the Family Album`
         : `${userEmail} wants to join the Family Album`;
     
-    const html = generateEmailHtml(userEmail, userName, message, fullAccessUrl, readOnlyUrl, denyUrl, expiresAt);
-    const plainText = generateEmailPlainText(userEmail, userName, message, fullAccessUrl, readOnlyUrl, denyUrl, expiresAt);
+    const html = generateEmailHtml(userEmail, userName, relationship, message, fullAccessUrl, readOnlyUrl, denyUrl, expiresAt);
+    const plainText = generateEmailPlainText(userEmail, userName, relationship, message, fullAccessUrl, readOnlyUrl, denyUrl, expiresAt);
     
     // Check if Azure Communication Services is configured
     if (process.env.AZURE_COMMUNICATION_CONNECTION_STRING && fromAddress) {
@@ -223,7 +223,7 @@ module.exports = async function (context, req) {
     context.log('Notify admins API called');
 
     try {
-        const { userEmail, userName, message } = req.body;
+        const { userEmail, userName, relationship, message } = req.body;
 
         if (!userEmail) {
             context.res = {
@@ -278,6 +278,16 @@ module.exports = async function (context, req) {
 
         const userId = userResult[0].ID;
 
+        // Save name and relationship to Users.Notes
+        if (userName || relationship) {
+            const notes = [userName && `Name: ${userName}`, relationship && `Relationship: ${relationship}`]
+                .filter(Boolean).join(' | ');
+            await query(
+                `UPDATE dbo.Users SET Notes = @notes WHERE ID = @userId`,
+                { notes, userId }
+            );
+        }
+
         // Generate approval tokens (valid for 7 days)
         const expiresAt = new Date();
         expiresAt.setDate(expiresAt.getDate() + 7);
@@ -312,6 +322,7 @@ module.exports = async function (context, req) {
         context.log(`📧 Notifying ${adminEmailsList.length} admin(s): ${adminEmailsList.join(', ')}`);
         context.log(`Subject: New Access Request - Family Album`);
         context.log(`User: ${userName || userEmail} (${userEmail})`);
+        context.log(`Relationship: ${relationship || 'Not provided'}`);
         context.log(`Approval links generated:`);
         context.log(`  ✅ Full Access: ${fullAccessUrl}`);
         context.log(`  📖 Read Only: ${readOnlyUrl}`);
@@ -325,7 +336,8 @@ module.exports = async function (context, req) {
                 context, 
                 adminEmailsList, 
                 userEmail, 
-                userName, 
+                userName,
+                relationship,
                 message, 
                 fullAccessUrl, 
                 readOnlyUrl, 

@@ -19,8 +19,10 @@ interface AuthStatus {
 export default function AccessRequest() {
   const [authStatus, setAuthStatus] = useState<AuthStatus | null>(null);
   const [loading, setLoading] = useState(true);
-  const [message, setMessage] = useState('');
-  const [notificationSent, setNotificationSent] = useState(false);
+  const [formData, setFormData] = useState({ name: '', relationship: '' });
+  const [formSubmitted, setFormSubmitted] = useState(false);
+  const [formSubmitting, setFormSubmitting] = useState(false);
+  const [formError, setFormError] = useState('');
 
   useEffect(() => {
     checkAuthStatus();
@@ -42,11 +44,17 @@ export default function AccessRequest() {
       }
       
       setAuthStatus(data);
-      
-      // If user has just authenticated and status is Pending, send notification
-      if (data.authenticated && data.user && data.user.status === 'Pending' && !notificationSent) {
-        await notifyAdmins(data.user.email, data.user.name);
-        setNotificationSent(true);
+
+      if (data.user?.email) {
+        // Check if this user already submitted their info (persisted across page refreshes)
+        const storageKey = `familyAlbum_requestSubmitted_${data.user.email}`;
+        if (localStorage.getItem(storageKey)) {
+          setFormSubmitted(true);
+        }
+        // Pre-fill name from OAuth provider if available
+        if (data.user.name) {
+          setFormData(prev => prev.name ? prev : { ...prev, name: data.user.name });
+        }
       }
     } catch (err) {
       console.error('Error checking auth status:', err);
@@ -55,19 +63,38 @@ export default function AccessRequest() {
     }
   };
 
-  const notifyAdmins = async (userEmail: string, userName: string) => {
+  const handleFormSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!authStatus?.user || formSubmitting) return;
+
+    if (!formData.name.trim() || !formData.relationship.trim()) {
+      setFormError('Please fill in both fields.');
+      return;
+    }
+
+    setFormError('');
+    setFormSubmitting(true);
     try {
       await fetch('/api/notify-admins', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          userEmail,
-          userName,
-          message: 'New user requesting access to Family Album'
+          userEmail: authStatus.user.email,
+          userName: formData.name.trim(),
+          relationship: formData.relationship.trim(),
+          message: `Relationship to family: ${formData.relationship.trim()}`
         })
       });
+
+      // Persist submission state so the form is not shown again on refresh
+      const storageKey = `familyAlbum_requestSubmitted_${authStatus.user.email}`;
+      localStorage.setItem(storageKey, 'true');
+      setFormSubmitted(true);
     } catch (err) {
-      console.error('Error notifying admins:', err);
+      console.error('Error submitting access request:', err);
+      setFormError('Something went wrong. Please try again.');
+    } finally {
+      setFormSubmitting(false);
     }
   };
 
@@ -99,6 +126,10 @@ export default function AccessRequest() {
 
     switch (authStatus.user.status) {
       case 'Pending':
+        if (!formSubmitted) {
+          // Form not yet submitted — handled separately in render
+          return null;
+        }
         return {
           icon: '⏳',
           title: 'Access Request Pending',
@@ -174,7 +205,140 @@ export default function AccessRequest() {
     );
   }
 
+  // Show the "tell us about yourself" form for new pending users
+  if (authStatus?.user?.status === 'Pending' && !formSubmitted) {
+    return (
+      <div style={{
+        minHeight: '100vh',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+        padding: '20px'
+      }}>
+        <div style={{
+          background: 'white',
+          borderRadius: '12px',
+          padding: '40px',
+          boxShadow: '0 10px 40px rgba(0, 0, 0, 0.2)',
+          maxWidth: '500px',
+          width: '100%'
+        }}>
+          <div style={{ textAlign: 'center', marginBottom: '30px' }}>
+            <div style={{ fontSize: '64px', marginBottom: '20px' }}>👋</div>
+            <h1 style={{ margin: '0 0 15px 0', color: '#333' }}>Request Access</h1>
+            <p style={{ color: '#666', fontSize: '16px', lineHeight: '1.6' }}>
+              Welcome! To help the family administrator review your request, please tell us a little about yourself.
+            </p>
+          </div>
+
+          <form onSubmit={handleFormSubmit}>
+            <div style={{ marginBottom: '20px' }}>
+              <label style={{ display: 'block', fontWeight: '600', color: '#333', marginBottom: '8px' }}>
+                Your Full Name *
+              </label>
+              <input
+                type="text"
+                value={formData.name}
+                onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
+                placeholder="e.g. Jane Smith"
+                required
+                style={{
+                  width: '100%',
+                  padding: '12px',
+                  border: '1px solid #ddd',
+                  borderRadius: '8px',
+                  fontSize: '16px',
+                  boxSizing: 'border-box'
+                }}
+              />
+            </div>
+
+            <div style={{ marginBottom: '24px' }}>
+              <label style={{ display: 'block', fontWeight: '600', color: '#333', marginBottom: '8px' }}>
+                How are you related to the Morton family? *
+              </label>
+              <input
+                type="text"
+                value={formData.relationship}
+                onChange={(e) => setFormData(prev => ({ ...prev, relationship: e.target.value }))}
+                placeholder="e.g. Mike's daughter, married to John Morton, childhood friend of Sue..."
+                required
+                style={{
+                  width: '100%',
+                  padding: '12px',
+                  border: '1px solid #ddd',
+                  borderRadius: '8px',
+                  fontSize: '16px',
+                  boxSizing: 'border-box'
+                }}
+              />
+            </div>
+
+            {formError && (
+              <p style={{ color: '#dc3545', fontSize: '14px', marginBottom: '16px' }}>{formError}</p>
+            )}
+
+            <button
+              type="submit"
+              disabled={formSubmitting}
+              style={{
+                display: 'block',
+                width: '100%',
+                padding: '14px',
+                background: formSubmitting ? '#aaa' : '#667eea',
+                color: 'white',
+                border: 'none',
+                borderRadius: '8px',
+                fontWeight: '600',
+                fontSize: '16px',
+                cursor: formSubmitting ? 'not-allowed' : 'pointer',
+                transition: 'background 0.3s'
+              }}
+            >
+              {formSubmitting ? 'Submitting...' : 'Submit Access Request'}
+            </button>
+          </form>
+
+          <div style={{
+            marginTop: '30px',
+            paddingTop: '20px',
+            borderTop: '1px solid #e0e0e0',
+            fontSize: '14px',
+            color: '#999',
+            textAlign: 'center'
+          }}>
+            Signed in as: <strong style={{ color: '#666' }}>{authStatus.user.email}</strong>
+            <br />
+            <button
+              onClick={() => {
+                sessionStorage.clear();
+                localStorage.clear();
+                window.location.href = getLogoutUrl();
+              }}
+              style={{
+                color: '#667eea',
+                backgroundColor: 'white',
+                textDecoration: 'none',
+                marginTop: '10px',
+                display: 'inline-block',
+                padding: '8px 16px',
+                border: '1px solid #667eea',
+                borderRadius: '4px',
+                fontWeight: '500',
+                cursor: 'pointer'
+              }}
+            >
+              🔄 Sign in with different account
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   const status = getStatusMessage();
+  if (!status) return null;
 
   return (
     <div style={{
