@@ -66,34 +66,6 @@
       "allowedRoles": ["authenticated"]
     }
   ],
-  "auth": {
-    "identityProviders": {
-      "azureActiveDirectory": {
-        "registration": {
-          "openIdIssuer": "https://login.microsoftonline.com/common/v2.0",
-          "clientIdSettingName": "AZURE_AD_CLIENT_ID",
-          "clientSecretSettingName": "AZURE_AD_CLIENT_SECRET"
-        },
-        "login": {
-          "loginParameters": [
-            "scope=openid profile email https://graph.microsoft.com/User.Read"
-          ]
-        },
-        "userDetailsClaim": "email"
-      },
-      "google": {
-        "registration": {
-          "clientIdSettingName": "GOOGLE_CLIENT_ID",
-          "clientSecretSettingName": "GOOGLE_CLIENT_SECRET"
-        },
-        "login": {
-          "scopes": ["openid", "profile", "email"]
-        }
-      }
-    },
-    "rolesSource": "/api/get-roles",
-    "cookieSessionLifetimeInMinutes": 60
-  },
   "navigationFallback": {
     "rewrite": "/index.html",
     "exclude": ["/images/*.{png,jpg,gif}", "/css/*", "/api/*"]
