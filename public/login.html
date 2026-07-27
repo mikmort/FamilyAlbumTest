@@ -159,8 +159,8 @@
         const googleLoginLink = document.getElementById('google-login-link');
 
         if (urlParams.has('fresh')) {
-            msLoginLink.href = '/.auth/login/aad?post_login_redirect_uri=' + encodeURIComponent(redirectTarget) + '&prompt=login';
-            googleLoginLink.href = '/.auth/login/google?post_login_redirect_uri=' + encodeURIComponent(redirectTarget) + '&prompt=login';
+            msLoginLink.href = '/.auth/login/aad?post_login_redirect_uri=' + encodeURIComponent(redirectTarget) + '&prompt=select_account';
+            googleLoginLink.href = '/.auth/login/google?post_login_redirect_uri=' + encodeURIComponent(redirectTarget) + '&prompt=select_account';
             console.log('Fresh logout detected - skipping auto-redirect');
         } else {
             msLoginLink.href = '/.auth/login/aad?post_login_redirect_uri=' + encodeURIComponent(redirectTarget) + '&prompt=select_account';

@@ -103,11 +103,10 @@
 
         // Force browser cache invalidation
         window.location.hash = Math.random();
-        
+
         // Redirect to the login page. The ?fresh=1 flag causes login.html to use
-        // prompt=login, which forces Microsoft/Google to show the account picker
-        // even if there is a cached browser session — no need to call Microsoft's
-        // global logout endpoint (which requires a pre-registered redirect URI).
+        // prompt=select_account, which forces Microsoft to show the account picker
+        // (including an "Use another account" option) even when an SSO session exists.
         setTimeout(() => {
             const finalLoginUrl = redirect + (redirect.includes('?') ? '&nocache=' : '?nocache=') + Date.now();
             window.location.replace(finalLoginUrl);
