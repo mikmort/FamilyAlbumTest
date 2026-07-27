@@ -76,8 +76,7 @@
         },
         "login": {
           "loginParameters": [
-            "scope=openid profile email https://graph.microsoft.com/User.Read",
-            "prompt=select_account"
+            "scope=openid profile email https://graph.microsoft.com/User.Read"
           ]
         },
         "userDetailsClaim": "email"
