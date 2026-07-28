@@ -94,6 +94,7 @@
     "apiRuntime": "node:18"
   },
   "auth": {
+    "rolesSource": "/api/get-roles",
     "identityProviders": {
       "azureActiveDirectory": {
         "registration": {
