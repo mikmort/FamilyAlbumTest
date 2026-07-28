@@ -66,17 +66,6 @@
       "allowedRoles": ["authenticated"]
     }
   ],
-  "auth": {
-    "identityProviders": {
-      "azureActiveDirectory": {
-        "login": {
-          "loginParameters": [
-            "prompt=select_account"
-          ]
-        }
-      }
-    }
-  },
   "navigationFallback": {
     "rewrite": "/index.html",
     "exclude": ["/images/*.{png,jpg,gif}", "/css/*", "/api/*"]
