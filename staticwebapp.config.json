@@ -92,5 +92,19 @@
   },
   "platform": {
     "apiRuntime": "node:18"
+  },
+  "auth": {
+    "identityProviders": {
+      "azureActiveDirectory": {
+        "registration": {
+          "openIdIssuer": "https://login.microsoftonline.com/common/v2.0",
+          "clientIdSettingName": "AZURE_AD_CLIENT_ID",
+          "clientSecretSettingName": "AZURE_AD_CLIENT_SECRET"
+        },
+        "login": {
+          "loginParameters": ["scope=openid profile email", "prompt=select_account"]
+        }
+      }
+    }
   }
 }
