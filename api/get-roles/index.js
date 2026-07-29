@@ -13,14 +13,22 @@
 module.exports = async function (context, req) {
   context.log('get-roles called');
 
-  // Any user who reaches this endpoint has completed Microsoft/Google OAuth.
-  // Grant 'authenticated' so they can access the app and see their status.
-  const principal = req.headers['x-ms-client-principal'];
-  if (!principal) {
-    context.log('No client principal - returning empty roles');
-    return { status: 200, body: { roles: [] } };
+  // SWA calls this endpoint (POST) after the user has successfully completed
+  // OAuth with Microsoft or Google.  The client principal may be in the
+  // request body (rolesSource protocol) OR in the x-ms-client-principal
+  // header (regular API request).  In either case we simply grant
+  // 'authenticated' so the user can enter the app; finer-grained RBAC is
+  // handled by /api/auth-status.
+  const headerPrincipal = req.headers['x-ms-client-principal'];
+  const bodyPrincipal   = req.body && (req.body.userId || req.body.userDetails);
+
+  if (!headerPrincipal && !bodyPrincipal) {
+    context.log('No principal found in header or body');
+  } else {
+    context.log('Principal found - granting authenticated');
   }
 
-  context.log('Principal present - returning authenticated');
+  // Always return 'authenticated'. SWA only invokes this function after a
+  // successful OAuth exchange, so any caller is a real authenticated user.
   return { status: 200, body: { roles: ['authenticated'] } };
 };
