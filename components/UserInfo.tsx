@@ -120,7 +120,14 @@ export default function UserInfo() {
         ) : (
           <span>{getProviderIcon()}</span>
         )}
-        <span>{user.userDetails}</span>
+        <span>{
+          // Prefer the real email from claims over the Azure AD UPN (which can be an onmicrosoft.com alias)
+          user.claims?.find(c =>
+            c.typ === 'http://schemas.xmlsoap.org/ws/2005/05/identity/claims/emailaddress' ||
+            c.typ === 'email' ||
+            c.typ === 'preferred_username'
+          )?.val || user.userDetails
+        }</span>
         <span style={{ fontSize: '10px' }}>▼</span>
       </button>
 
