@@ -92,14 +92,5 @@
   },
   "platform": {
     "apiRuntime": "node:18"
-  },
-  "auth": {
-    "identityProviders": {
-      "azureActiveDirectory": {
-        "login": {
-          "loginParameters": ["scope=openid profile email", "prompt=select_account"]
-        }
-      }
-    }
   }
 }
