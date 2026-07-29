@@ -103,7 +103,7 @@
           "clientSecretSettingName": "AZURE_AD_CLIENT_SECRET"
         },
         "login": {
-          "loginParameters": ["scope=openid profile email"]
+          "loginParameters": ["scope=openid profile email", "prompt=select_account"]
         }
       }
     }
