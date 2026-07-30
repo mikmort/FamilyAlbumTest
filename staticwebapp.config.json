@@ -96,14 +96,5 @@
   },
   "platform": {
     "apiRuntime": "node:18"
-  },
-  "auth": {
-    "identityProviders": {
-      "azureActiveDirectory": {
-        "login": {
-          "loginParameters": ["prompt=select_account"]
-        }
-      }
-    }
   }
 }
