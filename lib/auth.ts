@@ -74,9 +74,7 @@ export function getLogoutUrl(): string {
  * Logs out of SWA and returns to cleanup page for final session clearing
  */
 export function getSwitchAccountUrl(): string {
-  // Redirect to logout cleanup page which will clear all storage before redirecting to login
-  const cleanupPath = `/logout-cleanup.html?redirect=${encodeURIComponent('/login.html?fresh=1&switch=1&t=' + Date.now())}`;
-  return `/.auth/logout?post_logout_redirect_uri=${encodeURIComponent(cleanupPath)}`;
+  return `/.auth/logout?post_logout_redirect_uri=${encodeURIComponent('/switch-account.html?mode=switch')}`;
 }
 
 /**
