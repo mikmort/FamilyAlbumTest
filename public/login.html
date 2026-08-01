@@ -158,8 +158,8 @@
         const msLoginLink = document.getElementById('ms-login-link');
         const googleLoginLink = document.getElementById('google-login-link');
 
-        // Go directly to the OAuth provider — no logout chain needed here
-        msLoginLink.href = '/.auth/login/aad?post_login_redirect_uri=' + encodeURIComponent(redirectTarget);
+        // prompt=select_account forces Microsoft to show the account picker every time
+        msLoginLink.href = '/.auth/login/aad?prompt=select_account&post_login_redirect_uri=' + encodeURIComponent(redirectTarget);
         googleLoginLink.href = '/.auth/login/google?post_login_redirect_uri=' + encodeURIComponent(redirectTarget);
 
         // Mark that user explicitly chose to log in this session
