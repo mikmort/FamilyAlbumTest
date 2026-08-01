@@ -158,7 +158,7 @@
         const msLoginLink = document.getElementById('ms-login-link');
         const googleLoginLink = document.getElementById('google-login-link');
 
-        const msLoginTarget = '/.auth/login/aad?post_login_redirect_uri=' + encodeURIComponent(redirectTarget) + '&prompt=select_account';
+        const msLoginTarget = '/.auth/login/aad?post_login_redirect_uri=' + encodeURIComponent(redirectTarget) + '&prompt=login';
         const googleLoginTarget = '/.auth/login/google?post_login_redirect_uri=' + encodeURIComponent(redirectTarget) + '&prompt=select_account';
 
         // Chain through logout first to clear any existing SWA session,
