@@ -65,7 +65,8 @@ export default function Home() {
   useEffect(() => {
     // Require explicit login on every new browser session
     if (typeof window !== 'undefined' && !sessionStorage.getItem('loginConfirmed')) {
-      window.location.href = '/login.html';
+      // Sign out of SWA first so the login page always gets a fresh OAuth flow
+      window.location.href = '/.auth/logout?post_logout_redirect_uri=' + encodeURIComponent('/login.html');
       return;
     }
     checkAuthStatus();
