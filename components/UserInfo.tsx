@@ -69,7 +69,7 @@ export default function UserInfo() {
 
   const handleSwitchAccount = (e: React.MouseEvent<HTMLAnchorElement>) => {
     sessionStorage.clear();
-    if (user.identityProvider === 'aad') {
+    if (user?.identityProvider === 'aad') {
       // Chain through Microsoft's own logout to clear the browser-level session
       const loginPageUrl = window.location.origin + '/login.html';
       const liveLogoutUrl = 'https://login.live.com/logout.srf?ru=' + encodeURIComponent(loginPageUrl);
@@ -82,7 +82,7 @@ export default function UserInfo() {
 
   const handleLogout = (e: React.MouseEvent<HTMLAnchorElement>) => {
     sessionStorage.clear();
-    if (user.identityProvider === 'aad') {
+    if (user?.identityProvider === 'aad') {
       const loginPageUrl = window.location.origin + '/login.html';
       const liveLogoutUrl = 'https://login.live.com/logout.srf?ru=' + encodeURIComponent(loginPageUrl);
       const msAadLogoutUrl = 'https://login.microsoftonline.com/common/oauth2/v2.0/logout?post_logout_redirect_uri=' + encodeURIComponent(liveLogoutUrl);
