@@ -158,30 +158,9 @@
         const msLoginLink = document.getElementById('ms-login-link');
         const googleLoginLink = document.getElementById('google-login-link');
 
-        if (urlParams.has('fresh')) {
-            msLoginLink.href = '/.auth/login/aad?post_login_redirect_uri=' + encodeURIComponent(redirectTarget) + '&prompt=select_account';
-            googleLoginLink.href = '/.auth/login/google?post_login_redirect_uri=' + encodeURIComponent(redirectTarget) + '&prompt=select_account';
-            console.log('Fresh logout detected - skipping auto-redirect');
-        } else {
-            msLoginLink.href = '/.auth/login/aad?post_login_redirect_uri=' + encodeURIComponent(redirectTarget) + '&prompt=select_account';
-            googleLoginLink.href = '/.auth/login/google?post_login_redirect_uri=' + encodeURIComponent(redirectTarget) + '&prompt=select_account';
-
-            fetch('/.auth/me', { 
-              cache: 'no-store',
-              headers: {
-                'Cache-Control': 'no-cache, no-store, must-revalidate',
-                'Pragma': 'no-cache',
-                'Expires': '0'
-              }
-            })
-                .then(response => response.json())
-                .then(data => {
-                    if (data.clientPrincipal && data.clientPrincipal.userRoles && data.clientPrincipal.userRoles.includes('authenticated')) {
-                        window.location.href = redirectTarget;
-                    }
-                })
-                .catch(err => console.log('Not authenticated'));
-        }
+        // Always show login buttons — never auto-redirect even if a session exists
+        msLoginLink.href = '/.auth/login/aad?post_login_redirect_uri=' + encodeURIComponent(redirectTarget) + '&prompt=select_account';
+        googleLoginLink.href = '/.auth/login/google?post_login_redirect_uri=' + encodeURIComponent(redirectTarget) + '&prompt=select_account';
     </script>
 </body>
 </html>
