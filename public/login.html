@@ -158,15 +158,9 @@
         const msLoginLink = document.getElementById('ms-login-link');
         const googleLoginLink = document.getElementById('google-login-link');
 
-        // For Microsoft: chain SWA logout → AAD logout → Live logout → SWA login
-        // This clears the Microsoft browser session so a fresh login form always appears
-        const msLoginFinalUrl = window.location.origin + '/.auth/login/aad?post_login_redirect_uri=' + encodeURIComponent(redirectTarget);
-        const liveLogoutUrl = 'https://login.live.com/logout.srf?ru=' + encodeURIComponent(msLoginFinalUrl);
-        const msAadLogoutUrl = 'https://login.microsoftonline.com/common/oauth2/v2.0/logout?post_logout_redirect_uri=' + encodeURIComponent(liveLogoutUrl);
-        msLoginLink.href = '/.auth/logout?post_logout_redirect_uri=' + encodeURIComponent(msAadLogoutUrl);
-
-        const googleLoginTarget = '/.auth/login/google?post_login_redirect_uri=' + encodeURIComponent(redirectTarget) + '&prompt=select_account';
-        googleLoginLink.href = '/.auth/logout?post_logout_redirect_uri=' + encodeURIComponent(googleLoginTarget);
+        // Go directly to the OAuth provider — no logout chain needed here
+        msLoginLink.href = '/.auth/login/aad?post_login_redirect_uri=' + encodeURIComponent(redirectTarget);
+        googleLoginLink.href = '/.auth/login/google?post_login_redirect_uri=' + encodeURIComponent(redirectTarget);
 
         // Mark that user explicitly chose to log in this session
         msLoginLink.addEventListener('click', () => sessionStorage.setItem('loginConfirmed', '1'));
