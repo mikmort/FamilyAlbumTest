@@ -96,7 +96,7 @@ export default function UserInfo() {
   if (!user) return null;
 
   const getProviderIcon = () => {
-    switch (user.identityProvider) {
+    switch (user?.identityProvider) {
       case 'aad':
         return '🔷'; // Microsoft
       case 'google':
