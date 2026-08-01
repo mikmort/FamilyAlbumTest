@@ -158,9 +158,12 @@
         const msLoginLink = document.getElementById('ms-login-link');
         const googleLoginLink = document.getElementById('google-login-link');
 
-        // Always show login buttons — never auto-redirect even if a session exists
         msLoginLink.href = '/.auth/login/aad?post_login_redirect_uri=' + encodeURIComponent(redirectTarget) + '&prompt=select_account';
         googleLoginLink.href = '/.auth/login/google?post_login_redirect_uri=' + encodeURIComponent(redirectTarget) + '&prompt=select_account';
+
+        // Mark that user explicitly chose to log in this session
+        msLoginLink.addEventListener('click', () => sessionStorage.setItem('loginConfirmed', '1'));
+        googleLoginLink.addEventListener('click', () => sessionStorage.setItem('loginConfirmed', '1'));
     </script>
 </body>
 </html>

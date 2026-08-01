@@ -63,6 +63,11 @@ export default function Home() {
 
   // Check authorization on mount
   useEffect(() => {
+    // Require explicit login on every new browser session
+    if (typeof window !== 'undefined' && !sessionStorage.getItem('loginConfirmed')) {
+      window.location.href = '/login.html';
+      return;
+    }
     checkAuthStatus();
   }, []);
 
