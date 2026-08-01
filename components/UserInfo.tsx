@@ -21,6 +21,8 @@ export default function UserInfo() {
   const [loading, setLoading] = useState(true);
   const [pictureUrl, setPictureUrl] = useState<string | null>(null);
   const [dropdownOpen, setDropdownOpen] = useState(false);
+  const [preferredEmail, setPreferredEmail] = useState<string | null>(null);
+  const [emailPickerOpen, setEmailPickerOpen] = useState(false);
 
   useEffect(() => {
     fetch('/.auth/me')
@@ -29,6 +31,10 @@ export default function UserInfo() {
         if (data.clientPrincipal) {
           setUser(data.clientPrincipal);
           
+          // Load saved preferred email from localStorage
+          const saved = localStorage.getItem('preferredDisplayEmail');
+          if (saved) setPreferredEmail(saved);
+
           // Extract picture URL from claims
           if (data.clientPrincipal.claims) {
             const pictureClaim = data.clientPrincipal.claims.find((claim: UserClaim) => 
@@ -62,15 +68,28 @@ export default function UserInfo() {
   }, [dropdownOpen]);
 
   const handleSwitchAccount = (e: React.MouseEvent<HTMLAnchorElement>) => {
-    // Clear session data before switching accounts
     sessionStorage.clear();
-    window.location.href = getSwitchAccountUrl();
+    if (user.identityProvider === 'aad') {
+      // Chain through Microsoft's own logout to clear the browser-level session
+      const loginPageUrl = window.location.origin + '/login.html';
+      const liveLogoutUrl = 'https://login.live.com/logout.srf?ru=' + encodeURIComponent(loginPageUrl);
+      const msAadLogoutUrl = 'https://login.microsoftonline.com/common/oauth2/v2.0/logout?post_logout_redirect_uri=' + encodeURIComponent(liveLogoutUrl);
+      window.location.href = '/.auth/logout?post_logout_redirect_uri=' + encodeURIComponent(msAadLogoutUrl);
+    } else {
+      window.location.href = getSwitchAccountUrl();
+    }
   };
 
   const handleLogout = (e: React.MouseEvent<HTMLAnchorElement>) => {
-    // Clear session data before logging out
     sessionStorage.clear();
-    window.location.href = getLogoutUrl();
+    if (user.identityProvider === 'aad') {
+      const loginPageUrl = window.location.origin + '/login.html';
+      const liveLogoutUrl = 'https://login.live.com/logout.srf?ru=' + encodeURIComponent(loginPageUrl);
+      const msAadLogoutUrl = 'https://login.microsoftonline.com/common/oauth2/v2.0/logout?post_logout_redirect_uri=' + encodeURIComponent(liveLogoutUrl);
+      window.location.href = '/.auth/logout?post_logout_redirect_uri=' + encodeURIComponent(msAadLogoutUrl);
+    } else {
+      window.location.href = getLogoutUrl();
+    }
   };
 
   if (loading) return null;
@@ -120,14 +139,23 @@ export default function UserInfo() {
         ) : (
           <span>{getProviderIcon()}</span>
         )}
-        <span>{
-          // Prefer the real email from claims over the Azure AD UPN (which can be an onmicrosoft.com alias)
-          user.claims?.find(c =>
-            c.typ === 'http://schemas.xmlsoap.org/ws/2005/05/identity/claims/emailaddress' ||
-            c.typ === 'email' ||
-            c.typ === 'preferred_username'
-          )?.val || user.userDetails
-        }</span>
+        <span>{(() => {
+          // Check claim types in priority order, skip onmicrosoft.com aliases
+          const isReal = (v: string) => v.includes('@') && !v.endsWith('.onmicrosoft.com');
+          const types = [
+            'http://schemas.xmlsoap.org/ws/2005/05/identity/claims/emailaddress',
+            'email',
+            'emails',
+            'preferred_username',
+          ];
+          for (const typ of types) {
+            const val = user.claims?.find(c => c.typ === typ)?.val;
+            if (val && isReal(val)) return val;
+          }
+          // Fall back: any email-like claim that isn't an onmicrosoft.com alias
+          const any = user.claims?.find(c => isReal(c.val))?.val;
+          return any || user.userDetails;
+        })()}</span>
         <span style={{ fontSize: '10px' }}>▼</span>
       </button>
 
