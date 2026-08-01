@@ -127,8 +127,11 @@ export default function Home() {
   }, [authStatus]);
 
   const checkAuthStatus = async () => {
+    const controller = new AbortController();
+    // Abort after 20s so a hung function doesn't freeze the loading screen forever
+    const timeoutId = setTimeout(() => controller.abort(), 20000);
     try {
-      const response = await fetch('/api/auth-status');
+      const response = await fetch('/api/auth-status', { signal: controller.signal });
       const data = await response.json();
       
       // If database is warming up, retry after a delay
@@ -136,14 +139,22 @@ export default function Home() {
         setAuthStatus(data);
         setTimeout(() => {
           checkAuthStatus();
-        }, 3000); // Retry every 3 seconds
+        }, 3000);
         return;
       }
       
       setAuthStatus(data);
-    } catch (err) {
+    } catch (err: unknown) {
+      const name = err instanceof Error ? err.name : '';
+      if (name === 'AbortError') {
+        // Treat timeout same as warmup — retry
+        setAuthStatus({ authenticated: false, authorized: false, user: null, databaseWarming: true, error: 'Loading...' } as any);
+        setTimeout(() => checkAuthStatus(), 3000);
+        return;
+      }
       console.error('Error checking auth status:', err);
     } finally {
+      clearTimeout(timeoutId);
       setLoadingAuth(false);
     }
   };
