@@ -96,5 +96,20 @@
   },
   "platform": {
     "apiRuntime": "node:18"
+  },
+  "auth": {
+    "rolesSource": "/api/get-roles",
+    "identityProviders": {
+      "azureActiveDirectory": {
+        "registration": {
+          "openIdIssuer": "https://login.microsoftonline.com/661e4baf-db68-4a3d-9d81-73dd277cabd1/v2.0",
+          "clientIdSettingName": "AZURE_AD_CLIENT_ID",
+          "clientSecretSettingName": "AZURE_AD_CLIENT_SECRET"
+        },
+        "login": {
+          "loginParameters": ["prompt=select_account"]
+        }
+      }
+    }
   }
 }
