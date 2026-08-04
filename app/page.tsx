@@ -285,6 +285,7 @@ export default function Home() {
   }
 
   const isAdmin = authStatus?.user?.role === 'Admin';
+  const isReadOnly = authStatus?.user?.role === 'Read';
 
   return (
     <>
@@ -299,23 +300,26 @@ export default function Home() {
             onNewMedia={() => setView('new-media')}
             onSettings={() => setShowSettingsMenu(true)}
             newMediaCount={newMediaCount}
+            canUpload={!isReadOnly}
           />
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-          <button
-            onClick={() => setShowSettingsMenu(true)}
-            style={{
-              background: '#3498db',
-              color: 'white',
-              border: 'none',
-              padding: '0.5rem 1rem',
-              borderRadius: '4px',
-              fontSize: '14px',
-              cursor: 'pointer',
-            }}
-          >
-            ⚙️ Settings
-          </button>
+          {!isReadOnly && (
+            <button
+              onClick={() => setShowSettingsMenu(true)}
+              style={{
+                background: '#3498db',
+                color: 'white',
+                border: 'none',
+                padding: '0.5rem 1rem',
+                borderRadius: '4px',
+                fontSize: '14px',
+                cursor: 'pointer',
+              }}
+            >
+              ⚙️ Settings
+            </button>
+          )}
           <UserInfo />
         </div>
       </div>
