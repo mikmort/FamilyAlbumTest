@@ -1331,6 +1331,7 @@ export default function AdminSettings({ onRequestsChange }: AdminSettingsProps) 
               <>
                 {scanningCodecs && <p style={{ color: '#666', fontStyle: 'italic' }}>Scanned {Math.min(codecScanResult.scanned, codecScanResult.total)} of {codecScanResult.total}…</p>}
                 <p><strong>Total videos:</strong> {codecScanResult.total} &nbsp; <strong>H.264:</strong> {codecScanResult.h264Count} &nbsp; <strong>H.265 (needs re-encode):</strong> {codecScanResult.hevc?.length ?? 0}</p>
+                {codecScanResult.sampleError && <p style={{ color: '#c0392b', fontSize: '0.9rem' }}><strong>Sample error:</strong> {codecScanResult.sampleError}</p>}
                 {codecScanResult.hevc?.length > 0 && (
                   <details open>
                     <summary style={{ cursor: 'pointer', fontWeight: '600', color: '#d9534f' }}>H.265 videos ({codecScanResult.hevc.length})</summary>

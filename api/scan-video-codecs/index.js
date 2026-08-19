@@ -12,10 +12,6 @@ try {
     // fluent-ffmpeg is optional — scan will report unavailable if missing
 }
 
-module.exports = async function (context, req) {
-    context.res = { status: 200, body: { alive: true } };
-};
-
 function generateReadSasUrl(blobClient) {
     const accountName = process.env.AZURE_STORAGE_ACCOUNT;
     const accountKey = process.env.AZURE_STORAGE_KEY;
@@ -75,8 +71,11 @@ module.exports = async function (context, req) {
         for (let i = 0; i < videos.length; i += BATCH) {
             await Promise.all(videos.slice(i, i + BATCH).map(async (video) => {
                 try {
-                    const blobName = video.PBlobUrl.split(`/${containerName}/`)[1]?.split('?')[0];
-                    if (!blobName) { errors.push({ file: video.PFileName, detail: 'Cannot parse blob URL' }); return; }
+                    // Use URL parsing so container name mismatches don't silently break extraction
+                    const cleanUrl = video.PBlobUrl.split('?')[0];
+                    const urlPath = new URL(cleanUrl).pathname; // /<container>/<blobname...>
+                    const blobName = urlPath.split('/').slice(2).join('/'); // drop leading '' and container
+                    if (!blobName) { errors.push({ file: video.PFileName, detail: `Cannot parse: ${video.PBlobUrl}` }); return; }
                     const sasUrl = generateReadSasUrl(containerClient.getBlobClient(blobName));
                     const { codec, detail } = await probeCodec(sasUrl);
                     if (codec === 'hevc' || codec === 'h265') {
@@ -102,6 +101,8 @@ module.exports = async function (context, req) {
                 nextOffset: nextOffset < total ? nextOffset : null,
                 h264Count,
                 hevc,
+                // first 3 errors shown at top level so the cause is immediately visible
+                sampleError: errors[0]?.detail || null,
                 errors
             }
         };
