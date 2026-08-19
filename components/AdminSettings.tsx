@@ -66,6 +66,8 @@ export default function AdminSettings({ onRequestsChange }: AdminSettingsProps) 
   const [regenerateProgress, setRegenerateProgress] = useState<any>(null);
   const [isRegeneratingThumbnails, setIsRegeneratingThumbnails] = useState(false);
   const [thumbnailRegenerateResult, setThumbnailRegenerateResult] = useState<any>(null);
+  const [scanningCodecs, setScanningCodecs] = useState(false);
+  const [codecScanResult, setCodecScanResult] = useState<any>(null);
 
   useEffect(() => {
     fetchUsers();
@@ -1278,6 +1280,58 @@ export default function AdminSettings({ onRequestsChange }: AdminSettingsProps) 
                   ))}
                 </ul>
               </details>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Video Codec Scan */}
+      <div className="card" style={{ marginBottom: '2rem', background: '#fff8e1', borderColor: '#f0a500' }}>
+        <h2 style={{ marginTop: 0 }}>📹 Video Codec Scan</h2>
+        <p style={{ color: '#666', marginBottom: '1rem' }}>Scan all videos to find any encoded in H.265/HEVC that may not play in all browsers.</p>
+        <button
+          className="btn btn-primary"
+          onClick={async () => {
+            setScanningCodecs(true);
+            setCodecScanResult(null);
+            try {
+              const res = await fetch('/api/scan-video-codecs');
+              const data = await res.json();
+              setCodecScanResult(data);
+            } catch (err: any) {
+              setCodecScanResult({ success: false, error: err.message });
+            } finally {
+              setScanningCodecs(false);
+            }
+          }}
+          disabled={scanningCodecs}
+        >
+          {scanningCodecs ? 'Scanning...' : 'Scan Videos'}
+        </button>
+        {codecScanResult && (
+          <div style={{ marginTop: '1rem' }}>
+            {!codecScanResult.success ? (
+              <p style={{ color: 'red' }}>Error: {codecScanResult.error}</p>
+            ) : (
+              <>
+                <p><strong>Total videos:</strong> {codecScanResult.total} &nbsp; <strong>H.264:</strong> {codecScanResult.h264Count} &nbsp; <strong>H.265 (needs re-encode):</strong> {codecScanResult.hevc?.length ?? 0}</p>
+                {codecScanResult.hevc?.length > 0 && (
+                  <details open>
+                    <summary style={{ cursor: 'pointer', fontWeight: '600', color: '#d9534f' }}>H.265 videos ({codecScanResult.hevc.length})</summary>
+                    <ul style={{ marginTop: '0.5rem', fontSize: '0.9rem', fontFamily: 'monospace' }}>
+                      {codecScanResult.hevc.map((f: string) => <li key={f}>{f}</li>)}
+                    </ul>
+                  </details>
+                )}
+                {codecScanResult.errors?.length > 0 && (
+                  <details style={{ marginTop: '0.5rem' }}>
+                    <summary style={{ cursor: 'pointer', color: '#999' }}>Probe errors ({codecScanResult.errors.length})</summary>
+                    <ul style={{ marginTop: '0.5rem', fontSize: '0.85rem', fontFamily: 'monospace' }}>
+                      {codecScanResult.errors.map((e: any) => <li key={e.file}>{e.file}: {e.detail}</li>)}
+                    </ul>
+                  </details>
+                )}
+              </>
             )}
           </div>
         )}
