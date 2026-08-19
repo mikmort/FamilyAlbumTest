@@ -26,6 +26,8 @@ export default function MediaDetailModal({
   const [isFullScreen, setIsFullScreen] = useState(startFullscreen);
   const videoRef = useRef<HTMLVideoElement>(null);
   const [videoError, setVideoError] = useState(false);
+  const [reencoding, setReencoding] = useState(false);
+  const [reencodeMessage, setReencodeMessage] = useState<string | null>(null);
   const [imageError, setImageError] = useState(false);
   const [retryCount, setRetryCount] = useState(0);
   const [isRetrying, setIsRetrying] = useState(false);
@@ -167,6 +169,8 @@ export default function MediaDetailModal({
   useEffect(() => {
     setIsLoadingMedia(false);
     setVideoError(false);
+    setReencoding(false);
+    setReencodeMessage(null);
     setImageError(false);
     setRetryCount(0);
     setIsRetrying(false);
@@ -1284,20 +1288,65 @@ export default function MediaDetailModal({
                     <p style={{ marginBottom: '1.5rem', fontSize: '0.9rem', color: '#868e96' }}>
                       File: {media.PFileName}
                     </p>
-                    <button
-                      onClick={handleDownload}
-                      style={{
-                        padding: '12px 24px',
-                        backgroundColor: '#007bff',
-                        color: 'white',
-                        border: 'none',
-                        borderRadius: '4px',
-                        cursor: 'pointer',
-                        fontSize: '1rem'
-                      }}
-                    >
-                      ⬇️ Download Video to Play Locally
-                    </button>
+                    {reencodeMessage && (
+                      <p style={{ marginBottom: '1rem', color: reencodeMessage.startsWith('✓') ? '#28a745' : '#dc3545' }}>
+                        {reencodeMessage}
+                      </p>
+                    )}
+                    <div style={{ display: 'flex', gap: '1rem', justifyContent: 'center', flexWrap: 'wrap' }}>
+                      <button
+                        onClick={async () => {
+                          setReencoding(true);
+                          setReencodeMessage('Re-encoding to H.264… this may take a minute.');
+                          try {
+                            const encodedPath = (media.PFileName || '')
+                              .replace(/\\/g, '/')
+                              .split('/')
+                              .map(encodeURIComponent)
+                              .join('/');
+                            const res = await fetch(`/api/reencode-video/${encodedPath}`, { method: 'POST' });
+                            const data = await res.json();
+                            if (data.success) {
+                              setReencodeMessage('✓ Re-encoded successfully! Reload to play.');
+                              setVideoError(false);
+                            } else {
+                              setReencodeMessage(`Error: ${data.error}`);
+                            }
+                          } catch (err: any) {
+                            setReencodeMessage(`Error: ${err.message}`);
+                          } finally {
+                            setReencoding(false);
+                          }
+                        }}
+                        disabled={reencoding}
+                        style={{
+                          padding: '12px 24px',
+                          backgroundColor: '#28a745',
+                          color: 'white',
+                          border: 'none',
+                          borderRadius: '4px',
+                          cursor: reencoding ? 'not-allowed' : 'pointer',
+                          fontSize: '1rem',
+                          opacity: reencoding ? 0.7 : 1
+                        }}
+                      >
+                        {reencoding ? '⏳ Re-encoding…' : '🔄 Re-encode to H.264'}
+                      </button>
+                      <button
+                        onClick={handleDownload}
+                        style={{
+                          padding: '12px 24px',
+                          backgroundColor: '#007bff',
+                          color: 'white',
+                          border: 'none',
+                          borderRadius: '4px',
+                          cursor: 'pointer',
+                          fontSize: '1rem'
+                        }}
+                      >
+                        ⬇️ Download Video to Play Locally
+                      </button>
+                    </div>
                   </div>
                 ) : isLoadingMedia ? (
                   <div style={{
