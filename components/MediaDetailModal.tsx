@@ -28,6 +28,7 @@ export default function MediaDetailModal({
   const [videoError, setVideoError] = useState(false);
   const [reencoding, setReencoding] = useState(false);
   const [reencodeMessage, setReencodeMessage] = useState<string | null>(null);
+  const [videoCacheBust, setVideoCacheBust] = useState<string>('');
   const [imageError, setImageError] = useState(false);
   const [retryCount, setRetryCount] = useState(0);
   const [isRetrying, setIsRetrying] = useState(false);
@@ -171,6 +172,7 @@ export default function MediaDetailModal({
     setVideoError(false);
     setReencoding(false);
     setReencodeMessage(null);
+    setVideoCacheBust('');
     setImageError(false);
     setRetryCount(0);
     setIsRetrying(false);
@@ -1016,11 +1018,11 @@ export default function MediaDetailModal({
           ) : (
             <video 
               controls 
-              src={media.PBlobUrl}
+              src={media.PBlobUrl + (videoCacheBust ? `?v=${videoCacheBust}` : '')}
               className="fullscreen-video"
               autoPlay
               onLoadedData={() => setIsLoadingMedia(false)}
-              key={media.PFileName}
+              key={media.PFileName + videoCacheBust}
             >
               Your browser does not support the video tag.
             </video>
@@ -1312,7 +1314,8 @@ export default function MediaDetailModal({
                               throw new Error(`Server error (${res.status}): ${res.statusText || 'Backend call failure'}`);
                             }
                             if (data.success) {
-                              setReencodeMessage('✓ Re-encoded successfully! Reload to play.');
+                              setReencodeMessage('✓ Re-encoded successfully! Playing now…');
+                              setVideoCacheBust(Date.now().toString());
                               setVideoError(false);
                             } else {
                               setReencodeMessage(`Error: ${data.error}`);
@@ -1373,7 +1376,7 @@ export default function MediaDetailModal({
                       controls 
                       autoPlay
                       preload="metadata"
-                      src={media.PBlobUrl}
+                      src={media.PBlobUrl + (videoCacheBust ? `?v=${videoCacheBust}` : '')}
                       onClick={() => setIsFullScreen(true)}
                       style={{ cursor: 'pointer', width: '100%' }}
                       onError={(e) => {
