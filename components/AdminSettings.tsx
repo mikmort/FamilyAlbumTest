@@ -1294,12 +1294,28 @@ export default function AdminSettings({ onRequestsChange }: AdminSettingsProps) 
           onClick={async () => {
             setScanningCodecs(true);
             setCodecScanResult(null);
+            // Accumulate results across pages to avoid SWA 45s timeout
+            let offset = 0;
+            let total = 0;
+            const allHevc: string[] = [];
+            const allErrors: any[] = [];
+            let allH264 = 0;
             try {
-              const res = await fetch('/api/scan-video-codecs');
-              const data = await res.json();
-              setCodecScanResult(data);
+              while (true) {
+                const res = await fetch(`/api/scan-video-codecs?offset=${offset}`);
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                const data = await res.json();
+                if (!data.success) throw new Error(data.error || 'Scan failed');
+                total = data.total;
+                allH264 += data.h264Count;
+                allHevc.push(...data.hevc);
+                allErrors.push(...data.errors);
+                setCodecScanResult({ success: true, total, h264Count: allH264, hevc: [...allHevc], errors: [...allErrors], scanned: offset + 10 });
+                if (!data.nextOffset) break;
+                offset = data.nextOffset;
+              }
             } catch (err: any) {
-              setCodecScanResult({ success: false, error: err.message });
+              setCodecScanResult((prev: any) => ({ ...(prev || {}), success: false, error: err.message }));
             } finally {
               setScanningCodecs(false);
             }
@@ -1310,10 +1326,10 @@ export default function AdminSettings({ onRequestsChange }: AdminSettingsProps) 
         </button>
         {codecScanResult && (
           <div style={{ marginTop: '1rem' }}>
-            {!codecScanResult.success ? (
-              <p style={{ color: 'red' }}>Error: {codecScanResult.error}</p>
-            ) : (
+            {codecScanResult.error && <p style={{ color: 'red' }}>Error: {codecScanResult.error}</p>}
+            {codecScanResult.success && (
               <>
+                {scanningCodecs && <p style={{ color: '#666', fontStyle: 'italic' }}>Scanned {Math.min(codecScanResult.scanned, codecScanResult.total)} of {codecScanResult.total}…</p>}
                 <p><strong>Total videos:</strong> {codecScanResult.total} &nbsp; <strong>H.264:</strong> {codecScanResult.h264Count} &nbsp; <strong>H.265 (needs re-encode):</strong> {codecScanResult.hevc?.length ?? 0}</p>
                 {codecScanResult.hevc?.length > 0 && (
                   <details open>

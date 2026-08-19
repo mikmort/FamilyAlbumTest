@@ -28,8 +28,8 @@ function generateReadSasUrl(blobClient) {
 
 async function probeCodec(sasUrl) {
     return new Promise((resolve) => {
-        // 10-second timeout per video so the overall scan stays well under 45s
-        const timer = setTimeout(() => resolve({ codec: 'timeout' }), 10000);
+        // 8s per video; caller batches 5 at a time → max ~40s per page, safely under SWA 45s limit
+        const timer = setTimeout(() => resolve({ codec: 'timeout' }), 8000);
         ffmpeg.ffprobe(sasUrl, (err, data) => {
             clearTimeout(timer);
             if (err) { resolve({ codec: 'error', detail: err.message }); return; }
@@ -52,9 +52,14 @@ module.exports = async function (context, req) {
             return;
         }
 
-        const videos = await query(
+        const offset = parseInt(req.query.offset) || 0;
+        const PAGE = 10; // 2 batches of 5, ~16s max → well under SWA 45s limit
+
+        const allVideos = await query(
             `SELECT PFileName, PBlobUrl FROM Pictures WHERE PType = 2 ORDER BY PDateEntered DESC`
         );
+        const total = allVideos.length;
+        const videos = allVideos.slice(offset, offset + PAGE);
 
         const containerName = process.env.AZURE_STORAGE_CONTAINER || 'family-album-media';
         const containerClient = getContainerClient();
@@ -62,7 +67,6 @@ module.exports = async function (context, req) {
         const errors = [];
         let h264Count = 0;
 
-        // Process 5 at a time to stay under the SWA 45-second gateway timeout
         const BATCH = 5;
         for (let i = 0; i < videos.length; i += BATCH) {
             await Promise.all(videos.slice(i, i + BATCH).map(async (video) => {
@@ -84,9 +88,18 @@ module.exports = async function (context, req) {
             }));
         }
 
+        const nextOffset = offset + PAGE;
         context.res = {
             status: 200,
-            body: { success: true, total: videos.length, h264Count, hevc, errors }
+            body: {
+                success: true,
+                total,
+                offset,
+                nextOffset: nextOffset < total ? nextOffset : null,
+                h264Count,
+                hevc,
+                errors
+            }
         };
     } catch (err) {
         context.log.error('Scan error:', err);
