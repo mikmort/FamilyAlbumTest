@@ -23,7 +23,7 @@ module.exports = async function (context, req) {
     }
 
     if (!ffmpeg) {
-        context.res = { status: 500, body: { error: 'FFmpeg not available on this server' } };
+        context.res = { status: 200, body: { success: false, error: 'FFmpeg not available on this server' } };
         return;
     }
 
@@ -52,7 +52,7 @@ module.exports = async function (context, req) {
         }
 
         if (!blobClient) {
-            context.res = { status: 404, body: { error: `Blob not found: ${fileName}` } };
+            context.res = { status: 200, body: { success: false, error: `Blob not found: ${fileName}` } };
             return;
         }
 
@@ -122,7 +122,7 @@ module.exports = async function (context, req) {
     } catch (err) {
         context.log.error('Re-encode error:', err);
         context.res = {
-            status: 500,
+            status: 200,
             body: { success: false, error: err.message || 'Re-encode failed' }
         };
     }
