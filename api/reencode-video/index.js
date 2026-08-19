@@ -4,6 +4,7 @@ const fs = require('fs').promises;
 const { StorageSharedKeyCredential, generateBlobSASQueryParameters, BlobSASPermissions } = require('@azure/storage-blob');
 const { checkAuthorization } = require('../shared/auth');
 const { getContainerClient } = require('../shared/storage');
+const { execute } = require('../shared/db');
 
 // Generate a short-lived read SAS URL so FFmpeg can stream from blob directly
 function generateReadSasUrl(blobClient) {
@@ -113,13 +114,26 @@ module.exports = async function (context, req) {
 
             context.log(`✓ Uploaded re-encoded video: ${foundPath}`);
 
+            // Update PBlobUrl in the database so all browsers get a fresh URL, bypassing any cached H.265
+            const newBlobUrl = `${blockBlobClient.url}?v=${Date.now()}`;
+            try {
+                await execute(
+                    `UPDATE Pictures SET PBlobUrl = @newUrl WHERE PFileName = @fileName`,
+                    { newUrl: newBlobUrl, fileName: fileName }
+                );
+                context.log(`✓ Updated PBlobUrl in database`);
+            } catch (dbErr) {
+                context.log.warn('Non-fatal: could not update PBlobUrl in DB:', dbErr.message);
+            }
+
             context.res = {
                 status: 200,
                 body: {
                     success: true,
                     message: 'Video re-encoded to H.264 successfully',
                     originalSizeMB: sizeMB,
-                    newSizeMB: (outputBuffer.length / (1024*1024)).toFixed(1)
+                    newSizeMB: (outputBuffer.length / (1024*1024)).toFixed(1),
+                    newBlobUrl
                 }
             };
         } finally {

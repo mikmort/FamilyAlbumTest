@@ -1316,7 +1316,9 @@ export default function MediaDetailModal({
                             }
                             if (data.success) {
                               setReencodeMessage('✓ Re-encoded successfully! Playing now…');
-                              const cacheBust = Date.now().toString();
+                              // Use the versioned URL returned by the API (also saved in DB for future visits)
+                              const newUrl = data.newBlobUrl;
+                              const cacheBust = newUrl ? newUrl.split('?v=')[1] : Date.now().toString();
                               localStorage.setItem(`videoCacheBust_${media.PFileName}`, cacheBust);
                               setVideoCacheBust(cacheBust);
                               setVideoError(false);
