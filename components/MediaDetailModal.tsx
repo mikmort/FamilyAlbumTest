@@ -1305,7 +1305,12 @@ export default function MediaDetailModal({
                               .map(encodeURIComponent)
                               .join('/');
                             const res = await fetch(`/api/reencode-video/${encodedPath}`, { method: 'POST' });
-                            const data = await res.json();
+                            let data: any;
+                            try {
+                              data = await res.json();
+                            } catch {
+                              throw new Error(`Server error (${res.status}): ${res.statusText || 'Backend call failure'}`);
+                            }
                             if (data.success) {
                               setReencodeMessage('✓ Re-encoded successfully! Reload to play.');
                               setVideoError(false);
