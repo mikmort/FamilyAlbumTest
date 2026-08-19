@@ -5,12 +5,10 @@ const fetch = require('node-fetch');
 
 // Detect codec by fetching only the first 64KB of the MP4 container (no ffprobe needed)
 async function detectCodec(sasUrl, timeoutMs = 10000) {
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), timeoutMs);
     try {
         const res = await fetch(sasUrl, {
             headers: { 'Range': 'bytes=0-65535' },
-            signal: controller.signal
+            timeout: timeoutMs  // node-fetch v2 native timeout (no AbortController needed)
         });
         if (!res.ok && res.status !== 206) return { codec: 'error', detail: `HTTP ${res.status}` };
         const buf = Buffer.from(await res.arrayBuffer());
@@ -22,7 +20,7 @@ async function detectCodec(sasUrl, timeoutMs = 10000) {
         if (contentLength > 65536) {
             const tailRes = await fetch(sasUrl, {
                 headers: { 'Range': `bytes=${contentLength - 65536}-` },
-                signal: controller.signal
+                timeout: timeoutMs
             });
             if (tailRes.ok || tailRes.status === 206) {
                 const tailBuf = Buffer.from(await tailRes.arrayBuffer());
@@ -32,9 +30,7 @@ async function detectCodec(sasUrl, timeoutMs = 10000) {
         }
         return { codec: 'unknown' };
     } catch (err) {
-        return { codec: 'error', detail: err.name === 'AbortError' ? 'timeout' : err.message };
-    } finally {
-        clearTimeout(timer);
+        return { codec: 'error', detail: err.type === 'request-timeout' ? 'timeout' : err.message };
     }
 }
 
