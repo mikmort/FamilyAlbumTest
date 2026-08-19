@@ -1,8 +1,24 @@
 const os = require('os');
 const path = require('path');
 const fs = require('fs').promises;
+const { StorageSharedKeyCredential, generateBlobSASQueryParameters, BlobSASPermissions } = require('@azure/storage-blob');
 const { checkAuthorization } = require('../shared/auth');
 const { getContainerClient } = require('../shared/storage');
+
+// Generate a short-lived read SAS URL so FFmpeg can stream from blob directly
+function generateReadSasUrl(blobClient) {
+    const accountName = process.env.AZURE_STORAGE_ACCOUNT;
+    const accountKey = process.env.AZURE_STORAGE_KEY;
+    const credential = new StorageSharedKeyCredential(accountName, accountKey);
+    const expiresOn = new Date(Date.now() + 30 * 60 * 1000);
+    const sasToken = generateBlobSASQueryParameters({
+        containerName: blobClient.containerName,
+        blobName: blobClient.name,
+        permissions: BlobSASPermissions.parse('r'),
+        expiresOn
+    }, credential).toString();
+    return `${blobClient.url}?${sasToken}`;
+}
 
 let ffmpeg = null;
 try {
@@ -63,29 +79,19 @@ module.exports = async function (context, req) {
         const sizeMB = (properties.contentLength / (1024 * 1024)).toFixed(1);
         context.log(`Blob size: ${sizeMB} MB`);
 
-        const downloadResponse = await blobClient.download();
-        const chunks = [];
-        for await (const chunk of downloadResponse.readableStreamBody) {
-            chunks.push(chunk);
-        }
-        const inputBuffer = Buffer.concat(chunks);
-        context.log(`Downloaded ${inputBuffer.length} bytes`);
-
-        const tempDir = os.tmpdir();
-        const inputPath = path.join(tempDir, `reencode_in_${Date.now()}.mp4`);
-        const outputPath = path.join(tempDir, `reencode_out_${Date.now()}.mp4`);
+        // Stream directly from blob URL to avoid download-to-buffer latency
+        const inputSasUrl = generateReadSasUrl(blobClient);
+        const outputPath = path.join(os.tmpdir(), `reencode_out_${Date.now()}.mp4`);
 
         try {
-            await fs.writeFile(inputPath, inputBuffer);
-
             await new Promise((resolve, reject) => {
-                ffmpeg(inputPath)
+                ffmpeg(inputSasUrl)
                     .videoCodec('libx264')
                     .audioCodec('aac')
                     .outputOptions([
                         '-movflags +faststart',
                         '-pix_fmt yuv420p',
-                        '-preset fast',
+                        '-preset ultrafast',
                         '-crf 23'
                     ])
                     .on('start', (cmd) => context.log('FFmpeg command:', cmd))
@@ -98,7 +104,7 @@ module.exports = async function (context, req) {
             });
 
             const outputBuffer = await fs.readFile(outputPath);
-            context.log(`Re-encoded: ${inputBuffer.length} -> ${outputBuffer.length} bytes`);
+            context.log(`Re-encoded: ${sizeMB} MB input -> ${(outputBuffer.length / (1024*1024)).toFixed(1)} MB output`);
 
             const blockBlobClient = containerClient.getBlockBlobClient(foundPath);
             await blockBlobClient.uploadData(outputBuffer, {
@@ -112,12 +118,11 @@ module.exports = async function (context, req) {
                 body: {
                     success: true,
                     message: 'Video re-encoded to H.264 successfully',
-                    originalSize: inputBuffer.length,
-                    newSize: outputBuffer.length
+                    originalSizeMB: sizeMB,
+                    newSizeMB: (outputBuffer.length / (1024*1024)).toFixed(1)
                 }
             };
         } finally {
-            await fs.unlink(inputPath).catch(() => {});
             await fs.unlink(outputPath).catch(() => {});
         }
     }
