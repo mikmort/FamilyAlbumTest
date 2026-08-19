@@ -172,7 +172,8 @@ export default function MediaDetailModal({
     setVideoError(false);
     setReencoding(false);
     setReencodeMessage(null);
-    setVideoCacheBust('');
+    // Restore any persisted cache-bust (survives page reload)
+    setVideoCacheBust(localStorage.getItem(`videoCacheBust_${media.PFileName}`) || '');
     setImageError(false);
     setRetryCount(0);
     setIsRetrying(false);
@@ -1315,7 +1316,9 @@ export default function MediaDetailModal({
                             }
                             if (data.success) {
                               setReencodeMessage('✓ Re-encoded successfully! Playing now…');
-                              setVideoCacheBust(Date.now().toString());
+                              const cacheBust = Date.now().toString();
+                              localStorage.setItem(`videoCacheBust_${media.PFileName}`, cacheBust);
+                              setVideoCacheBust(cacheBust);
                               setVideoError(false);
                             } else {
                               setReencodeMessage(`Error: ${data.error}`);
