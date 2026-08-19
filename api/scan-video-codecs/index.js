@@ -9,8 +9,12 @@ try {
     const ffmpegPath = require('@ffmpeg-installer/ffmpeg').path;
     ffmpeg.setFfmpegPath(ffmpegPath);
 } catch (err) {
-    console.warn('FFmpeg not available:', err.message);
+    // fluent-ffmpeg is optional — scan will report unavailable if missing
 }
+
+module.exports = async function (context, req) {
+    context.res = { status: 200, body: { alive: true } };
+};
 
 function generateReadSasUrl(blobClient) {
     const accountName = process.env.AZURE_STORAGE_ACCOUNT;
