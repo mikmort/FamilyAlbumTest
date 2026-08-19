@@ -16,6 +16,7 @@ try {
 module.exports = async function (context, req) {
     context.log('Re-encode video function triggered');
 
+    try {
     const { authorized, error } = await checkAuthorization(context, 'Full');
     if (!authorized) {
         context.res = { status: 403, body: { error } };
@@ -29,14 +30,14 @@ module.exports = async function (context, req) {
 
     const rawFileName = req.params.fileName;
     if (!rawFileName) {
-        context.res = { status: 400, body: { error: 'fileName parameter is required' } };
+        context.res = { status: 200, body: { success: false, error: 'fileName parameter is required' } };
         return;
     }
 
     const fileName = decodeURIComponent(rawFileName).replace(/\\/g, '/');
     context.log(`Re-encoding video: ${fileName}`);
 
-    try {
+    {
         const containerClient = getContainerClient();
 
         const pathsToTry = [fileName, `media/${fileName}`];
@@ -119,6 +120,7 @@ module.exports = async function (context, req) {
             await fs.unlink(inputPath).catch(() => {});
             await fs.unlink(outputPath).catch(() => {});
         }
+    }
     } catch (err) {
         context.log.error('Re-encode error:', err);
         context.res = {
