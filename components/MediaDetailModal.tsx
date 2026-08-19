@@ -172,8 +172,7 @@ export default function MediaDetailModal({
     setVideoError(false);
     setReencoding(false);
     setReencodeMessage(null);
-    // Restore any persisted cache-bust (survives page reload)
-    setVideoCacheBust(localStorage.getItem(`videoCacheBust_${media.PFileName}`) || '');
+    setVideoCacheBust('');
     setImageError(false);
     setRetryCount(0);
     setIsRetrying(false);
@@ -1019,7 +1018,7 @@ export default function MediaDetailModal({
           ) : (
             <video 
               controls 
-              src={media.PBlobUrl + (videoCacheBust ? `?v=${videoCacheBust}` : '')}
+              src={media.PBlobUrl + (videoCacheBust ? (media.PBlobUrl.includes('?') ? `&v=${videoCacheBust}` : `?v=${videoCacheBust}`) : '')}
               className="fullscreen-video"
               autoPlay
               onLoadedData={() => setIsLoadingMedia(false)}
@@ -1316,10 +1315,7 @@ export default function MediaDetailModal({
                             }
                             if (data.success) {
                               setReencodeMessage('✓ Re-encoded successfully! Playing now…');
-                              // Use the versioned URL returned by the API (also saved in DB for future visits)
-                              const newUrl = data.newBlobUrl;
-                              const cacheBust = newUrl ? newUrl.split('?v=')[1] : Date.now().toString();
-                              localStorage.setItem(`videoCacheBust_${media.PFileName}`, cacheBust);
+                              const cacheBust = (data.newBlobUrl || '').split('?v=')[1] || Date.now().toString();
                               setVideoCacheBust(cacheBust);
                               setVideoError(false);
                             } else {
@@ -1381,7 +1377,7 @@ export default function MediaDetailModal({
                       controls 
                       autoPlay
                       preload="metadata"
-                      src={media.PBlobUrl + (videoCacheBust ? `?v=${videoCacheBust}` : '')}
+                      src={media.PBlobUrl + (videoCacheBust ? (media.PBlobUrl.includes('?') ? `&v=${videoCacheBust}` : `?v=${videoCacheBust}`) : '')}
                       onClick={() => setIsFullScreen(true)}
                       style={{ cursor: 'pointer', width: '100%' }}
                       onError={(e) => {
