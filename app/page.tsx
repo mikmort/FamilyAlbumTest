@@ -419,7 +419,7 @@ export default function Home() {
             <button className="btn btn-secondary mb-2" onClick={handleBack}>
               ← Back
             </button>
-            <ProcessNewFiles />
+            <ProcessNewFiles isAdmin={isAdmin} />
           </>
         )}
 

@@ -40,12 +40,18 @@ interface FaceSuggestion {
   faceIndex: number; // which face in the image (0, 1, 2...)
 }
 
-export default function ProcessNewFiles() {
+interface ProcessNewFilesProps {
+  isAdmin?: boolean;
+}
+
+export default function ProcessNewFiles({ isAdmin = false }: ProcessNewFilesProps) {
+  // null = not yet decided; true = process all; false = process own only
+  const [processAll, setProcessAll] = useState<boolean | null>(isAdmin ? null : false);
   const [currentFile, setCurrentFile] = useState<UnindexedFile | null>(null);
   const [allFiles, setAllFiles] = useState<UnindexedFile[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [remainingCount, setRemainingCount] = useState(0);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(!isAdmin);
   const [error, setError] = useState('');
   const [processing, setProcessing] = useState(false);
 
@@ -125,11 +131,12 @@ export default function ProcessNewFiles() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // Load next file on mount and after processing
+  // Load next file on mount and after processing (only once scope is decided)
   useEffect(() => {
+    if (processAll === null) return;
     loadAllFiles();
     loadRemainingCount();
-  }, []);
+  }, [processAll]);
 
   // Update current file when index changes
   useEffect(() => {
@@ -295,7 +302,8 @@ export default function ProcessNewFiles() {
     setLoading(true);
     setError('');
     try {
-      const res = await fetch('/api/unindexed/list');
+      const url = processAll ? '/api/unindexed/list?all=true' : '/api/unindexed/list';
+      const res = await fetch(url);
       const data = await res.json();
       
       if (data.success) {
@@ -351,7 +359,8 @@ export default function ProcessNewFiles() {
 
   const loadRemainingCount = async () => {
     try {
-      const res = await fetch('/api/unindexed/count');
+      const url = processAll ? '/api/unindexed/count?all=true' : '/api/unindexed/count';
+      const res = await fetch(url);
       const data = await res.json();
       if (data.success) {
         setRemainingCount(data.count);
@@ -649,6 +658,72 @@ export default function ProcessNewFiles() {
       .map(p => p.neName)
       .join(', ');
   };
+
+  if (processAll === null) {
+    return (
+      <div className="process-container">
+        <div style={{
+          background: 'white',
+          borderRadius: '12px',
+          padding: '2rem',
+          maxWidth: '480px',
+          margin: '3rem auto',
+          boxShadow: '0 4px 24px rgba(0,0,0,0.12)',
+          textAlign: 'center'
+        }}>
+          <div style={{ fontSize: '2.5rem', marginBottom: '1rem' }}>📁</div>
+          <h2 style={{ marginBottom: '0.5rem', color: '#2c3e50' }}>Process New Files</h2>
+          <p style={{ color: '#666', marginBottom: '2rem' }}>
+            As an Admin, you can process all unindexed files or only the files you uploaded.
+          </p>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+            <button
+              onClick={() => setProcessAll(true)}
+              style={{
+                backgroundColor: '#dc3545',
+                color: 'white',
+                border: 'none',
+                padding: '1rem 1.5rem',
+                borderRadius: '8px',
+                fontSize: '1rem',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.75rem',
+              }}
+            >
+              <span style={{ fontSize: '1.4rem' }}>🗂️</span>
+              <div style={{ textAlign: 'left' }}>
+                <div style={{ fontWeight: 'bold' }}>Process All Unindexed Files</div>
+                <div style={{ fontSize: '0.85rem', opacity: 0.9 }}>Review files uploaded by all users</div>
+              </div>
+            </button>
+            <button
+              onClick={() => setProcessAll(false)}
+              style={{
+                backgroundColor: '#3498db',
+                color: 'white',
+                border: 'none',
+                padding: '1rem 1.5rem',
+                borderRadius: '8px',
+                fontSize: '1rem',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.75rem',
+              }}
+            >
+              <span style={{ fontSize: '1.4rem' }}>👤</span>
+              <div style={{ textAlign: 'left' }}>
+                <div style={{ fontWeight: 'bold' }}>Process My Files Only</div>
+                <div style={{ fontSize: '0.85rem', opacity: 0.9 }}>Review only files you uploaded</div>
+              </div>
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   if (loading) {
     return (

@@ -28,11 +28,14 @@ module.exports = async function (context, req) {
   }
 
   try {
-    // GET /api/unindexed or /api/unindexed/list - List all unindexed files for current user
+    const userEmail = authResult.user?.Email;  // Capital E from database
+    const userRole = authResult.user?.role || authResult.user?.Role;
+    const isAdmin = userRole === 'Admin';
+    const allFiles = isAdmin && req.query?.all === 'true';
+
+    // GET /api/unindexed or /api/unindexed/list - List unindexed files
     if (method === 'GET' && (action === 'list' || !action)) {
-      const userEmail = authResult.user?.Email;  // Capital E from database
-      
-      context.log(`📋 Querying unindexed files for user: ${userEmail}`);
+      context.log(`📋 Querying unindexed files for user: ${userEmail}, allFiles: ${allFiles}`);
       
       // Debug: Check what's actually in the database
       const debugResult = await query(`
@@ -59,11 +62,11 @@ module.exports = async function (context, req) {
           uiYear,
           uiUploadedBy
         FROM UnindexedFiles
-        WHERE uiStatus = 'N' AND uiUploadedBy = @userEmail
+        WHERE uiStatus = 'N'${allFiles ? '' : ' AND uiUploadedBy = @userEmail'}
         ORDER BY uiDateAdded ASC
-      `, { userEmail });
+      `, allFiles ? {} : { userEmail });
 
-      context.log(`📋 Found ${result.length} unindexed files for user: ${userEmail}`);
+      context.log(`📋 Found ${result.length} unindexed files`);
 
       context.res = {
         status: 200,
@@ -75,15 +78,13 @@ module.exports = async function (context, req) {
       return;
     }
 
-    // GET /api/unindexed/count - Get count of unindexed files for current user
+    // GET /api/unindexed/count - Get count of unindexed files
     if (method === 'GET' && action === 'count') {
-      const userEmail = authResult.user?.Email;  // Capital E from database
-      
       const result = await query(`
         SELECT COUNT(*) as count
         FROM UnindexedFiles
-        WHERE uiStatus = 'N' AND uiUploadedBy = @userEmail
-      `, { userEmail });
+        WHERE uiStatus = 'N'${allFiles ? '' : ' AND uiUploadedBy = @userEmail'}
+      `, allFiles ? {} : { userEmail });
 
       context.res = {
         status: 200,
@@ -95,9 +96,8 @@ module.exports = async function (context, req) {
       return;
     }
 
-    // GET /api/unindexed/next - Get next unindexed file to process for current user
+    // GET /api/unindexed/next - Get next unindexed file to process
     if (method === 'GET' && action === 'next') {
-      const userEmail = authResult.user?.Email;  // Capital E from database
       
       const result = await query(`
         SELECT TOP 1
@@ -116,9 +116,9 @@ module.exports = async function (context, req) {
           uiYear,
           uiUploadedBy
         FROM UnindexedFiles
-        WHERE uiStatus = 'N' AND uiUploadedBy = @userEmail
+        WHERE uiStatus = 'N'${allFiles ? '' : ' AND uiUploadedBy = @userEmail'}
         ORDER BY uiDateAdded ASC
-      `, { userEmail });
+      `, allFiles ? {} : { userEmail });
 
       if (result.length === 0) {
         context.res = {
